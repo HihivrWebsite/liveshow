@@ -116,7 +116,7 @@ def index():
                         if (!data.error && data.status === '向阳Hihi开始直播了，快来快来') {
                             linkElement.className = 'live';
                             document.getElementById('live-title').textContent = `直播间名称: ${data.title}`;
-                            document.getElementById('live-online').textContent = `当前同接: ${data.online}`;
+
                             document.getElementById('live-details').style.display = 'block';
                             document.getElementById('admin-contact').style.display = 'none';
                         } else {
@@ -141,3 +141,4 @@ def index():
 
 if __name__ == "__main__":
     app.run(port=31368)  # 使用Flask内置的服务器运行应用
+                              # document.getElementById('live-online').textContent = `当前同接: ${data.online}`;
