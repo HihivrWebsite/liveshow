@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>直播状态</title>
+    <script>
+        function checkLiveStatus() {
+            fetch('http://localhost:31368')
+                .then(response => response.text())
+                .then(status => {
+                    document.getElementById('live-status').innerText = status;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+        setInterval(checkLiveStatus, 5000); // 每5秒检查一次直播状态
+    </script>
+</head>
+<body onload="checkLiveStatus()">
+    <h1>直播状态</h1>
+    <p id="live-status">检测中...</p>
+</body>
+</html>
