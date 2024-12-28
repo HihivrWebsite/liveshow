@@ -23,7 +23,7 @@ To get the application running on your local machine, follow these steps:
 Once the installation is complete, you can start the Flask application:
 
 ```bash
-python user_info.py
+python live_info.py
 ```
 
 The application will start running on `http://localhost:31368` by default. You can access the web interface and API endpoints from there.
