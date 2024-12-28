@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string
+from flask import Flask, jsonify, render_template_string
 import requests
 
 app = Flask(__name__)
@@ -23,7 +23,7 @@ def get_live_status(room_id):
         data = response.json()
         if 'data' in data and 'live_status' in data['data']:
             return {
-                'status': '直播中' if data['data']['live_status'] == 1 else '未直播',
+                'status': '向阳Hihi开始直播了，快来快来' if data['data']['live_status'] == 1 else '向阳Hihi还没有直播哦，请看主播的动态查看何时直播，没说的话一般是晚上十点直播哦',
                 'color': '#d4edda' if data['data']['live_status'] == 1 else '#f8f9fa',  # 绿色或浅灰色
                 'error': False
             }
@@ -33,56 +33,78 @@ def get_live_status(room_id):
         print(f"Error fetching live status: {e}")
         return {'status': '无法获取直播状态', 'color': '#ffcccc', 'error': True}  # 错误时红色
 
-@app.route('/')
-def index():
+@app.route('/api/status')
+def api_status():
     room_id = 31368680  # 替换为实际的直播间ID
     status_info = get_live_status(room_id)
-    
-    html_content = f"""
+    return jsonify(status_info)
+
+@app.route('/')
+def index():
+    html_content = """
     <!DOCTYPE html>
     <html lang="zh-cn">
     <head>
         <meta charset="UTF-8">
-        <title>直播状态</title>
+        <title>向阳Hihi直播状态</title>
         <style>
-            body {{
-                background-color: {status_info['color']};
+            body {
                 transition: background-color 0.5s;
                 font-family: Arial, sans-serif;
-            }}
-            .container {{
+            }
+            .container {
                 text-align: center;
                 margin-top: 20%;
-            }}
-            h1, p {{
+            }
+            h1, p {
                 text-align: center;
-            }}
-            a {{
+            }
+            a {
                 display: inline-block;
                 margin-top: 20px;
                 padding: 10px 20px;
-                background-color: #{'FFC633' if not status_info['error'] else 'transparent'}; /* 按钮背景颜色 */
+                background-color: #FFC633; /* 按钮背景颜色 */
                 color: white;
                 text-decoration: none;
                 border-radius: 5px;
                 font-weight: bold;
-            }}
-            a:hover {{
-                background-color: #{'E6B22D' if not status_info['error'] else 'transparent'}; /* 鼠标悬停时的颜色 */
-            }}
-            .error {{
+            }
+            a:hover {
+                background-color: #E6B22D; /* 鼠标悬停时的颜色 */
+            }
+            .error {
                 color: red;
                 font-weight: bold;
-            }}
+            }
         </style>
     </head>
-    <body>
+    <body id="live-status-body">
         <div class="container">
-            <h1>直播状态</h1>
-            <p>{status_info['status']}</p>
-            {'<a href="https://live.bilibili.com/31368680">点击进入向阳Hihi直播间</a>' if not status_info['error'] else ''}
-            {'<p class="error">联系管理员 <a href="mailto:pma2138@outlook.com">pma2138@outlook.com</a></p>' if status_info['error'] else ''}
+            <h1 id="live-status-title">最可爱的向阳Hihi直播状态</h1>
+            <p id="live-status-text"></p>
+            <a href="https://live.bilibili.com/31368680" id="live-status-link" target="_blank">点击进入向阳Hihi直播间</a>
+            <p id="admin-contact" class="error" style="display:none;">联系管理员 <a href="mailto:pma2138@outlook.com">pma2138@outlook.com</a></p>
         </div>
+
+        <script>
+            function updateLiveStatus() {
+                fetch('/api/status')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('live-status-body').style.backgroundColor = data.color;
+                        document.getElementById('live-status-text').textContent = data.status;
+                        document.getElementById('live-status-link').style.display = data.error ? 'none' : 'inline-block';
+                        document.getElementById('admin-contact').style.display = data.error ? 'block' : 'none';
+                    })
+                    .catch(error => console.error('Error updating live status:', error));
+            }
+
+            // 初次加载页面时更新状态
+            window.onload = updateLiveStatus;
+
+            // 每隔一分钟更新一次直播状态
+            setInterval(updateLiveStatus, 60000);
+        </script>
     </body>
     </html>
     """
