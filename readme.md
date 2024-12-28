@@ -4,7 +4,7 @@ To get the application running on your local machine, follow these steps:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/********
+   git clone https://github.com/HihivrWebsite/liveshow.git
    ```
 
 2. **Create a virtual environment (optional but recommended):**
