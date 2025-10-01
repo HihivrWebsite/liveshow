@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VR斗虫榜_https://hihivr.top</title>
+    <title>{{ title }}_https://hihivr.top</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -129,7 +129,7 @@
         <a href="https://smms.app/image/Q2i7IUqjMDb3pev" target="_blank">
             <img src="https://s2.loli.net/2024/11/16/Q2i7IUqjMDb3pev.png" alt="hihi.png" style="height: 200px; margin-left: 10px;">
         </a>
-        <h1>VR斗虫榜_https:斜杠hihivr点top</h1>
+        <h1>{{ title }}_https:斜杠hihivr点top</h1>
 		
         <button onclick="window.open('https://hihivr.top', '_blank')">进入向阳Hihi粉丝站主站</button>
     </header>
@@ -139,7 +139,7 @@
 		
         <button onclick="window.open('https://space.bilibili.com/1048135385', '_blank')">关注花礼harei喵，关注花礼harei谢谢喵</button>
     </header>
-    <h2 style="display: none;">VR斗虫榜</h2>
+    <h2 style="display: none;">{{ title }}</h2>
     <h2>{{ title }}</h2>
     <p>刷新时间：{{ refresh_time }}</p>
     <div style="text-align: center; margin: 10px 0;">
@@ -222,7 +222,9 @@
             return;
         }
 
-        window.location.href = `/by_month?month=${safeYear}${safeMonth}`;
+        const currentUrl = new URL(window.location.href);
+        const currentFilter = currentUrl.searchParams.get('filter') || 'all';
+        window.location.href = `/by_month?month=${safeYear}${safeMonth}&filter=${currentFilter}`;
     }
     
     function switchFilter(filterType) {

@@ -156,16 +156,42 @@ logging.basicConfig(level=logging.DEBUG)
 # 添加详细调试日志，检查 total_revenue 的值和类型
 @app.route('/by_month')
 async def by_month():
-    # 获取年月参数
+    # 获取年月参数和过滤参数
     month = request.args.get('month', datetime.now().strftime('%Y%m'))
-    api_url = f"https://vr.qianqiuzy.cn/gift/by_month?month={month}"
+    filter_type = request.args.get('filter', 'all')  # all, vr, psp
+    
+    all_data = []
+    
     try:
-        data = await fetch_data(api_url)
+        # 获取VR数据
+        if filter_type in ['all', 'vr']:
+            vr_api_url = f"https://vr.qianqiuzy.cn/gift/by_month?month={month}"
+            vr_data = await fetch_data(vr_api_url)
+            for item in vr_data:
+                item['union'] = 'VirtuaReal'  # 添加工会字段
+            all_data.extend(vr_data)
     except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-        app.logger.error(f"API请求失败: {str(e)}")
-        return render_template('error.html', error_message="无法获取以往数据"), 500
+        app.logger.error(f"VR API请求失败: {str(e)}")
+        if filter_type == 'vr':
+            return render_template('error.html', error_message="无法获取VR主播数据"), 500
+    
+    try:
+        # 获取PSP数据
+        if filter_type in ['all', 'psp']:
+            psp_api_url = f"https://psp.qianqiuzy.cn/gift/by_month?month={month}"
+            psp_data = await fetch_data(psp_api_url)
+            for item in psp_data:
+                item['union'] = 'PSPlive'  # 添加工会字段
+            all_data.extend(psp_data)
+    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        app.logger.error(f"PSP API请求失败: {str(e)}")
+        if filter_type == 'psp':
+            return render_template('error.html', error_message="无法获取PSP主播数据"), 500
+    
+    if not all_data:
+        return render_template('error.html', error_message="无法获取主播数据"), 500
 
-    for item in data:
+    for item in all_data:
         try:
             # 确保所有字段都能正确转换为 Decimal 类型
             gift = Decimal(str(item.get('gift', 0)))
@@ -179,11 +205,11 @@ async def by_month():
             item['total_revenue'] = Decimal(0)
 
     # 调试：打印排序前的数据到终端
-    logging.debug(f"排序前的数据: {data}")
+    logging.debug(f"排序前的数据: {all_data}")
 
     # 确保排序时使用 Decimal 类型
     sorted_data = sorted(
-        data,
+        all_data,
         key=lambda x: x['total_revenue'],
         reverse=True
     )
@@ -191,7 +217,15 @@ async def by_month():
     # 调试：打印排序后的数据到终端
     logging.debug(f"排序后的数据: {sorted_data}")
 
-    return render_template('index.html', anchors=sorted_data, title=f"{month[:4]}年{int(month[4:]):02d}月记录数据", refresh_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    # 设置标题
+    if filter_type == 'vr':
+        title = f"维阿斗虫榜_{month[:4]}年{int(month[4:]):02d}月记录数据"
+    elif filter_type == 'psp':
+        title = f"PSPlive斗虫榜_{month[:4]}年{int(month[4:]):02d}月记录数据"
+    else:
+        title = f"维阿PSP斗虫榜_{month[:4]}年{int(month[4:]):02d}月记录数据"
+
+    return render_template('index.html', anchors=sorted_data, title=title, refresh_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'), current_filter=filter_type)
 
 # 替换 before_first_request，确保事件循环在应用启动时正确设置
 @app.before_request
