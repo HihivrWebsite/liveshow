@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VR斗虫榜_https://hihivr.top</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #FFF8E1;
+            color: #333;
+            animation: fadeIn 1s ease-in;
+        }
+        h1, h2 {
+            font-family: 'Arial', sans-serif;
+            color: #FFC633;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            text-align: center;
+            color: #FFC633;
+            font-size: 2.5em;
+            animation: slideIn 1s ease-in-out;
+        }
+        h1 a {
+            text-decoration: none;
+            color: #FFC633;
+        }
+        h1 a:hover {
+            text-decoration: underline;
+        }
+        h2 {
+            text-align: center;
+            color: #FFC633;
+            font-size: 1.8em;
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #FFC633;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 1.5s ease-in;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #FFC633;
+            color: #fff;
+            font-size: 1.1em;
+        }
+        td {
+            font-size: 0.95em;
+        }
+        tr:nth-child(even) {
+            background-color: #FFF3D1;
+        }
+        tr:hover {
+            background-color: #FFE8A1;
+            transition: background-color 0.3s ease;
+        }
+        .live {
+            color: #fff;
+            background-color: #33CC99;
+            font-weight: bold;
+            border-radius: 5px;
+            padding: 5px;
+            animation: pulse 1.5s infinite;
+        }
+        button {
+            background-color: #33CC99;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        button:hover {
+            background-color: #28a745;
+            transform: scale(1.05);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes pulse {
+            0% { background-color: #33CC99; }
+            50% { background-color: #66FFCC; }
+            100% { background-color: #33CC99; }
+        }
+        header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        header img {
+            height: 50px;
+            margin: 0 10px;
+        }
+        header h1 {
+            text-align: center;
+            font-size: 3em;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="https://smms.app/image/BvHWJNoL2iscPXl" target="_blank">
+            <img src="https://s2.loli.net/2024/11/16/BvHWJNoL2iscPXl.png" alt="h222.png" style="height: 200px; margin-right: 10px;">
+        </a>
+        <a href="https://smms.app/image/Q2i7IUqjMDb3pev" target="_blank">
+            <img src="https://s2.loli.net/2024/11/16/Q2i7IUqjMDb3pev.png" alt="hihi.png" style="height: 200px; margin-left: 10px;">
+        </a>
+        <h1>VR斗虫榜_https:斜杠hihivr点top</h1>
+		
+        <button onclick="window.open('https://hihivr.top', '_blank')">进入向阳Hihi粉丝站主站</button>
+    </header>
+	    <header>
+      
+        <h1>特别感谢某热心小礼猫-千秋紫莹提供的斗虫数据API，感谢其对本项目提供了巨大的帮助</h1>
+		
+        <button onclick="window.open('https://space.bilibili.com/1048135385', '_blank')">关注花礼harei喵，关注花礼harei谢谢喵</button>
+    </header>
+    <h2 style="display: none;">VR斗虫榜</h2>
+    <h2>{{ title }}</h2>
+    <p>刷新时间：{{ refresh_time }}</p>
+    <div style="text-align: center; margin: 10px 0;">
+        <button onclick="switchFilter('all')" {% if current_filter == 'all' %}style="background-color: #28a745;"{% endif %}>维阿PSP斗虫榜</button>
+        <button onclick="switchFilter('vr')" {% if current_filter == 'vr' %}style="background-color: #28a745;"{% endif %}>维阿斗虫榜</button>
+        <button onclick="switchFilter('psp')" {% if current_filter == 'psp' %}style="background-color: #28a745;"{% endif %}>PSPlive斗虫榜</button>
+    </div>
+    <button onclick="openMonthSelector()">切换不同月份</button>
+    <table>
+        <thead>
+            <tr>
+                <th>排名</th>
+                <th>主播名称</th>
+                <th>工会</th>
+                <th>关注数</th>
+                <th>有效天</th>
+                <th>开播时长</th>
+                <th>开播状态</th>
+                <th>礼物收入</th>
+                <th>舰长收入</th>
+                <th>SC收入</th>
+                <th>总营收</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for anchor in anchors %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ anchor.anchor_name }}</td>
+                <td>{{ anchor.union }}</td>
+                <td>{{ anchor.attention }}</td>
+                <td>{{ anchor.effective_days }}</td>
+                <td>{{ anchor.live_duration }}</td>
+                <td class="{{ 'live' if anchor.status == 1 else '' }}">{{ "正在直播" if anchor.status == 1 else "未开播" }}</td>
+                <td>{{ anchor.gift }}</td>
+                <td>{{ anchor.guard }}</td>
+                <td>{{ anchor.super_chat }}</td>
+                <td>{{ (anchor.gift|float + anchor.guard|float + anchor.super_chat|float)|round(2) }}</td>
+                <td>
+                    <button onclick="location.href='/live_sessions?room_id={{ anchor.room_id }}&union={{ anchor.union }}&month={{ anchor.month }}'">查看详细数据</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+<script async>
+    function openMonthSelector() {
+        let year = prompt("请输入年份 (例如: 2025):");
+        let month = prompt("请输入月份 (例如: 09):");
+
+        // 基础输入检查
+        if (!year || !month) {
+            alert("请输入有效的年份和月份！");
+            return;
+        }
+
+        // 清理输入空格
+        year = year.trim();
+        month = month.trim();
+
+        // 严格格式验证
+        if (!/^\d{4}$/.test(year)) {
+            alert("年份必须为4位纯数字（2000-2099），例如：2025");
+            return;
+        }
+        
+        if (!/^(0[1-9]|1[0-2])$/.test(month)) {
+            alert("月份必须为01-12之间的2位数字，例如：09");
+            return;
+        }
+
+        // 安全URL构造
+        const safeYear = encodeURIComponent(year);
+        const safeMonth = encodeURIComponent(month);
+        
+        // 额外验证组合日期有效性（防止202513等无效组合）
+        if (parseInt(month) > 12) {
+            alert("请输入有效的月份（01-12）");
+            return;
+        }
+
+        window.location.href = `/by_month?month=${safeYear}${safeMonth}`;
+    }
+    
+    function switchFilter(filterType) {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('filter', filterType);
+        window.location.href = currentUrl.toString();
+    }
+</script>
+</body>
+</html>
