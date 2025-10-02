@@ -121,6 +121,7 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@3.0.0"></script>
     <script src="/static/wasm_calculator.js"></script>
 </head>
 <body>
@@ -172,6 +173,16 @@
         <button onclick="showVRPSPComparison()" id="comparisonButton" style="display: none; background-color: #FFC633; color: #333;" title="VR与PSP工会数据对比（使用WASM高精度计算）">VR PSP对比图（WASM）</button>
         <button onclick="hideAllCharts()">关闭图表</button>
     </div>
+    <div class="chart-info" style="background-color: #E8F5E9; border: 2px solid #FFC633; border-radius: 10px; padding: 15px; margin: 20px 0; text-align: center;">
+        <h3 style="color: #FFC633; margin-top: 0;">📊 图表交互说明</h3>
+        <p><strong>图表功能：</strong></p>
+        <ul style="text-align: left; display: inline-block;">
+            <li>点击图例可以隐藏/显示对应的数据显示</li>
+            <li>鼠标悬停在饼图块上可以查看详细数值和百分比</li>
+            <li>图表支持缩放和拖拽（如果浏览器支持）</li>
+            <li>双击图表可以重置缩放</li>
+        </ul>
+    </div>
     <div id="chartContainer" style="display: none; text-align: center; margin: 20px 0;">
         <canvas id="chartCanvas" width="800" height="600"></canvas>
     </div>
@@ -182,7 +193,7 @@
         <button onclick="switchFilter('psp')" {% if current_filter == 'psp' %}style="background-color: #28a745;"{% endif %}>PSPlive斗虫榜</button>
     </div>
     <div style="text-align: center; margin: 10px 0;">
-        <button onclick="openMonthSelector()">切换不同月份</button>
+        <button onclick="openMonthSelector()">切换不同月份（下面“开播状态”显示“正在直播”的点击可以跳转到对应直播间）</button>
     </div>
     <table>
         <thead>
@@ -210,7 +221,13 @@
                 <td>{{ anchor.attention }}</td>
                 <td>{{ anchor.effective_days }}</td>
                 <td>{{ anchor.live_duration }}</td>
-                <td class="{{ 'live' if anchor.status == 1 else '' }}">{{ "正在直播" if anchor.status == 1 else "未开播" }}</td>
+                <td class="{{ 'live' if anchor.status == 1 else '' }}">
+                    {% if anchor.status == 1 %}
+                        <a href="https://live.bilibili.com/{{ anchor.room_id }}" target="_blank" style="color: white; text-decoration: underline;" title="点击跳转到 {{ anchor.anchor_name }} 的 Bilibili 直播间">正在直播</a>
+                    {% else %}
+                        未开播
+                    {% endif %}
+                </td>
                 <td>{{ anchor.gift }}</td>
                 <td>{{ anchor.guard }}</td>
                 <td>{{ anchor.super_chat }}</td>
@@ -333,7 +350,29 @@
                         text: '主播营收占比'
                     },
                     legend: {
-                        position: 'right',
+                        position: 'right'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${context.label}: ${value.toFixed(2)} (${percentage}%)`;
+                            }
+                        }
+                    },
+                    datalabels: {
+                        formatter: (value, ctx) => {
+                            const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${ctx.chart.data.labels[ctx.dataIndex]}\n${value.toFixed(2)} (${percentage}%)`;
+                        },
+                        color: '#fff',
+                        font: {
+                            weight: 'bold',
+                            size: 12
+                        }
                     }
                 }
             }
@@ -407,7 +446,28 @@
                         text: 'VR vs PSP 总营收对比'
                     },
                     legend: {
-                        position: 'right',
+                        position: 'right'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${context.label}: ${value.toFixed(2)} (${percentage}%)`;
+                            }
+                        }
+                    },
+                    datalabels: {
+                        formatter: (value, ctx) => {
+                            const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${ctx.chart.data.labels[ctx.dataIndex]}\n${value.toFixed(2)} (${percentage}%)`;
+                        },
+                        color: '#fff',
+                        font: {
+                            weight: 'bold'
+                        }
                     }
                 }
             }

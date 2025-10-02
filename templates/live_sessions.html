@@ -129,7 +129,17 @@
         <button onclick="showSessionChart()">显示直播数据折线图</button>
         <button onclick="hideChart()">关闭图表</button>
         <button onclick="window.history.back()">返回</button>
-        <button onclick="location.href='/'">返回普通模式</button>
+        <button onclick="window.open('https://live.bilibili.com/{{ room_id }}', '_blank')">跳转到直播间</button>
+    </div>
+    <div class="chart-info" style="background-color: #E8F5E9; border: 2px solid #FFC633; border-radius: 10px; padding: 15px; margin: 20px 0; text-align: center;">
+        <h3 style="color: #FFC633; margin-top: 0;">📊 图表交互说明</h3>
+        <p><strong>图表功能：</strong></p>
+        <ul style="text-align: left; display: inline-block;">
+            <li>点击图例可以隐藏/显示对应的数据显示</li>
+            <li>鼠标悬停在数据点上可以查看详细数值</li>
+            <li>图表支持缩放和拖拽（如果浏览器支持）</li>
+            <li>双击图表可以重置缩放</li>
+        </ul>
     </div>
     <div id="chartContainer" style="display: none; text-align: center; margin: 20px 0;">
         <canvas id="chartCanvas" width="800" height="600"></canvas>
@@ -144,21 +154,26 @@
             <tr>
                 <th>开始时间</th>
                 <th>结束时间</th>
-                <th>礼物收入</th>
-                <th>舰长收入</th>
-                <th>SC收入</th>
+                <th>直播时长（分钟）</th>
+                <th>礼物收入<br>(占比%)</th>
+                <th>舰长收入<br>(占比%)</th>
+                <th>SC收入<br>(占比%)</th>
                 <th>总营收</th>
                 <th>标题</th>
             </tr>
         </thead>
         <tbody>
             {% for session in sessions %}
+            {% set gift_pct = session.total_revenue > 0 and (session.gift|float / session.total_revenue * 100)|round(1) or 0 %}
+            {% set guard_pct = session.total_revenue > 0 and (session.guard|float / session.total_revenue * 100)|round(1) or 0 %}
+            {% set super_chat_pct = session.total_revenue > 0 and (session.super_chat|float / session.total_revenue * 100)|round(1) or 0 %}
             <tr>
                 <td>{{ session.start_time }}</td>
                 <td>{{ session.end_time }}</td>
-                <td>{{ session.gift }}</td>
-                <td>{{ session.guard }}</td>
-                <td>{{ session.super_chat }}</td>
+                <td>{{ session.duration_minutes }}</td>
+                <td>{{ session.gift }}<br>({{ gift_pct }}%)</td>
+                <td>{{ session.guard }}<br>({{ guard_pct }}%)</td>
+                <td>{{ session.super_chat }}<br>({{ super_chat_pct }}%)</td>
                 <td>{{ session.total_revenue }}</td>
                 <td>{{ session.title }}</td>
             </tr>
@@ -219,17 +234,14 @@
             rows.forEach(row => {
                 const startTime = row.cells[0].textContent;
                 const endTime = row.cells[1].textContent;
-                const gift = parseFloat(row.cells[2].textContent) || 0;
-                const guard = parseFloat(row.cells[3].textContent) || 0;
-                const superChat = parseFloat(row.cells[4].textContent) || 0;
-                const totalRevenue = parseFloat(row.cells[5].textContent) || 0;
+                const durationMinutes = parseFloat(row.cells[2].textContent) || 0;
+                const gift = parseFloat(row.cells[3].textContent) || 0;
+                const guard = parseFloat(row.cells[4].textContent) || 0;
+                const superChat = parseFloat(row.cells[5].textContent) || 0;
+                const totalRevenue = parseFloat(row.cells[6].textContent) || 0;
                 
-                // 计算直播时长（简化处理，只取小时部分）
-                let duration = 0;
-                if (startTime && endTime && startTime !== '0000-00-00 00:00:00' && endTime !== '0000-00-00 00:00:00') {
-                    // 这里简化处理，实际应用中需要更精确的时长计算
-                    duration = 1; // 假设每场直播时长为1单位
-                }
+                // 使用表格中实际的直播时长（分钟）
+                let duration = durationMinutes;
                 
                 labels.push(startTime.split(' ')[0] || '直播场次');
                 giftData.push(gift);
@@ -264,7 +276,10 @@
                             borderColor: '#FF6384',
                             backgroundColor: 'rgba(255, 99, 132, 0.2)',
                             yAxisID: 'y',
-                            fill: false
+                            fill: false,
+                            pointRadius: 5,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#FF6384'
                         },
                         {
                             label: '礼物收入',
@@ -272,7 +287,10 @@
                             borderColor: '#36A2EB',
                             backgroundColor: 'rgba(54, 162, 235, 0.2)',
                             yAxisID: 'y1',
-                            fill: false
+                            fill: false,
+                            pointRadius: 5,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#36A2EB'
                         },
                         {
                             label: '舰长收入',
@@ -280,7 +298,10 @@
                             borderColor: '#FFCE56',
                             backgroundColor: 'rgba(255, 206, 86, 0.2)',
                             yAxisID: 'y1',
-                            fill: false
+                            fill: false,
+                            pointRadius: 5,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#FFCE56'
                         },
                         {
                             label: 'SC收入',
@@ -288,7 +309,10 @@
                             borderColor: '#4BC0C0',
                             backgroundColor: 'rgba(75, 192, 192, 0.2)',
                             yAxisID: 'y1',
-                            fill: false
+                            fill: false,
+                            pointRadius: 5,
+                            pointHoverRadius: 8,
+                            pointBackgroundColor: '#4BC0C0'
                         },
                         {
                             label: '总营收',
@@ -297,7 +321,10 @@
                             backgroundColor: 'rgba(153, 102, 255, 0.2)',
                             yAxisID: 'y1',
                             fill: false,
-                            borderWidth: 3
+                            borderWidth: 3,
+                            pointRadius: 6,
+                            pointHoverRadius: 10,
+                            pointBackgroundColor: '#9966FF'
                         }
                     ]
                 },
@@ -335,6 +362,15 @@
                                 drawOnChartArea: false,
                             },
                         }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    tooltips: {
+                        enabled: true,
+                        mode: 'index',
+                        intersect: false
                     }
                 }
             });
