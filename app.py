@@ -219,11 +219,11 @@ async def by_month():
 
     # 设置标题
     if filter_type == 'vr':
-        title = f"维阿斗虫榜_{month[:4]}年{int(month[4:]):02d}月记录数据"
+        title = f"维阿斗虫榜_{month[:4]}年{int(month[4:]):02d}月记录数据（点击“正在直播”跳转到对应直播间）"
     elif filter_type == 'psp':
-        title = f"PSPlive斗虫榜_{month[:4]}年{int(month[4:]):02d}月记录数据"
+        title = f"PSPlive斗虫榜_{month[:4]}年{int(month[4:]):02d}月记录数据（点击“正在直播”跳转到对应直播间）"
     else:
-        title = f"维阿PSP斗虫榜_{month[:4]}年{int(month[4:]):02d}月记录数据"
+        title = f"维阿PSP斗虫榜_{month[:4]}年{int(month[4:]):02d}月记录数据（点击“正在直播”跳转到对应直播间）"
 
     return render_template('index.html', anchors=sorted_data, title=title, refresh_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'), current_filter=filter_type)
 
@@ -275,7 +275,37 @@ async def live_sessions():
         return render_template('error.html', error_message="无法获取直播数据"), 500
 
     for session in session_data.get('sessions', []):
-        session['total_revenue'] = Decimal(str(session.get('gift', 0))) + Decimal(str(session.get('guard', 0))) + Decimal(str(session.get('super_chat', 0)))
+        # 确保所有数值字段都是 float 类型，以便在模板中进行计算
+        gift_val = float(session.get('gift', 0) or 0)
+        guard_val = float(session.get('guard', 0) or 0)
+        super_chat_val = float(session.get('super_chat', 0) or 0)
+        session['gift'] = gift_val
+        session['guard'] = guard_val
+        session['super_chat'] = super_chat_val
+        session['total_revenue'] = gift_val + guard_val + super_chat_val
+        
+        # 计算直播时长（分钟）
+        start_time_str = session.get('start_time', '')
+        end_time_str = session.get('end_time', '')
+        
+        duration_minutes = 0
+        if start_time_str:
+            try:
+                start_time = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
+                if end_time_str and end_time_str != '0000-00-00 00:00:00':
+                    end_time = datetime.strptime(end_time_str, '%Y-%m-%d %H:%M:%S')
+                    duration = end_time - start_time
+                else:
+                    # 如果没有结束时间，使用当前时间
+                    duration = datetime.now() - start_time
+                
+                # 转换为分钟，四舍五入到整数
+                duration_minutes = int(duration.total_seconds() / 60)
+            except (ValueError, TypeError) as e:
+                app.logger.error(f"时间解析错误: {start_time_str}, {end_time_str}, 错误: {str(e)}")
+                duration_minutes = 0
+        
+        session['duration_minutes'] = duration_minutes
 
     return render_template(
         'live_sessions.html',
