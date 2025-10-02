@@ -287,5 +287,6 @@ async def live_sessions():
         refresh_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     )
 
+
 if __name__ == '__main__':
     app.run(port=2992, debug=True)

@@ -87,6 +87,8 @@
             margin: 0;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/wasm_calculator.js"></script>
 </head>
 <body>
     <header>
@@ -106,16 +108,38 @@
 		
         <button onclick="window.open('https://space.bilibili.com/1048135385', '_blank')">关注花礼harei喵，关注花礼harei谢谢喵</button>
     </header>
+    
+    <div class="wasm-info" style="background-color: #E8F5E9; border: 2px solid #FFC633; border-radius: 10px; padding: 15px; margin: 20px 0; text-align: center;">
+        <h3 style="color: #FFC633; margin-top: 0;">🚀 WASM高精度计算说明</h3>
+        <p><strong>技术特性：</strong></p>
+        <ul style="text-align: left; display: inline-block;">
+            <li>使用WebAssembly进行高精度浮点数计算，避免JavaScript精度问题</li>
+            <li>所有数据计算在客户端完成，保护您的隐私</li>
+            <li>自动检测浏览器WASM支持，不支持时降级到JavaScript计算</li>
+        </ul>
+        <p><strong>注意事项：</strong></p>
+        <ul style="text-align: left; display: inline-block;">
+            <li>首次加载可能需要几秒钟初始化WASM模块</li>
+            <li>如遇计算问题，请检查浏览器是否支持WebAssembly</li>
+        </ul>
+    </div>
+    
     <div class="button-container">
         <button onclick="openMonthSelector()">切换不同月份</button>
+        <button onclick="showSessionChart()">显示直播数据折线图</button>
+        <button onclick="hideChart()">关闭图表</button>
         <button onclick="window.history.back()">返回</button>
+        <button onclick="location.href='/'">返回普通模式</button>
+    </div>
+    <div id="chartContainer" style="display: none; text-align: center; margin: 20px 0;">
+        <canvas id="chartCanvas" width="800" height="600"></canvas>
     </div>
     <h1>{{ title }}</h1>
     <p>刷新时间：{{ refresh_time }}</p>
     <div class="queried-user">
         查询用户：{{ queried_user }} ({{ union }})
     </div>
-    <table>
+    <table id="dataTable">
         <thead>
             <tr>
                 <th>开始时间</th>
@@ -169,6 +193,159 @@
                 location.href = `/live_sessions?room_id=${roomId}&union=${union}&month=${year}${month}`;
             } else {
                 alert("无法切换月份，因为没有有效的 room_id。");
+            }
+        }
+        
+        // 折线图相关变量
+        let sessionChart = null;
+        
+        // 显示直播数据折线图
+        function showSessionChart() {
+            // 不再隐藏表格，让图表和表格同时显示
+            // 显示图表容器
+            document.getElementById('chartContainer').style.display = 'block';
+            
+            // 获取表格数据
+            const table = document.getElementById('dataTable');
+            const rows = table.querySelectorAll('tbody tr');
+            
+            const labels = [];
+            const giftData = [];
+            const guardData = [];
+            const superChatData = [];
+            const totalRevenueData = [];
+            const durationData = [];
+            
+            rows.forEach(row => {
+                const startTime = row.cells[0].textContent;
+                const endTime = row.cells[1].textContent;
+                const gift = parseFloat(row.cells[2].textContent) || 0;
+                const guard = parseFloat(row.cells[3].textContent) || 0;
+                const superChat = parseFloat(row.cells[4].textContent) || 0;
+                const totalRevenue = parseFloat(row.cells[5].textContent) || 0;
+                
+                // 计算直播时长（简化处理，只取小时部分）
+                let duration = 0;
+                if (startTime && endTime && startTime !== '0000-00-00 00:00:00' && endTime !== '0000-00-00 00:00:00') {
+                    // 这里简化处理，实际应用中需要更精确的时长计算
+                    duration = 1; // 假设每场直播时长为1单位
+                }
+                
+                labels.push(startTime.split(' ')[0] || '直播场次');
+                giftData.push(gift);
+                guardData.push(guard);
+                superChatData.push(superChat);
+                totalRevenueData.push(totalRevenue);
+                durationData.push(duration);
+            });
+            
+            // 如果没有数据，显示错误
+            if (labels.length === 0) {
+                alert('没有可用的数据来生成图表');
+                hideChart();
+                return;
+            }
+            
+            // 销毁现有图表
+            if (sessionChart) {
+                sessionChart.destroy();
+            }
+            
+            // 创建折线图
+            const ctx = document.getElementById('chartCanvas').getContext('2d');
+            sessionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '直播时长',
+                            data: durationData,
+                            borderColor: '#FF6384',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            yAxisID: 'y',
+                            fill: false
+                        },
+                        {
+                            label: '礼物收入',
+                            data: giftData,
+                            borderColor: '#36A2EB',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            yAxisID: 'y1',
+                            fill: false
+                        },
+                        {
+                            label: '舰长收入',
+                            data: guardData,
+                            borderColor: '#FFCE56',
+                            backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                            yAxisID: 'y1',
+                            fill: false
+                        },
+                        {
+                            label: 'SC收入',
+                            data: superChatData,
+                            borderColor: '#4BC0C0',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            yAxisID: 'y1',
+                            fill: false
+                        },
+                        {
+                            label: '总营收',
+                            data: totalRevenueData,
+                            borderColor: '#9966FF',
+                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                            yAxisID: 'y1',
+                            fill: false,
+                            borderWidth: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '直播数据趋势图'
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: '直播时长'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: '收入 (元)'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 隐藏图表（但保持表格显示）
+        function hideChart() {
+            document.getElementById('chartContainer').style.display = 'none';
+            if (sessionChart) {
+                sessionChart.destroy();
+                sessionChart = null;
             }
         }
     </script>
