@@ -6,6 +6,27 @@
 
 维阿PSP斗虫榜是一个用于展示维阿（VirtuaReal）和PSP（PSPlive）工会主播直播数据的应用。该项目采用前后端分离架构，使用Rust/Axum作为后端API服务，Vue 3/Vite作为前端用户界面。
 
+## 快速开始
+
+### Docker一键部署（推荐）
+
+如果您已安装Docker和Docker Compose，可以使用以下命令一键部署：
+
+```bash
+# 克隆项目
+git clone https://github.com/HihivrWebsite/liveshow.git
+cd liveshow
+
+# 一键部署
+docker-compose up -d
+```
+
+应用将在 http://localhost:2992 启动。
+
+### 传统部署方式
+
+参考下面的安装与运行部分。
+
 ### 主要技术栈
 - **后端**: Rust + Axum + Tokio
 - **前端**: Vue 3 + Vite + Vue Router + Chart.js
@@ -108,7 +129,18 @@ chmod +x ./start.sh
 ./start.sh
 ```
 
-#### 方法二：手动启动
+#### 方法二：Docker部署（一键部署推荐）
+
+使用Docker Compose可以一键部署整个应用：
+
+```bash
+# 在项目根目录运行以下命令
+docker-compose up -d
+```
+
+应用将在 http://localhost:2992 启动。
+
+#### 方法三：手动启动
 
 ##### 后端启动:
 ```bash
@@ -199,8 +231,57 @@ npm run build
 2. 构建后端可执行文件 (`cargo build --release`)
 3. 配置Web服务器（如Nginx）以提供静态文件服务并代理API请求到后端
 
-### Docker部署（可选）
-项目可以使用Docker容器化部署，分别构建前端和后端镜像。
+### Docker部署（推荐）
+
+#### 一键部署方法
+使用Docker Compose可以一键部署整个应用：
+
+```bash
+# 在项目根目录运行以下命令
+docker-compose up -d
+```
+
+应用将在 http://localhost:2992 启动。
+
+#### 手动构建Docker镜像
+如果您想手动构建镜像：
+
+```bash
+# 构建应用镜像
+docker build -t liveshow-app .
+
+# 运行容器
+docker run -d -p 2992:2992 --name liveshow liveshow-app
+```
+
+#### 自定义部署
+您也可以使用提供的Docker Compose文件进行自定义部署：
+
+```bash
+# 构建并启动服务
+docker-compose up --build -d
+
+# 查看服务状态
+docker-compose ps
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
+```
+
+#### Docker Compose 配置说明
+- 默认端口: 2992
+- 自动重启策略: unless-stopped
+- 健康检查: 每30秒检查API端点
+- 环境变量: RUST_LOG=info
+
+### Docker 镜像结构
+- 前端: 使用Node.js 18-alpine构建Vue应用
+- 后端: 使用Rust 1.75-alpine编译Rust应用
+- 运行时: Alpine Linux，使用非root用户运行
+- 端口: 2992 (HTTP)
 
 ## 维护与扩展
 
