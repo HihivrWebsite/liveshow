@@ -1,0 +1,9 @@
+D:\OneDrive\Code\Hihivrsite\liveshow\rust_backend\target\debug\deps\compression_codecs-7b697326d476ed3d.d: C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\lib.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\mod.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\decoder.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\encoder.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\params.rs
+
+D:\OneDrive\Code\Hihivrsite\liveshow\rust_backend\target\debug\deps\libcompression_codecs-7b697326d476ed3d.rmeta: C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\lib.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\mod.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\decoder.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\encoder.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\params.rs
+
+C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\lib.rs:
+C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\mod.rs:
+C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\decoder.rs:
+C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\encoder.rs:
+C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-codecs-0.4.36\src\brotli\params.rs:
