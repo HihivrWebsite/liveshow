@@ -1,0 +1,10 @@
+D:\OneDrive\Code\Hihivrsite\liveshow\rust_backend\target\x86_64-unknown-linux-musl\release\deps\compression_core-1b0179745fc1aa57.d: C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\lib.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\level.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\unshared.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\util.rs
+
+D:\OneDrive\Code\Hihivrsite\liveshow\rust_backend\target\x86_64-unknown-linux-musl\release\deps\libcompression_core-1b0179745fc1aa57.rlib: C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\lib.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\level.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\unshared.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\util.rs
+
+D:\OneDrive\Code\Hihivrsite\liveshow\rust_backend\target\x86_64-unknown-linux-musl\release\deps\libcompression_core-1b0179745fc1aa57.rmeta: C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\lib.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\level.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\unshared.rs C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\util.rs
+
+C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\lib.rs:
+C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\level.rs:
+C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\unshared.rs:
+C:\Users\PMA2138\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\compression-core-0.4.31\src\util.rs:

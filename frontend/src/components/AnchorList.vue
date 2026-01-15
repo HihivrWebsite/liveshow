@@ -2718,6 +2718,9 @@ export default {
   border-radius: 30px; /* 使用与表格相同的超椭圆曲线 */
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  /* 确保在窄屏设备上表格容器可以横向滚动 */
+  display: block;
+  white-space: nowrap;
 }
 
 .anchor-table {
@@ -2885,24 +2888,63 @@ export default {
 }
 
 /* 响应式设计 */
+@media (max-width: 1300px) {
+  .anchor-table th,
+  .anchor-table td {
+    padding: 8px 5px;
+    font-size: 0.8rem;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+}
+
 @media (max-width: 1200px) {
   .anchor-table th,
   .anchor-table td {
-    padding: 8px 6px;
-    font-size: 0.85rem;
+    padding: 7px 4px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .anchor-list {
+    padding: 15px 10px;
+    margin: 10px 5px;
+  }
+
+  .page-title {
+    font-size: 1.4rem;
+    text-align: center;
+  }
+
+  .anchor-table {
+    font-size: 0.75rem;
+    min-width: 1000px; /* 确保表格有最小宽度以保持可读性 */
+  }
+
+  .anchor-table th,
+  .anchor-table td {
+    padding: 6px 3px;
+  }
+
+  .table-container {
+    overflow-x: auto;
   }
 }
 
 @media (max-width: 768px) {
   .anchor-list {
-    padding: 15px;
-    margin: 10px 0;
+    padding: 15px 8px;
+    margin: 8px 0;
   }
 
   .filter-controls,
   .action-controls {
     flex-direction: column;
     align-items: center;
+    gap: 10px;
   }
 
   .filter-btn,
@@ -2910,25 +2952,96 @@ export default {
     width: 100%;
     max-width: 280px;
     margin: 5px 0;
+    padding: 10px 15px;
   }
 
   .page-title {
     font-size: 1.3rem;
+    text-align: center;
   }
 
   .anchor-table {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
+    min-width: 900px; /* 在平板设备上保持表格可读性 */
   }
 
   .anchor-table th,
   .anchor-table td {
-    padding: 6px 4px;
+    padding: 5px 2px;
+    min-width: 60px; /* 确保单元格有足够的宽度 */
+  }
+
+  .table-container {
+    overflow-x: auto;
+    border-radius: 15px; /* 适应较小屏幕的圆角 */
+  }
+
+  .number-cell,
+  .duration-cell,
+  .total-revenue {
+    font-size: 0.85em; /* 略微放大数字以提高可读性 */
+  }
+}
+
+@media (max-width: 600px) {
+  .anchor-list {
+    padding: 12px 6px;
+    margin: 6px 0;
+  }
+
+  .filter-btn,
+  .action-btn {
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  .page-title {
+    font-size: 1.2rem;
+  }
+
+  .refresh-time {
+    font-size: 0.75rem;
+    text-align: center;
+  }
+
+  .anchor-table {
+    font-size: 0.65rem;
+    min-width: 800px; /* 在小屏幕上保持表格宽度 */
+  }
+
+  .anchor-table th,
+  .anchor-table td {
+    padding: 4px 1.5px;
+    min-width: 50px;
+  }
+
+  .rank-cell, .name-cell, .union-cell {
+    min-width: auto;
+  }
+
+  .number-cell, .duration-cell, .total-revenue {
+    font-size: 0.9em;
+    word-break: break-word; /* 允许长数字换行 */
+  }
+
+  .view-btn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    min-width: 100px;
   }
 }
 
 @media (max-width: 480px) {
   .anchor-list {
-    padding: 10px;
+    padding: 10px 4px;
+  }
+
+  .filter-btn,
+  .action-btn {
+    padding: 7px 10px;
+    font-size: 0.8rem;
+    margin: 4px 0;
   }
 
   .page-title {
@@ -2936,21 +3049,24 @@ export default {
   }
 
   .refresh-time {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
   }
 
   .anchor-table {
-    font-size: 0.7rem;
+    font-size: 0.6rem;
+    min-width: 700px; /* 在手机上保持表格可读性 */
   }
 
   .anchor-table th,
   .anchor-table td {
-    padding: 4px 2px;
+    padding: 3px 1px;
+    min-width: 45px;
   }
 
   .number-cell,
   .duration-cell {
     text-align: center;
+    font-size: 0.95em;
   }
 
   .action-cell {
@@ -2958,8 +3074,42 @@ export default {
   }
 
   .view-btn {
-    padding: 4px 8px;
+    padding: 5px 8px;
     font-size: 0.7rem;
+    min-width: 90px;
+  }
+
+  .status-badge.live {
+    min-width: 70px;
+    padding: 3px 6px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .anchor-list {
+    padding: 8px 2px;
+  }
+
+  .page-title {
+    font-size: 1rem;
+  }
+
+  .anchor-table {
+    font-size: 0.55rem;
+    min-width: 600px; /* 在极小屏幕上保持表格可读性 */
+  }
+
+  .anchor-table th,
+  .anchor-table td {
+    padding: 2.5px 0.5px;
+    min-width: 40px;
+  }
+
+  .view-btn {
+    padding: 4px 6px;
+    font-size: 0.65rem;
+    min-width: 80px;
   }
 }
 

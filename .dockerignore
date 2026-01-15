@@ -1,0 +1,21 @@
+# .dockerignore
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+.nyc_output
+coverage
+.nyc_output
+.coverage
+.vscode
+.idea
+*.log
+.DS_Store
+target/
+frontend/node_modules/
+frontend/dist/
+rust_backend/target/
+rust_backend/dist/
+!rust_backend/dist/

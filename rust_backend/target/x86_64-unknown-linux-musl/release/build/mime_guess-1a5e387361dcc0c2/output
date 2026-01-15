@@ -1,0 +1,1 @@
+cargo:rustc-env=MIME_TYPES_GENERATED_PATH=D:\OneDrive\Code\Hihivrsite\liveshow\rust_backend\target\x86_64-unknown-linux-musl\release\build\mime_guess-1a5e387361dcc0c2\out\mime_types_generated.rs

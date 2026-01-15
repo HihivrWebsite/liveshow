@@ -7,7 +7,8 @@
 
 html, body {
   height: 100%;
-  overflow-x: hidden;
+  /* 移除 overflow-x: hidden 以允许横向滚动 */
+  min-width: 100vw; /* 确保页面至少占满屏幕宽度 */
 }
 
 /* 全局样式 */
@@ -46,6 +47,26 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(45deg, #e0658a, #FF8C00); /* 深一点的洋红橙渐变 */
+}
+
+/* 确保内容在窄屏上可读 */
+@media screen and (max-width: 480px) {
+  table {
+    font-size: 12px;
+  }
+
+  th, td {
+    word-wrap: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* 对于特别小的数字，允许换行 */
+  .number-cell, .duration-cell, .total-revenue {
+    white-space: normal;
+    word-break: break-all;
+  }
 }
 
 /* 链接样式 */
@@ -93,14 +114,44 @@ a:hover {
 }
 
 /* 媒体查询 */
+@media (max-width: 1200px) {
+  .container {
+    padding: 0 15px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .container {
+    padding: 0 12px;
+  }
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 0 10px;
+  }
+
+  body {
+    font-size: 14px; /* 在平板上稍微减小字体 */
   }
 }
 
 @media (max-width: 480px) {
   .container {
     padding: 0 5px;
+  }
+
+  body {
+    font-size: 13px; /* 在手机上进一步减小字体 */
+  }
+}
+
+@media (max-width: 360px) {
+  .container {
+    padding: 0 3px;
+  }
+
+  body {
+    font-size: 12px; /* 在小手机上进一步减小字体 */
   }
 }
