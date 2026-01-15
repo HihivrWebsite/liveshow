@@ -224,31 +224,87 @@ export default {
 }
 
 /* 响应式设计 */
+@media (max-width: 1024px) {
+  .header-content {
+    padding: 0 15px;
+  }
+
+  .logo-section {
+    gap: 15px;
+  }
+
+  .logo-img {
+    height: 100px;
+  }
+
+  .site-title {
+    font-size: 2rem;
+  }
+
+  .action-btn.primary {
+    font-size: 1.5rem;
+    padding: 15px 30px;
+  }
+
+  .creator-text-large {
+    font-size: 1rem;
+  }
+}
+
 @media (max-width: 768px) {
   .header-content {
     padding: 0 10px;
   }
-  
+
   .logo-section {
     flex-direction: column;
     gap: 10px;
+    align-items: center;
   }
-  
+
+  .logo-images {
+    flex-direction: column;
+    align-items: center;
+  }
+
   .logo-img {
     height: 80px;
+    max-width: 100%;
   }
-  
+
   .site-title {
     font-size: 1.4rem;
+    text-align: center;
+    padding: 0 10px;
   }
-  
+
+  .header-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+  }
+
   .action-btn {
     padding: 8px 16px;
     font-size: 0.8rem;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto 5px auto;
   }
-  
-  .creator-text {
-    font-size: 0.8rem;
+
+  .action-btn.primary {
+    font-size: 1.2rem;
+    padding: 12px 24px;
+  }
+
+  .creator-info {
+    text-align: center;
+  }
+
+  .creator-text-large {
+    font-size: 0.9rem;
+    margin-bottom: 10px;
   }
 }
 
@@ -256,20 +312,47 @@ export default {
   .logo-img {
     height: 60px;
   }
-  
+
   .site-title {
     font-size: 1.2rem;
+    padding: 0 5px;
   }
-  
+
   .action-btn {
     padding: 6px 12px;
     font-size: 0.75rem;
-    margin: 5px 2px;
+    margin: 5px auto;
     display: block;
     width: 100%;
     max-width: 280px;
-    margin-left: auto;
-    margin-right: auto;
+  }
+
+  .action-btn.primary {
+    font-size: 1rem;
+    padding: 10px 20px;
+  }
+
+  .creator-text-large {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .logo-img {
+    height: 50px;
+  }
+
+  .site-title {
+    font-size: 1.0rem;
+  }
+
+  .action-btn.primary {
+    font-size: 0.9rem;
+    padding: 8px 16px;
+  }
+
+  .creator-text-large {
+    font-size: 0.75rem;
   }
 }
 </style>

@@ -1006,6 +1006,9 @@ export default {
   border-radius: 30px; /* 使用与表格相同的超椭圆曲线 */
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  /* 确保在窄屏设备上表格容器可以横向滚动 */
+  display: block;
+  white-space: nowrap;
 }
 
 .sessions-table {
@@ -1119,50 +1122,247 @@ export default {
 }
 
 /* 响应式设计 */
+@media (max-width: 1300px) {
+  .sessions-table th,
+  .sessions-table td {
+    padding: 8px 5px;
+    font-size: 0.8rem;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+}
+
 @media (max-width: 1200px) {
   .sessions-table th,
   .sessions-table td {
-    padding: 8px 6px;
-    font-size: 0.85rem;
+    padding: 7px 4px;
+    font-size: 0.75rem;
   }
-  
+
   .title-cell {
     max-width: 150px;
   }
 }
 
+@media (max-width: 1024px) {
+  .live-sessions {
+    padding: 15px 10px;
+    margin: 10px 5px;
+  }
+
+  .page-title {
+    font-size: 1.4rem;
+    text-align: center;
+  }
+
+  .sessions-table {
+    font-size: 0.75rem;
+    min-width: 1000px; /* 确保表格有最小宽度以保持可读性 */
+  }
+
+  .sessions-table th,
+  .sessions-table td {
+    padding: 6px 3px;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  .title-cell {
+    max-width: 120px;
+  }
+}
+
 @media (max-width: 768px) {
   .live-sessions {
-    padding: 15px;
-    margin: 10px 0;
+    padding: 15px 8px;
+    margin: 8px 0;
   }
-  
+
   .action-controls {
     flex-direction: column;
     align-items: center;
+    gap: 10px;
   }
-  
+
   .action-btn {
     width: 100%;
     max-width: 280px;
     margin: 5px 0;
+    padding: 10px 15px;
   }
-  
+
   .page-title {
     font-size: 1.3rem;
+    text-align: center;
   }
-  
+
   .sessions-table {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
+    min-width: 900px; /* 在平板设备上保持表格可读性 */
   }
-  
+
   .sessions-table th,
   .sessions-table td {
-    padding: 6px 4px;
+    padding: 5px 2px;
+    min-width: 60px; /* 确保单元格有足够的宽度 */
   }
-  
+
+  .table-container {
+    overflow-x: auto;
+    border-radius: 15px; /* 适应较小屏幕的圆角 */
+  }
+
   .title-cell {
     max-width: 100px;
+  }
+
+  .revenue-cell .amount,
+  .revenue-cell .percentage,
+  .total-revenue {
+    font-size: 0.85em; /* 略微放大数字以提高可读性 */
+  }
+}
+
+@media (max-width: 600px) {
+  .live-sessions {
+    padding: 12px 6px;
+    margin: 6px 0;
+  }
+
+  .action-btn {
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  .page-title {
+    font-size: 1.2rem;
+  }
+
+  .refresh-time {
+    font-size: 0.75rem;
+    text-align: center;
+  }
+
+  .queried-user {
+    font-size: 0.9rem;
+    text-align: center;
+  }
+
+  .sessions-table {
+    font-size: 0.65rem;
+    min-width: 800px; /* 在小屏幕上保持表格宽度 */
+  }
+
+  .sessions-table th,
+  .sessions-table td {
+    padding: 4px 1.5px;
+    min-width: 50px;
+  }
+
+  .title-cell {
+    max-width: 80px;
+  }
+
+  .revenue-cell .amount,
+  .revenue-cell .percentage,
+  .total-revenue {
+    font-size: 0.9em;
+    word-break: break-word; /* 允许长数字换行 */
+  }
+
+  .sc-btn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    min-width: 100px;
+  }
+}
+
+@media (max-width: 480px) {
+  .live-sessions {
+    padding: 10px 4px;
+  }
+
+  .action-btn {
+    padding: 7px 10px;
+    font-size: 0.8rem;
+    margin: 4px 0;
+  }
+
+  .page-title {
+    font-size: 1.1rem;
+  }
+
+  .refresh-time {
+    font-size: 0.7rem;
+  }
+
+  .queried-user {
+    font-size: 0.9rem;
+  }
+
+  .sessions-table {
+    font-size: 0.6rem;
+    min-width: 700px; /* 在手机上保持表格可读性 */
+  }
+
+  .sessions-table th,
+  .sessions-table td {
+    padding: 3px 1px;
+    min-width: 45px;
+  }
+
+  .revenue-cell {
+    text-align: center;
+  }
+
+  .total-revenue {
+    text-align: center;
+  }
+
+  .title-cell {
+    max-width: 60px;
+  }
+
+  .action-cell {
+    text-align: center;
+  }
+
+  .sc-btn {
+    padding: 5px 8px;
+    font-size: 0.7rem;
+    min-width: 90px;
+  }
+}
+
+@media (max-width: 360px) {
+  .live-sessions {
+    padding: 8px 2px;
+  }
+
+  .page-title {
+    font-size: 1.0rem;
+  }
+
+  .sessions-table {
+    font-size: 0.55rem;
+    min-width: 600px; /* 在极小屏幕上保持表格可读性 */
+  }
+
+  .sessions-table th,
+  .sessions-table td {
+    padding: 2.5px 0.5px;
+    min-width: 40px;
+  }
+
+  .sc-btn {
+    padding: 4px 6px;
+    font-size: 0.65rem;
+    min-width: 80px;
   }
 }
 

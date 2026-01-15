@@ -55,6 +55,8 @@ body {
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  /* 确保内容可以横向滚动而不是被裁剪 */
+  overflow-x: auto;
 }
 
 /* 页面过渡动画 */
@@ -69,9 +71,22 @@ body {
 }
 
 /* 响应式设计 */
+@media (max-width: 1024px) {
+  .main-content {
+    padding: 15px;
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 768px) {
   .main-content {
     padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-content {
+    padding: 8px;
   }
 }
 </style>

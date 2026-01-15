@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>响应式设计测试 - 优化版</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        .instructions {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #2196F3;
+        }
+        
+        .device-frame {
+            border: 2px solid #ccc;
+            border-radius: 20px;
+            margin: 20px 0;
+            padding: 10px;
+            background: #000;
+            display: inline-block;
+        }
+        
+        .screen {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            width: 100%;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: none;
+        }
+        
+        .device-label {
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .devices-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            gap: 20px;
+        }
+        
+        .desktop { width: 1200px; }
+        .tablet { width: 768px; }
+        .mobile { width: 480px; }
+        .small-mobile { width: 320px; }
+        
+        /* 为窄屏设备添加横向滚动指示 */
+        .scroll-indicator {
+            text-align: center;
+            margin: 10px 0;
+            color: #666;
+            font-style: italic;
+        }
+        
+        /* 响应式调整 */
+        @media (max-width: 1300px) {
+            .devices-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .device-frame {
+                width: 100%;
+                max-width: 1200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>响应式设计测试页面 - 优化版</h1>
+        
+        <div class="instructions">
+            <h3>测试说明：</h3>
+            <ul>
+                <li>此页面用于测试前端应用在不同设备尺寸下的显示效果</li>
+                <li>特别关注窄屏设备上的横向滚动功能</li>
+                <li>表格内容应该可以在窄屏设备上横向滚动查看</li>
+                <li>整个页面内容在极窄时也应该支持横向滚动</li>
+            </ul>
+        </div>
+        
+        <h2>桌面端视图 (1200px)</h2>
+        <div class="scroll-indicator">正常显示，无需横向滚动</div>
+        <div class="device-frame desktop">
+            <div class="screen">
+                <iframe src="http://localhost:3000"></iframe>
+            </div>
+        </div>
+        
+        <h2>平板端视图 (768px)</h2>
+        <div class="scroll-indicator">可能需要横向滚动查看完整表格</div>
+        <div class="device-frame tablet">
+            <div class="screen">
+                <iframe src="http://localhost:3000"></iframe>
+            </div>
+        </div>
+        
+        <h2>手机端视图 (480px)</h2>
+        <div class="scroll-indicator">需要横向滚动查看完整表格</div>
+        <div class="device-frame mobile">
+            <div class="screen">
+                <iframe src="http://localhost:3000"></iframe>
+            </div>
+        </div>
+        
+        <h2>小手机视图 (320px)</h2>
+        <div class="scroll-indicator">需要横向滚动，整个页面可能也需要横向滚动</div>
+        <div class="device-frame small-mobile">
+            <div class="screen">
+                <iframe src="http://localhost:3000"></iframe>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>重点测试项：</h3>
+            <ol>
+                <li>窄屏设备上表格是否可以横向滚动</li>
+                <li>页面内容在极窄时是否支持横向滚动</li>
+                <li>所有信息是否都能在各尺寸下完整显示</li>
+                <li>UI元素是否在各尺寸下保持良好外观</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

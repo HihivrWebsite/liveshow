@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>响应式设计测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        .device-frame {
+            border: 2px solid #ccc;
+            border-radius: 20px;
+            margin: 20px 0;
+            padding: 10px;
+            background: #000;
+            display: inline-block;
+        }
+        
+        .screen {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            width: 100%;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 500px;
+            border: none;
+        }
+        
+        .device-label {
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .devices-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            gap: 20px;
+        }
+        
+        .desktop { width: 1200px; }
+        .tablet { width: 768px; }
+        .mobile { width: 480px; }
+        .small-mobile { width: 360px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>响应式设计测试页面</h1>
+        <p style="text-align: center;">此页面用于测试前端应用在不同设备尺寸下的显示效果</p>
+        
+        <div class="devices-container">
+            <div>
+                <div class="device-frame desktop">
+                    <div class="screen">
+                        <iframe src="http://localhost:3000"></iframe>
+                    </div>
+                </div>
+                <div class="device-label">桌面端 (1200px)</div>
+            </div>
+            
+            <div>
+                <div class="device-frame tablet">
+                    <div class="screen">
+                        <iframe src="http://localhost:3000"></iframe>
+                    </div>
+                </div>
+                <div class="device-label">平板端 (768px)</div>
+            </div>
+        </div>
+        
+        <div class="devices-container">
+            <div>
+                <div class="device-frame mobile">
+                    <div class="screen">
+                        <iframe src="http://localhost:3000"></iframe>
+                    </div>
+                </div>
+                <div class="device-label">手机端 (480px)</div>
+            </div>
+            
+            <div>
+                <div class="device-frame small-mobile">
+                    <div class="screen">
+                        <iframe src="http://localhost:3000"></iframe>
+                    </div>
+                </div>
+                <div class="device-label">小手机 (360px)</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 定期刷新iframe以确保内容是最新的
+        setInterval(function() {
+            const iframes = document.querySelectorAll('iframe');
+            // 不刷新iframe，以免影响用户体验
+        }, 30000); // 每30秒检查一次
+        
+        // 页面加载完成后显示提示
+        window.onload = function() {
+            console.log('响应式测试页面已加载完成');
+            console.log('请检查各个尺寸下的显示效果是否正常');
+        };
+    </script>
+</body>
+</html>
