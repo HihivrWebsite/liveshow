@@ -16,7 +16,7 @@
 - **后端**: Rust + Axum + Tokio
 - **前端**: Vue 3 + Vite + Vue Router + Chart.js
 - **API协议**: RESTful API
-- **数据来源**: 从外部API获取主播数据
+- **数据来源**: 从外部API（vr.qianqiuzy.cn 和 psp.qianqiuzy.cn）获取主播数据
 
 ### 核心功能
 - 展示维阿和PSP工会主播的收入数据
@@ -80,7 +80,7 @@ liveshow/
 
 ```mermaid
 graph TB
-    subgraph "Frontend" ["前端应用 (Vue 3)"]
+    subgraph Frontend ["前端应用 (Vue 3)"]
         A[App.vue]
         B[HeaderSection.vue]
         C[AnchorList.vue]
@@ -89,24 +89,24 @@ graph TB
         F[SuperChatDetail.vue]
         G[ErrorPage.vue]
         H[ChartComponent.vue]
-
+        
         I[Vue Router]
         J[Axios API]
         K[dataProcessor.js]
         L[api/index.js]
     end
-
-    subgraph "Backend" ["后端应用 (Rust/Axum)"]
+    
+    subgraph Backend ["后端应用 (Rust/Axum)"]
         M[main.rs]
         N[Axum Router]
-
-        subgraph "Middleware" ["中间件"]
+        
+        subgraph Middleware ["HTTP中间件"]
             O[CorsLayer]
             P[CompressionLayer]
             Q[TraceLayer]
         end
-
-        subgraph "BusinessLogic" ["业务逻辑"]
+        
+        subgraph BusinessLogic ["业务逻辑层"]
             R[get_anchors]
             S[get_anchors_by_month]
             T[get_live_sessions]
@@ -115,21 +115,21 @@ graph TB
             W[fetch_external_api]
             X[fetch_live_session_data]
         end
-
-        subgraph "DataModels" ["数据模型"]
+        
+        subgraph DataModels ["数据模型"]
             Y[Anchor]
             Z[LiveSession]
             AA[SuperChat]
             AB[ApiResponse]
         end
     end
-
-    subgraph "ExternalAPI" ["外部API"]
-        AC[VR API - vr.xxxxxxx]
-        AD[PSP API - psp.xxxxxxx]
+    
+    subgraph ExternalAPI ["外部API数据源"]
+        AC[VR API - vr.qianqiuzy.cn]
+        AD[PSP API - psp.qianqiuzy.cn]
     end
-
-    subgraph "ProcessFlow" ["数据处理流程"]
+    
+    subgraph ProcessFlow ["数据处理流程"]
         AE[用户请求]
         AF[前端API调用]
         AG[后端路由处理]
@@ -138,7 +138,7 @@ graph TB
         AJ[响应返回]
         AK[前端渲染]
     end
-
+    
     %% 连接关系
     A --> B
     A --> C
@@ -148,44 +148,39 @@ graph TB
     A --> G
     A --> H
     A --> I
-
+    
     C --> J
     D --> J
     F --> J
-
+    
     J --> AF
     AF --> AG
     AG --> R
     AG --> S
     AG --> T
     AG --> U
-
+    
     R --> V
     S --> V
     T --> X
     U --> W
-
+    
     V --> AH
     X --> AH
     W --> AH
-
+    
     AH --> AC
     AH --> AD
-
+    
     AC --> AI
     AD --> AI
-
+    
     AI --> AJ
     AJ --> AK
-
+    
     AK --> C
     AK --> D
     AK --> F
-
-    classDef frontend fill:#e1f5fe
-    classDef backend fill:#f3e5f5
-    classDef external fill:#fff3e0
-    classDef process fill:#e8f5e8
 ```
 
 ## 详细功能模块说明
