@@ -16,7 +16,7 @@
 - **后端**: Rust + Axum + Tokio
 - **前端**: Vue 3 + Vite + Vue Router + Chart.js
 - **API协议**: RESTful API
-- **数据来源**: 从外部API（vr.qianqiuzy.cn 和 psp.qianqiuzy.cn）获取主播数据
+- **数据来源**: 从外部API获取主播数据
 
 ### 核心功能
 - 展示维阿和PSP工会主播的收入数据
@@ -80,102 +80,66 @@ liveshow/
 
 ```mermaid
 graph TB
-    subgraph "Frontend_Application" ["前端应用 (Vue 3)"]
-        A[App.vue<br/>根组件]
-        B[HeaderSection.vue<br/>页眉组件]
-        C[AnchorList.vue<br/>主播列表组件<br/>- 营收占比分析<br/>- VR/PSP对比图<br/>- 回归分析<br/>- 聚类分析]
-        D[LiveSessions.vue<br/>直播会话组件<br/>- 直播数据折线图<br/>- SC历史记录<br/>- 多月份统计]
-        E[FooterSection.vue<br/>页脚组件]
-        F[SuperChatDetail.vue<br/>SC详情组件<br/>- SC历史详情<br/>- 时间段筛选]
-        G[ErrorPage.vue<br/>错误页面组件]
-        H[ChartComponent.vue<br/>图表组件<br/>- Chart.js实现<br/>- 响应式图表]
-        I[SimpleAnchorList.vue<br/>简化主播列表组件]
+    subgraph "Frontend" ["前端应用 (Vue 3)"]
+        A[App.vue]
+        B[HeaderSection.vue]
+        C[AnchorList.vue]
+        D[LiveSessions.vue]
+        E[FooterSection.vue]
+        F[SuperChatDetail.vue]
+        G[ErrorPage.vue]
+        H[ChartComponent.vue]
 
-        J[Vue Router<br/>路由管理<br/>- 路径匹配<br/>- 参数传递]
-        K[Axios API<br/>HTTP客户端<br/>- 请求拦截<br/>- 响应拦截<br/>- 错误处理]
-        L[dataProcessor.js<br/>数据处理工具<br/>- 格式化货币<br/>- 计算百分比<br/>- 防抖节流]
-        M[api/index.js<br/>API接口定义<br/>- /gift<br/>- /gift/by_month<br/>- /gift/live_sessions<br/>- /gift/sc]
+        I[Vue Router]
+        J[Axios API]
+        K[dataProcessor.js]
+        L[api/index.js]
     end
 
-    subgraph "Backend_Application" ["后端应用 (Rust/Axum)"]
-        N[main.rs<br/>主程序入口<br/>- tokio异步运行时<br/>- 全局HTTP客户端<br/>- 请求计数器]
-        O[Axum Router<br/>路由处理器<br/>- 并发请求处理<br/>- 路径匹配]
+    subgraph "Backend" ["后端应用 (Rust/Axum)"]
+        M[main.rs]
+        N[Axum Router]
 
-        subgraph "HTTP_Middleware" ["HTTP中间件"]
-            P1[CorsLayer<br/>跨域处理<br/>- 多域名支持<br/>- 预检缓存]
-            P2[CompressionLayer<br/>响应压缩<br/>- br/gzip压缩<br/>- 性能优化]
-            P3[TraceLayer<br/>请求跟踪<br/>- 日志记录<br/>- 性能监控]
+        subgraph "Middleware" ["中间件"]
+            O[CorsLayer]
+            P[CompressionLayer]
+            Q[TraceLayer]
         end
 
-        subgraph "Concurrency_Optimization" ["并发与优化"]
-            CO1[HTTP_CLIENT<br/>全局客户端<br/>- 连接池<br/>- 复用连接<br/>- 超时设置]
-            CO2[Tokio Runtime<br/>异步运行时<br/>- 多线程调度<br/>- 任务并发]
-            CO3[Request Counting<br/>请求计数<br/>- 原子操作<br/>- 性能监控]
-            CO4[Timeout Handling<br/>超时处理<br/>- 请求超时<br/>- 响应超时]
+        subgraph "BusinessLogic" ["业务逻辑"]
+            R[get_anchors]
+            S[get_anchors_by_month]
+            T[get_live_sessions]
+            U[get_sc_history]
+            V[fetch_anchor_data]
+            W[fetch_external_api]
+            X[fetch_live_session_data]
         end
 
-        subgraph "Business_Logic" ["业务逻辑层"]
-            Q1[get_anchors<br/>获取主播列表<br/>- 参数过滤<br/>- 并发请求VR/PSP]
-            Q2[get_anchors_by_month<br/>按月获取主播数据<br/>- 月份参数处理]
-            Q3[get_live_sessions<br/>获取直播会话详情<br/>- 房间ID验证<br/>- 工会识别]
-            Q4[get_sc_history<br/>获取SC历史数据<br/>- 数据清洗<br/>- 格式转换]
-            Q5[fetch_anchor_data<br/>获取主播数据<br/>- VR/PSP过滤<br/>- 数据合并<br/>- 总营收计算]
-            Q6[fetch_anchor_data_by_url<br/>按URL获取主播数据<br/>- 单一数据源]
-            Q7[fetch_external_api<br/>获取外部API数据<br/>- JSON解析<br/>- 错误处理<br/>- 数据映射]
-            Q8[fetch_live_session_data<br/>获取直播会话数据<br/>- 月份参数<br/>- 工会判断]
-            Q9[fetch_live_session_from_api<br/>从API获取直播会话<br/>- 数据解析<br/>- 持续时间计算]
-            Q10[fetch_sc_history<br/>获取SC历史数据<br/>- 消息解析<br/>- 时间排序]
-        end
-
-        subgraph "Data_Models" ["数据模型"]
-            R1[Anchor<br/>主播数据模型<br/>- 主播名/关注数/有效天<br/>- 礼物/舰长/SC收入<br/>- 总营收计算]
-            R2[LiveSession<br/>直播会话模型<br/>- 开始/结束时间<br/>- 舰长变化/粉丝团变化<br/>- 弹幕数/收入统计]
-            R3[SuperChat<br/>SC消息模型<br/>- 发送时间/用户名<br/>- 价格/消息内容]
-            R4[ApiResponse<br/>API响应模型<br/>- 主播列表/刷新时间<br/>- 过滤条件]
-            R5[ByMonthResponse<br/>按月响应模型<br/>- 月份数据/刷新时间]
-            R6[LiveSessionResponse<br/>直播会话响应模型<br/>- 会话列表/查询用户<br/>- 工会/标题/刷新时间]
-            R7[SCResponse<br/>SC历史响应模型<br/>- 房间ID/月份/SC列表]
+        subgraph "DataModels" ["数据模型"]
+            Y[Anchor]
+            Z[LiveSession]
+            AA[SuperChat]
+            AB[ApiResponse]
         end
     end
 
-    subgraph "External_API_Sources" ["外部API数据源"]
-        S1[https://vr.qianqiuzy.cn/gift<br/>VR工会主播数据<br/>- 实时数据<br/>- 高并发]
-        S2[https://psp.qianqiuzy.cn/gift<br/>PSP工会主播数据<br/>- 实时数据<br/>- 高并发]
-        S3[https://vr.qianqiuzy.cn/gift/by_month<br/>VR工会按月数据<br/>- 历史数据]
-        S4[https://psp.qianqiuzy.cn/gift/by_month<br/>PSP工会按月数据<br/>- 历史数据]
-        S5[https://vr.qianqiuzy.cn/gift/live_sessions<br/>VR工会直播会话<br/>- 会话详情]
-        S6[https://psp.qianqiuzy.cn/gift/live_sessions<br/>PSP工会直播会话<br/>- 会话详情]
-        S7[https://vr.qianqiuzy.cn/gift/sc<br/>VR工会SC历史<br/>- SC消息列表]
-        S8[https://psp.qianqiuzy.cn/gift/sc<br/>PSP工会SC历史<br/>- SC消息列表]
+    subgraph "ExternalAPI" ["外部API"]
+        AC[VR API - vr.xxxxxxx]
+        AD[PSP API - psp.xxxxxxx]
     end
 
-    subgraph "Performance_Optimizations" ["性能优化措施"]
-        PO1[Connection Pooling<br/>连接池<br/>- HTTP_CLIENT复用<br/>- 减少握手延迟]
-        PO2[Request Timeout<br/>请求超时<br/>- 10秒请求<br/>- 10秒响应<br/>- 15秒会话]
-        PO3[Response Compression<br/>响应压缩<br/>- br/gzip算法<br/>- 减少传输体积]
-        PO4[Async Processing<br/>异步处理<br/>- 非阻塞IO<br/>- 并发请求]
-        PO5[Memory Optimization<br/>内存优化<br/>- 零拷贝<br/>- RAII模式]
-        PO6[CPU Optimization<br/>CPU优化<br/>- 多核并行<br/>- SIMD指令]
+    subgraph "ProcessFlow" ["数据处理流程"]
+        AE[用户请求]
+        AF[前端API调用]
+        AG[后端路由处理]
+        AH[外部API获取]
+        AI[数据处理]
+        AJ[响应返回]
+        AK[前端渲染]
     end
 
-    subgraph "Data_Process_Flow" ["数据处理流程"]
-        DP1[用户请求发起<br/>- 浏览器<br/>- 网络请求]
-        DP2[前端API调用<br/>- Axios请求<br/>- 参数传递]
-        DP3[后端路由分发<br/>- Axum路由<br/>- 并发处理]
-        DP4[外部API数据获取<br/>- 并发请求<br/>- 连接复用]
-        DP5[数据处理与转换<br/>- JSON解析<br/>- 数据映射<br/>- 总营收计算]
-        DP6[响应返回前端<br/>- 压缩响应<br/>- CORS头设置]
-        DP7[前端数据渲染<br/>- Vue响应式<br/>- 组件更新<br/>- 图表绘制]
-    end
-
-    subgraph "Error_Handling" ["错误处理机制"]
-        EH1[Network Errors<br/>网络错误<br/>- 超时重试<br/>- 断路器模式]
-        EH2[API Errors<br/>API错误<br/>- 状态码处理<br/>- 错误信息返回]
-        EH3[Validation Errors<br/>验证错误<br/>- 参数校验<br/>- 类型检查]
-        EH4[Fallback Mechanisms<br/>降级机制<br/>- 默认数据<br/>- 缓存回退]
-    end
-
-    %% 前端内部连接
+    %% 连接关系
     A --> B
     A --> C
     A --> D
@@ -184,118 +148,44 @@ graph TB
     A --> G
     A --> H
     A --> I
-    A --> J
-    J --> A
-    K --> J
-    L --> C
-    L --> D
-    L --> F
-    M --> K
 
-    %% 前端API调用
-    C -.->|"GET /gift"| DP2
-    C -.->|"GET /gift/by_month"| DP2
-    D -.->|"GET /gift/live_sessions"| DP2
-    F -.->|"GET /gift/sc"| DP2
+    C --> J
+    D --> J
+    F --> J
 
-    %% 数据流向
-    DP1 --> DP2
-    DP2 --> DP3
-    DP3 --> Q1
-    DP3 --> Q2
-    DP3 --> Q3
-    DP3 --> Q4
+    J --> AF
+    AF --> AG
+    AG --> R
+    AG --> S
+    AG --> T
+    AG --> U
 
-    %% 后端处理流程
-    Q1 --> Q5
-    Q2 --> Q5
-    Q3 --> Q8
-    Q4 --> Q10
+    R --> V
+    S --> V
+    T --> X
+    U --> W
 
-    %% 并发优化
-    Q5 -->|"并发请求"| S1
-    Q5 -->|"并发请求"| S2
-    Q5 -->|"并发请求"| S3
-    Q5 -->|"并发请求"| S4
-    Q8 -->|"单次请求"| S5
-    Q8 -->|"单次请求"| S6
-    Q4 -->|"单次请求"| S7
-    Q4 -->|"单次请求"| S8
+    V --> AH
+    X --> AH
+    W --> AH
 
-    %% 外部API处理
-    S1 --> Q7
-    S2 --> Q7
-    S3 --> Q7
-    S4 --> Q7
-    S5 --> Q9
-    S6 --> Q9
-    S7 --> Q10
-    S8 --> Q10
+    AH --> AC
+    AH --> AD
 
-    %% 数据模型映射
-    Q7 --> R1
-    Q9 --> R2
-    Q10 --> R3
+    AC --> AI
+    AD --> AI
 
-    %% 响应构建
-    R1 --> R4
-    R1 --> R5
-    R2 --> R6
-    R3 --> R7
+    AI --> AJ
+    AJ --> AK
 
-    %% 响应返回
-    R4 --> DP6
-    R5 --> DP6
-    R6 --> DP6
-    R7 --> DP6
+    AK --> C
+    AK --> D
+    AK --> F
 
-    %% 前端渲染
-    DP6 --> DP7
-    DP7 --> C
-    DP7 --> D
-    DP7 --> F
-
-    %% 优化措施连接
-    CO1 -.-> Q7
-    CO1 -.-> Q9
-    CO1 -.-> Q10
-    PO1 -.-> CO1
-    PO2 -.-> Q7
-    PO2 -.-> Q9
-    PO2 -.-> Q10
-    PO3 -.-> DP6
-    PO4 -.-> Q1
-    PO4 -.-> Q2
-    PO4 -.-> Q3
-    PO4 -.-> Q4
-
-    %% 错误处理连接
-    EH1 -.-> Q7
-    EH1 -.-> Q9
-    EH1 -.-> Q10
-    EH2 -.-> Q1
-    EH2 -.-> Q2
-    EH2 -.-> Q3
-    EH2 -.-> Q4
-
-    %% 样式定义
-    classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef backend fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef datamodel fill:#fce4ec,stroke:#880e4f,stroke-width:2px
-    classDef process fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef middleware fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    classDef optimization fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
-    classDef errorhandling fill:#ffebee,stroke:#b71c1c,stroke-width:2px
-
-    class A,B,C,D,E,F,G,H,I,J,K,L,M Frontend
-    class N,O,Q1,Q2,Q3,Q4,Q5,Q6,Q7,Q8,Q9,Q10 Backend
-    class S1,S2,S3,S4,S5,S6,S7,S8 External
-    class R1,R2,R3,R4,R5,R6,R7 Datamodel
-    class DP1,DP2,DP3,DP4,DP5,DP6,DP7 Process
-    class P1,P2,P3 Middleware
-    class CO1,CO2,CO3,CO4,PO1,PO2,PO3,PO4,PO5,PO6 Optimization
-    class EH1,EH2,EH3,EH4 Errorhandling
+    classDef frontend fill:#e1f5fe
+    classDef backend fill:#f3e5f5
+    classDef external fill:#fff3e0
+    classDef process fill:#e8f5e8
 ```
 
 ## 详细功能模块说明
