@@ -475,6 +475,7 @@ export default {
   align-items: flex-end;
   flex-grow: 1;
   width: 100%; /* 横向铺满 */
+  flex-wrap: wrap; /* 允许换行 */
 }
 
 .sc-message-content {
@@ -486,7 +487,7 @@ export default {
   color: #FFFFFF; /* 白色字体 */
   padding: 10px;
   border-radius: 10px;
-  flex-grow: 1; /* 允许扩展 */
+  flex: 1; /* 允许扩展，占据剩余空间 */
   min-height: 40px; /* 最小高度 */
   overflow-y: visible; /* 可用滚动，让内容自然扩展 */
   margin-right: 10px; /* 为价格留出空间 */
@@ -496,6 +497,7 @@ export default {
     -1px  1px 0 #000,
      1px  1px 0 #000; /* 黑色描边效果 */
   min-width: 0; /* 允许收缩 */
+  flex-basis: 60%; /* 在窄屏下占据60%宽度 */
 }
 
 .sc-price-container {
@@ -503,6 +505,8 @@ export default {
   align-items: flex-end;
   justify-content: flex-end;
   min-width: 80px; /* 为价格留出最小宽度 */
+  flex-basis: 35%; /* 在窄屏下占据35%宽度 */
+  text-align: right; /* 右对齐 */
 }
 
 .sc-price {
@@ -510,6 +514,8 @@ export default {
   font-size: 2.8rem; /* 放大一倍（从1.4到2.8） */
   color: #FFD700; /* 默认金色 */
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7); /* 添加阴影确保可读性 */
+  word-break: break-all; /* 允许在任意字符间换行 */
+  overflow-wrap: break-word; /* 确保长数字能换行 */
 }
 
 /* 金色背景时金额文字变为红色 */
@@ -533,24 +539,56 @@ export default {
     padding: 15px;
     margin: 10px 0;
   }
-  
+
   .page-title {
     font-size: 1.3rem;
   }
-  
+
   .sc-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 5px;
   }
-  
+
   .action-btn {
     width: 100%;
     max-width: 200px;
   }
-  
+
   .sc-message {
     font-size: 0.9rem;
+  }
+
+  /* 在窄屏设备上调整SC内容布局 */
+  .sc-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sc-message-content {
+    flex-basis: auto;
+    margin-right: 0;
+    margin-bottom: 10px;
+    font-size: 1.2rem; /* 在窄屏上稍微减小字体 */
+  }
+
+  .sc-price-container {
+    flex-basis: auto;
+    text-align: center; /* 在窄屏上居中对齐 */
+  }
+
+  .sc-price {
+    font-size: 2rem; /* 在窄屏上稍微减小字体 */
+  }
+}
+
+@media (max-width: 480px) {
+  .sc-message-content {
+    font-size: 1rem; /* 进一步减小字体 */
+  }
+
+  .sc-price {
+    font-size: 1.5rem; /* 进一步减小字体 */
   }
 }
 
