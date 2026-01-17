@@ -1,0 +1,70 @@
+# 编译产物
+target/
+dist/
+
+# Rust
+ Cargo.lock
+ .cargo/
+
+
+# 临时文件
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+desktop.ini
+ehthumbs.db
+Icon?
+VolumeIcon.icns
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 构建产物
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 编辑器备份文件
+*~
+*.bak
+*.orig
+*.pyc
+*.pyo
+__pycache__/
+*.class
+
+# 环境变量文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 测试
+coverage/
+.nyc_output/
+.jest/
+
+# Browser
+.svelte-kit/
+.c8/
+.next/
+.nuxt/
+.vuepress/dist
+/.vuepress/.cache
+.phpunit.result.cache
