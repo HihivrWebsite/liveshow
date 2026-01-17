@@ -113,90 +113,124 @@
       <div v-if="scHistory && scHistory.list && scHistory.list.length > 0" class="sc-history-section hover-effect">
         <h3 style="color: #FFC633; margin-top: 0;">💬 SC历史记录</h3>
         <div class="sc-history-container">
-          <table class="sc-history-table">
-            <thead>
-              <tr>
-                <th>发送时间</th>
-                <th>用户名</th>
-                <th>用户ID</th>
-                <th>金额</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(sc, index) in scHistory.list" :key="index" class="hover-effect">
-                <td>{{ sc.send_time }}</td>
-                <td>{{ sc.uname }}</td>
-                <td>{{ sc.uid }}</td>
-                <td class="currency-cell">{{ formatCurrency(sc.price) }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <!-- 移动端：网格布局 -->
+          <div class="grid-container mobile-grid">
+            <div
+              v-for="(sc, index) in scHistory.list"
+              :key="index"
+              class="sc-grid-item"
+            >
+              <div class="grid-header">
+                <div class="grid-time">{{ sc.send_time }}</div>
+              </div>
+              <div class="grid-fields">
+                <div class="field-box">
+                  <div class="field-label">用户名</div>
+                  <div class="field-value">{{ sc.uname }}</div>
+                </div>
+                <div class="field-box">
+                  <div class="field-label">用户ID</div>
+                  <div class="field-value">{{ sc.uid }}</div>
+                </div>
+                <div class="field-box">
+                  <div class="field-label">金额</div>
+                  <div class="field-value currency-cell">{{ formatCurrency(sc.price) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="table-container hover-effect">
-        <table class="sessions-table">
-          <thead>
-            <tr>
-              <th>编号</th>
-              <th>时间</th>
-              <th>总直播时间</th>
-              <th class="bold-header">新增总督</th>
-              <th class="bold-header">新增提督</th>
-              <th class="bold-header">新增舰长</th>
-              <th class="bold-header">新增粉丝团</th>
-              <th class="bold-header">弹幕数</th>
-              <th class="bold-header">礼物收入<br><span class="sub-label">(占比%)</span></th>
-              <th class="bold-header">舰长收入<br><span class="sub-label">(占比%)</span></th>
-              <th class="bold-header">SC收入<br><span class="sub-label">(占比%)</span></th>
-              <th>总营收</th>
-              <th>标题</th>
-              <th>查看SuperChat详情</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(session, index) in sessions" :key="index" class="live-session-row hover-effect">
-              <td class="index-cell">{{ index + 1 }}</td>
-              <td class="datetime-cell">
+      <!-- 移动端：卡片布局 -->
+      <div class="cards-container mobile-cards">
+        <div
+          v-for="(session, index) in sessions"
+          :key="index"
+          class="session-card"
+        >
+          <div class="card-header">
+            <div class="card-index">#{{ index + 1 }}</div>
+            <div class="card-title">{{ session.title }}</div>
+          </div>
+          <div class="card-body">
+            <div class="field-box">
+              <div class="field-label">开始时间</div>
+              <div class="field-value datetime-cell">
                 <div class="start-time">{{ session.start_time.split(' ')[0] }}</div>
                 <div class="start-time">{{ session.start_time.split(' ')[1] }}</div>
+              </div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">结束时间</div>
+              <div class="field-value datetime-cell">
                 <div class="end-time">{{ session.end_time.split(' ')[0] || '-' }}</div>
                 <div class="end-time">{{ session.end_time.split(' ')[1] || '-' }}</div>
-              </td>
-              <td class="duration-cell" v-html="formatDurationCell(session.start_time, session.end_time)"></td>
-              <td class="number-cell">{{ (session.end_guard_3 != null ? session.end_guard_3 : 0) - (session.start_guard_3 != null ? session.start_guard_3 : 0) }}</td>
-              <td class="number-cell">{{ (session.end_guard_2 != null ? session.end_guard_2 : 0) - (session.start_guard_2 != null ? session.start_guard_2 : 0) }}</td>
-              <td class="number-cell">{{ (session.end_guard_1 != null ? session.end_guard_1 : 0) - (session.start_guard_1 != null ? session.start_guard_1 : 0) }}</td>
-              <td class="number-cell">{{ formatNumber((session.end_fans_count != null ? session.end_fans_count : 0) - (session.start_fans_count != null ? session.start_fans_count : 0)) }}</td>
-              <td class="number-cell">{{ formatNumber(session.danmaku_count != null ? session.danmaku_count : 0) }}</td>
-              <td class="revenue-cell">
+              </div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">总直播时间</div>
+              <div class="field-value" v-html="formatDurationCell(session.start_time, session.end_time)"></div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">新增总督</div>
+              <div class="field-value number-cell">{{ (session.end_guard_3 != null ? session.end_guard_3 : 0) - (session.start_guard_3 != null ? session.start_guard_3 : 0) }}</div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">新增提督</div>
+              <div class="field-value number-cell">{{ (session.end_guard_2 != null ? session.end_guard_2 : 0) - (session.start_guard_2 != null ? session.start_guard_2 : 0) }}</div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">新增舰长</div>
+              <div class="field-value number-cell">{{ (session.end_guard_1 != null ? session.end_guard_1 : 0) - (session.start_guard_1 != null ? session.start_guard_1 : 0) }}</div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">新增粉丝团</div>
+              <div class="field-value number-cell">{{ formatNumber((session.end_fans_count != null ? session.end_fans_count : 0) - (session.start_fans_count != null ? session.start_fans_count : 0)) }}</div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">弹幕数</div>
+              <div class="field-value number-cell">{{ formatNumber(session.danmaku_count != null ? session.danmaku_count : 0) }}</div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">礼物收入</div>
+              <div class="field-value revenue-cell">
                 <span class="amount">{{ formatCurrency(session.gift) }}</span>
                 <span class="percentage">({{ calculatePercentage(session.gift, calculateTotalRevenue(session)) }}%)</span>
-              </td>
-              <td class="revenue-cell">
+              </div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">舰长收入</div>
+              <div class="field-value revenue-cell">
                 <span class="amount">{{ formatCurrency(session.guard) }}</span>
                 <span class="percentage">({{ calculatePercentage(session.guard, calculateTotalRevenue(session)) }}%)</span>
-              </td>
-              <td class="revenue-cell">
+              </div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">SC收入</div>
+              <div class="field-value revenue-cell">
                 <span class="amount">{{ formatCurrency(session.super_chat) }}</span>
                 <span class="percentage">({{ calculatePercentage(session.super_chat, calculateTotalRevenue(session)) }}%)</span>
-              </td>
-              <td class="total-revenue">{{ formatCurrency(calculateTotalRevenue(session)) }}</td>
-              <td class="title-cell" style="white-space: normal; word-break: break-word; max-width: 150px;">{{ session.title }}</td>
-              <td class="action-cell">
-                <button
-                  @click="viewSuperChatDetails(session.start_time, session.end_time)"
-                  class="sc-btn hover-effect"
-                >
-                  查看SuperChat详情
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+            </div>
+            <div class="field-box">
+              <div class="field-label">总营收</div>
+              <div class="field-value total-revenue">{{ formatCurrency(calculateTotalRevenue(session)) }}</div>
+            </div>
+          </div>
+          <div class="card-footer">
+            <button
+              @click="viewSuperChatDetails(session.start_time, session.end_time)"
+              class="sc-btn hover-effect"
+            >
+              查看SuperChat详情
+            </button>
+          </div>
+        </div>
+      </div>
       </div>
     </div>
-  </div>
+  
 </template>
 
 <script>
@@ -1003,12 +1037,16 @@ export default {
 
 .table-container {
   overflow-x: auto;
-  border-radius: 30px; /* 使用与表格相同的超椭圆曲线 */
+  border-radius: 0; /* 移除圆角 */
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
   /* 确保在窄屏设备上表格容器可以横向滚动 */
   display: block;
   white-space: nowrap;
+  width: 100%; /* 使用正常宽度，修复截断问题 */
+  max-width: 100%; /* 限制表格容器最大宽度为容器宽度 */
+  margin-left: 0; /* 确保紧贴左侧 */
+  margin-right: 0; /* 确保紧贴右侧 */
 }
 
 .sessions-table {
@@ -1017,6 +1055,7 @@ export default {
   background: #FFF8E1;
   border-radius: 30px; /* 添加超椭圆曲线 */
   overflow: hidden; /* 确保圆角生效 */
+  table-layout: auto; /* 允许列宽自适应内容 */
 }
 
 .sessions-table th:first-child {
@@ -1121,6 +1160,429 @@ export default {
   font-weight: bold;
 }
 
+/* SC历史记录表格样式 */
+.sc-history-container {
+  overflow-x: auto;
+  border-radius: 0; /* 移除圆角 */
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  display: block;
+  white-space: nowrap;
+  width: 100%; /* 使用正常宽度，修复截断问题 */
+  max-width: 100%; /* 限制表格容器最大宽度为容器宽度 */
+  margin-left: 0; /* 确保紧贴左侧 */
+  margin-right: 0; /* 确保紧贴右侧 */
+}
+
+.sc-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #FFF8E1;
+  border-radius: 30px; /* 添加超椭圆曲线 */
+  overflow: hidden; /* 确保圆角生效 */
+  min-width: auto; /* 允许在窄屏上收缩 */
+  table-layout: auto; /* 允许列宽自适应 */
+}
+
+.sc-history-table th {
+  background: linear-gradient(45deg, #FFC633, #FFA500);
+  color: #333;
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.sc-history-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #FFC633;
+  color: #333;
+}
+
+/* SC历史记录表格单元格内容截断处理 */
+.sc-history-table .uname-cell {
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-history-table .uid-cell {
+  max-width: 80px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-history-table .send-time-cell {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* SC历史记录表格的响应式媒体查询 */
+@media (max-width: 1024px) {
+  .sc-history-table {
+    font-size: 0.75rem;
+  }
+
+  .sc-history-table th,
+  .sc-history-table td {
+    padding: 6px 3px;
+  }
+}
+
+@media (max-width: 600px) {
+  .sc-history-table {
+    font-size: 0.7rem;
+  }
+
+  .sc-history-table th,
+  .sc-history-table td {
+    padding: 8px 6px;
+    min-width: 60px;
+  }
+
+  .sc-history-table td {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 600px) {
+  .sc-history-table {
+    font-size: 0.65rem;
+  }
+
+  .sc-history-table th,
+  .sc-history-table td {
+    padding: 5px 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sc-history-table {
+    font-size: 0.6rem;
+  }
+
+  .sc-history-table th,
+  .sc-history-table td {
+    padding: 4px 3px;
+    min-width: 40px;
+  }
+
+  .sc-history-table td {
+    max-width: 80px;
+  }
+}
+
+@media (max-width: 360px) {
+  .sc-history-table {
+    font-size: 0.55rem;
+  }
+
+  .sc-history-table th,
+  .sc-history-table td {
+    padding: 3px 2px;
+  }
+}
+
+/* 桌面端表格显示 */
+.desktop-table {
+  display: table;
+}
+
+/* 移动端网格容器 */
+.grid-container {
+  display: none; /* 默认隐藏网格布局 */
+}
+
+/* 网格布局样式 */
+.session-grid-item {
+  background: #FFF8E1;
+  border: 1px solid #FFC633;
+  border-radius: 15px;
+  padding: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.sc-grid-item {
+  background: #FFF8E1;
+  border: 1px solid #FFC633;
+  border-radius: 15px;
+  padding: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.grid-header {
+  background: linear-gradient(45deg, #FFC633, #FFA500); /* 深色背景 */
+  color: white; /* 白色文字 */
+  padding: 8px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  display: flex; /* 使用flex布局 */
+  align-items: center; /* 垂直居中 */
+  justify-content: space-between; /* 两端对齐 */
+}
+
+.grid-index {
+  font-weight: bold;
+  font-size: 1.1em; /* 正常大小 */
+}
+
+.grid-title {
+  font-weight: bold;
+  margin: 5px 0;
+  font-size: 1.2em; /* 增大字号 */
+  text-align: center; /* 居中对齐 */
+  color: #333; /* 设置颜色 */
+  flex-grow: 1; /* 占据剩余空间 */
+  padding: 0 10px; /* 添加左右内边距 */
+}
+
+.grid-time {
+  font-weight: bold;
+  text-align: center;
+  font-size: 1.1em; /* 正常大小 */
+}
+
+.grid-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* 自适应网格 */
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.field-box {
+  background: rgba(255, 248, 225, 0.7); /* 淡黄色半透明背景，与AnchorList一致 */
+  border: 1px solid #FFC633;
+  border-radius: 10px; /* 增加圆角，与AnchorList一致 */
+  padding: 12px; /* 增加内边距，与AnchorList一致 */
+  min-width: 120px;
+  display: flex; /* 使用flex布局 */
+  flex-direction: column; /* 改为垂直布局，与AnchorList一致 */
+  align-items: flex-start; /* 左对齐内容，与AnchorList一致 */
+  text-align: left; /* 左对齐文本，与AnchorList一致 */
+  margin-bottom: 6px; /* 添加底部间距 */
+  transition: all 0.2s ease; /* 添加过渡效果 */
+}
+
+.field-label {
+  font-weight: bold;
+  color: #FF8C00; /* 使用更醒目的颜色，与AnchorList一致 */
+  font-size: 1.1em; /* 正常大小，与AnchorList一致 */
+  word-break: break-word;
+  margin-bottom: 4px; /* 与值之间添加间距 */
+  flex-shrink: 0; /* 防止标签被压缩，与AnchorList一致 */
+  transition: all 0.3s ease; /* 添加颜色过渡效果 */
+  background-color: rgba(255, 198, 51, 0.15); /* 添加轻微背景色 */
+  padding: 4px 8px; /* 添加内边距 */
+  border-radius: 8px; /* 添加圆角 */
+}
+
+.field-label:hover {
+  color: #FF6600; /* 悬停时更深的颜色，与AnchorList一致 */
+  background-color: rgba(255, 165, 0, 0.25); /* 悬停时更深的背景色 */
+}
+
+.field-value {
+  color: #333;
+  font-size: 1.1em; /* 正常大小，与AnchorList一致 */
+  word-break: break-word;
+  text-align: left; /* 值左对齐 */
+  margin-left: 0; /* 与标签之间添加间距，与AnchorList一致 */
+  overflow: hidden; /* 防止溢出 */
+  text-overflow: ellipsis; /* 溢出时显示省略号 */
+  transition: all 0.3s ease; /* 添加颜色过渡效果 */
+  align-self: flex-start; /* 左对齐 */
+  width: 100%; /* 占满整个宽度 */
+}
+
+.field-value:hover {
+  color: #f9729a; /* 悬停时使用主题色，与AnchorList一致 */
+}
+
+/* 高亮重要数值 */
+.total-revenue {
+  color: #f9729a !important;
+  font-weight: bold;
+}
+
+.currency-cell {
+  color: #f9729a !important;
+  font-weight: bold;
+}
+
+.grid-footer {
+  text-align: center;
+  margin-top: 8px;
+}
+
+/* 旧的卡片布局样式（保留用于可能的回退） */
+.session-card {
+  background: linear-gradient(135deg, #FFF8E1, #FFF5C2); /* 添加轻微渐变背景 */
+  border: 1px solid #FFC633;
+  border-radius: 20px;
+  padding: 15px; /* 增加内边距以改善视觉效果 */
+  margin-bottom: 15px; /* 增加外边距以改善视觉效果 */
+  box-shadow: 0 6px 16px rgba(255, 198, 51, 0.2); /* 添加更柔和的阴影，与AnchorList一致 */
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* 使用更平滑的缓动函数 */
+  position: relative; /* 为高级动效添加相对定位 */
+  overflow: hidden; /* 确保内容不会溢出 */
+  will-change: transform; /* 优化性能 */
+  transform: translateZ(0); /* 启用硬件加速 */
+}
+
+.session-card:hover {
+  transform: translateY(-8px) scale(1.02); /* 上浮并轻微放大 */
+  box-shadow: 0 12px 30px rgba(255, 198, 51, 0.4); /* 增强阴影 */
+  border-color: #FFA500; /* 边框颜色变化 */
+}
+
+
+.sc-card {
+  background: linear-gradient(135deg, #FFF8E1, #FFF5C2); /* 添加轻微渐变背景，与AnchorList一致 */
+  border: 1px solid #FFC633;
+  border-radius: 20px;
+  padding: 15px; /* 增加内边距以改善视觉效果 */
+  margin-bottom: 15px; /* 增加外边距以改善视觉效果 */
+  box-shadow: 0 6px 16px rgba(255, 198, 51, 0.2); /* 添加更柔和的阴影，与AnchorList一致 */
+  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* 使用更平滑的缓动函数 */
+  position: relative; /* 为高级动效添加相对定位 */
+  overflow: hidden; /* 确保内容不会溢出 */
+  will-change: transform; /* 优化性能 */
+  transform: translateZ(0); /* 启用硬件加速 */
+}
+
+.sc-card:hover {
+  transform: translateY(-8px) scale(1.02); /* 上浮并轻微放大 */
+  box-shadow: 0 12px 30px rgba(255, 198, 51, 0.4); /* 增强阴影 */
+  border-color: #FFA500; /* 边框颜色变化 */
+}
+
+
+.card-header {
+  display: flex;
+  justify-content: center; /* 改为居中对齐 */
+  align-items: center;
+  background: linear-gradient(45deg, #FFC633, #FFA500); /* 深色背景 */
+  color: white; /* 白色文字 */
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 8px; /* 压缩间距 */
+}
+
+.card-index {
+  font-weight: bold;
+  color: #FF8C00; /* 更醒目的颜色 */
+  text-align: center;
+  background-color: #FFF3CD;
+  border-radius: 50%;
+  width: 35px; /* 稍微增大 */
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2em; /* 增大字号 */
+}
+
+.card-title {
+  color: #333;
+  font-weight: bold;
+  text-align: center;
+  font-size: 1.2em; /* 增大字号 */
+}
+
+.card-time {
+  color: #4CAF50;
+  font-weight: bold;
+  text-align: center;
+  font-size: 1.1em; /* 增大字号 */
+}
+
+.card-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* 自动填充，最小140px宽的列，与AnchorList一致 */
+  gap: 8px; /* 优化间距 */
+}
+
+/* 大屏优化：在大屏幕上显示更多列，与AnchorList一致 */
+@media (min-width: 1024px) {
+  .card-body {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* 宽屏下使用与AnchorList相同的最小宽度 */
+    gap: 8px; /* 与AnchorList一致的间距 */
+  }
+}
+
+/* 中等屏幕：显示固定列数 */
+@media (min-width: 769px) and (max-width: 1023px) {
+  .card-body {
+    grid-template-columns: repeat(2, 1fr); /* 中等屏幕固定2列，与AnchorList一致 */
+    gap: 8px; /* 与AnchorList一致的间距 */
+  }
+}
+
+.field-label {
+  font-weight: bold;
+  color: #FF8C00; /* 使用更醒目的颜色，与AnchorList一致 */
+  font-size: 1em; /* 增大字号 */
+  word-break: break-word;
+  margin-bottom: 4px; /* 与值之间添加间距 */
+  align-self: flex-start; /* 左对齐 */
+  transition: all 0.3s ease; /* 添加颜色过渡效果 */
+  background-color: rgba(255, 198, 51, 0.15); /* 添加轻微背景色 */
+  padding: 4px 8px; /* 添加内边距 */
+  border-radius: 8px; /* 添加圆角 */
+  min-width: 80px; /* 设置最小宽度 */
+}
+
+.field-label:hover {
+  color: #FF6600; /* 悬停时更深的颜色 */
+  background-color: rgba(255, 165, 0, 0.25); /* 悬停时更深的背景色 */
+}
+
+.field-value {
+  text-align: left; /* 值左对齐，与标签对齐 */
+  color: #333;
+  font-size: 1.1em; /* 增大字号 */
+  word-break: break-word;
+  text-align: left; /* 值左对齐 */
+  overflow: hidden; /* 防止溢出 */
+  text-overflow: ellipsis; /* 溢出时显示省略号 */
+  transition: all 0.3s ease; /* 添加颜色过渡效果 */
+  align-self: flex-start; /* 左对齐 */
+  width: 100%; /* 占满整个宽度 */
+}
+
+.field-value:hover {
+  color: #f9729a; /* 悬停时使用主题色 */
+}
+
+.card-footer {
+  margin-top: 10px; /* 压缩间距 */
+  text-align: center;
+}
+
+/* 高亮重要数值 */
+.total-revenue {
+  color: #f9729a !important;
+  font-weight: bold;
+}
+
+.currency-cell {
+  color: #f9729a !important;
+  font-weight: bold;
+}
+
 /* 响应式设计 */
 @media (max-width: 1300px) {
   .sessions-table th,
@@ -1159,7 +1621,8 @@ export default {
 
   .sessions-table {
     font-size: 0.75rem;
-    min-width: 1000px; /* 确保表格有最小宽度以保持可读性 */
+    min-width: auto; /* 移除固定最小宽度，让表格适应屏幕 */
+    width: 100%; /* 让表格占满容器宽度 */
   }
 
   .sessions-table th,
@@ -1176,7 +1639,7 @@ export default {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .live-sessions {
     padding: 15px 8px;
     margin: 8px 0;
@@ -1200,30 +1663,68 @@ export default {
     text-align: center;
   }
 
-  .sessions-table {
-    font-size: 0.7rem;
-    min-width: 900px; /* 在平板设备上保持表格可读性 */
+  /* 移动端使用卡片布局 */
+  .desktop-table {
+    display: none; /* 隐藏桌面表格 */
   }
 
-  .sessions-table th,
-  .sessions-table td {
-    padding: 5px 2px;
-    min-width: 60px; /* 确保单元格有足够的宽度 */
+  .cards-container {
+    display: block; /* 显示卡片布局 */
+    width: 100%;
   }
 
   .table-container {
-    overflow-x: auto;
-    border-radius: 15px; /* 适应较小屏幕的圆角 */
+    overflow-x: visible; /* 移动端不需要横向滚动 */
   }
 
-  .title-cell {
-    max-width: 100px;
+  .session-card {
+    margin-bottom: 15px; /* 调整间距 */
+    padding: 12px; /* 调整内边距 */
   }
 
-  .revenue-cell .amount,
-  .revenue-cell .percentage,
-  .total-revenue {
-    font-size: 0.85em; /* 略微放大数字以提高可读性 */
+  .sc-card {
+    margin-bottom: 15px; /* 调整间距 */
+    padding: 12px; /* 调整内边距 */
+  }
+
+  .grid-fields {
+    gap: 6px; /* 调整间距 */
+  }
+
+  .field-box {
+    min-width: 110px; /* 调整最小宽度 */
+    padding: 6px; /* 调整内边距 */
+    flex-direction: column; /* 移动端改为垂直布局 */
+    text-align: center; /* 文字居中 */
+  }
+
+  .field-label {
+    font-size: 0.85em; /* 调整字体大小 */
+    margin-bottom: 2px;
+    margin-right: 0; /* 移动端移除右边距 */
+    text-align: center; /* 文字居中 */
+  }
+
+  .field-value {
+    font-size: 0.95em; /* 调整字体大小 */
+    margin-left: 0; /* 移动端移除左边距 */
+    text-align: center; /* 文字居中 */
+  }
+
+  .grid-header {
+    padding: 6px; /* 调整内边距 */
+  }
+
+  .grid-index {
+    font-size: 1em; /* 调整字体大小 */
+  }
+
+  .grid-title {
+    font-size: 1em; /* 调整字体大小 */
+  }
+
+  .card-body {
+    gap: 5px; /* 调整间距 */
   }
 }
 
@@ -1255,30 +1756,38 @@ export default {
 
   .sessions-table {
     font-size: 0.65rem;
-    min-width: 800px; /* 在小屏幕上保持表格宽度 */
+    min-width: auto;
+    width: 100%;
   }
 
   .sessions-table th,
   .sessions-table td {
-    padding: 4px 1.5px;
+    padding: 6px 4px;
     min-width: 50px;
   }
 
   .title-cell {
     max-width: 80px;
+    white-space: normal; /* 允许标题换行 */
   }
 
   .revenue-cell .amount,
   .revenue-cell .percentage,
   .total-revenue {
-    font-size: 0.9em;
-    word-break: break-word; /* 允许长数字换行 */
+    font-size: 0.75em;
+    text-align: right;
+  }
+
+  /* 仅在移动网格中保留换行处理 */
+  .mobile-grid .revenue-cell .percentage {
+    word-break: break-word;
   }
 
   .sc-btn {
-    padding: 6px 10px;
-    font-size: 0.75rem;
-    min-width: 100px;
+    padding: 6px 8px;
+    font-size: 0.7rem;
+    min-width: 90px;
+    width: 100%;
   }
 }
 
@@ -1307,13 +1816,14 @@ export default {
 
   .sessions-table {
     font-size: 0.6rem;
-    min-width: 700px; /* 在手机上保持表格可读性 */
+    min-width: auto;
+    width: 100%;
   }
 
   .sessions-table th,
   .sessions-table td {
-    padding: 3px 1px;
-    min-width: 45px;
+    padding: 5px 3px;
+    min-width: 40px;
   }
 
   .revenue-cell {
@@ -1326,16 +1836,19 @@ export default {
 
   .title-cell {
     max-width: 60px;
+    white-space: normal; /* 允许标题换行 */
   }
 
   .action-cell {
     text-align: center;
+    min-width: 100px;
   }
 
   .sc-btn {
-    padding: 5px 8px;
-    font-size: 0.7rem;
-    min-width: 90px;
+    padding: 5px 6px;
+    font-size: 0.65rem;
+    min-width: 80px;
+    width: 100%;
   }
 }
 
@@ -1350,19 +1863,21 @@ export default {
 
   .sessions-table {
     font-size: 0.55rem;
-    min-width: 600px; /* 在极小屏幕上保持表格可读性 */
+    min-width: auto; /* 移除固定最小宽度，让表格适应屏幕 */
+    width: 100%;
   }
 
   .sessions-table th,
   .sessions-table td {
-    padding: 2.5px 0.5px;
-    min-width: 40px;
+    padding: 4px 2px;
+    min-width: 35px;
   }
 
   .sc-btn {
-    padding: 4px 6px;
-    font-size: 0.65rem;
-    min-width: 80px;
+    padding: 4px 5px;
+    font-size: 0.6rem;
+    min-width: 70px;
+    width: 100%;
   }
 }
 
@@ -1688,5 +2203,134 @@ export default {
   background: #bbb;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* 宽屏优化：在大屏幕上显示更多列 */
+@media (min-width: 1025px) {
+  .grid-container {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); /* 自动填充，最小420px宽的列 */
+    gap: 20px; /* 卡片间距 */
+    padding: 15px; /* 内边距 */
+  }
+
+  .session-grid-item, .sc-grid-item {
+    margin-bottom: 0; /* 在网格布局中不需要底部边距 */
+    height: fit-content; /* 高度自适应内容 */
+    transition: transform 0.3s ease, box-shadow 0.3s ease; /* 添加悬停效果 */
+  }
+
+  .session-grid-item:hover, .sc-grid-item:hover {
+    transform: translateY(-5px); /* 悬停时轻微上移 */
+    box-shadow: 0 8px 24px rgba(255, 198, 51, 0.4); /* 增强阴影效果 */
+  }
+}
+
+/* 宽屏优化：在大屏幕上显示更多列，与AnchorList一致 */
+@media (min-width: 1025px) {
+  .cards-container {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); /* 自动填充，最小380px宽的列，与AnchorList一致 */
+    gap: 20px; /* 卡片间距，与AnchorList一致 */
+    padding: 15px; /* 内边距，与AnchorList一致 */
+  }
+
+  .session-card, .sc-card {
+    margin-bottom: 0; /* 在网格布局中不需要底部边距 */
+    height: fit-content; /* 高度自适应内容，与AnchorList一致 */
+    transition: transform 0.3s ease, box-shadow 0.3s ease; /* 添加悬停效果，与AnchorList一致 */
+  }
+
+  .session-card:hover, .sc-card:hover {
+    transform: translateY(-5px); /* 悬停时轻微上移，与AnchorList一致 */
+    box-shadow: 0 8px 24px rgba(255, 198, 51, 0.4); /* 增强阴影效果，与AnchorList一致 */
+  }
+}
+
+/* 移动端优化：在小屏幕上优化显示，与AnchorList一致 */
+@media (max-width: 768px) {
+  .card-body {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* 保持网格布局，与AnchorList一致 */
+    gap: 6px; /* 调整间距 */
+  }
+
+  .field-label, .field-value {
+    text-align: left; /* 移动端统一左对齐，与AnchorList一致 */
+    margin: 2px 0; /* 调整间距 */
+  }
+
+  .field-label {
+    font-weight: bold;
+    color: #555;
+  }
+
+  .card-header {
+    flex-direction: column; /* 移动端改为垂直布局 */
+    gap: 5px; /* 调整间距 */
+    text-align: center; /* 文字居中 */
+  }
+
+  .card-index, .card-title {
+    text-align: center; /* 移动端文字居中 */
+  }
+}
+
+/* 更窄屏幕优化 */
+@media (max-width: 600px) {
+  .card-body {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* 保持网格布局，调整最小宽度 */
+    gap: 5px; /* 调整间距 */
+  }
+}
+
+@media (max-width: 480px) {
+  .card-body {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); /* 保持网格布局，调整最小宽度 */
+    gap: 5px; /* 调整间距 */
+  }
+
+  .field-label {
+    font-size: 0.9em; /* 调整字体大小 */
+  }
+
+  .field-value {
+    font-size: 0.95em; /* 调整字体大小 */
+  }
+}
+
+@media (max-width: 360px) {
+  .card-body {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); /* 保持网格布局，调整最小宽度 */
+    gap: 4px; /* 调整间距 */
+  }
+
+  .field-label {
+    font-size: 0.85em; /* 调整字体大小 */
+  }
+
+  .field-value {
+    font-size: 0.9em; /* 调整字体大小 */
+  }
+}
+
+/* 触屏设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  .session-card,
+  .sc-card {
+    /* 为触屏设备添加点击反馈 */
+    tap-highlight-color: transparent;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .session-card:active,
+  .sc-card:active {
+    transform: scale(0.98); /* 点击时轻微缩小 */
+    box-shadow: 0 4px 16px rgba(255, 198, 51, 0.3); /* 减弱阴影 */
+  }
+
+  .field-label:active,
+  .field-value:active {
+    transform: scale(0.99); /* 点击时轻微缩小 */
+  }
 }
 </style>
