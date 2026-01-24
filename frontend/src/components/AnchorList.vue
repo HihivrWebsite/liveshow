@@ -396,11 +396,12 @@
           :rank="index + 1"
           :title="anchor.anchor_name + ' [' + anchor.union + ']'"
           :subtitle="''"
+          :is-live="anchor.status === 1"
           :fields="[
             { label: '关注数', value: formatNumber(anchor.attention), type: 'number' },
             { label: '有效天', value: anchor.effective_days },
             { label: '开播时长', value: anchor.live_duration, type: 'duration' },
-            { label: '开播状态', value: anchor.status === 1 ? '正在直播' : '未开播' },
+            { label: '开播状态', value: anchor.status === 1 ? '正在直播' : '未开播', className: anchor.status === 1 ? 'live-status-field' : 'offline-status-field' },
             { label: '总督', value: anchor.guard_3 || 0 },
             { label: '提督', value: anchor.guard_2 || 0 },
             { label: '舰长', value: anchor.guard_1 || 0 },
@@ -408,7 +409,8 @@
             { label: '礼物收入', value: formatCurrency(anchor.gift), type: 'currency' },
             { label: '舰长收入', value: formatCurrency(anchor.guard), type: 'currency' },
             { label: 'SC收入', value: formatCurrency(anchor.super_chat), type: 'currency' },
-            { label: '总营收', value: formatCurrency(calculateTotalRevenue(anchor)), type: 'currency' }
+            { label: '总营收', value: formatCurrency(calculateTotalRevenue(anchor)), type: 'currency' },
+            { label: '即时同接', value: anchor.current_concurrency !== null ? formatNumber(anchor.current_concurrency) : '未开播', type: anchor.current_concurrency !== null ? 'number' : 'text' }
           ]"
           :action-button="{ text: '查看详细数据', className: 'view-btn' }"
           :action-data="anchor"
@@ -2432,6 +2434,23 @@ export default {
                        currentFilter.value === 'psp' ? 'PSPlive斗虫榜' : '维阿PSP斗虫榜'
         }
         fetchData()
+
+        // 检查是否有scrollTo参数，如果有则跳转到指定元素
+        if (newQuery.scrollTo) {
+          nextTick(() => {
+            const targetElement = document.getElementById(newQuery.scrollTo)
+            if (targetElement) {
+              targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+              // 添加临时高亮效果
+              targetElement.style.transition = 'background-color 0.5s ease'
+              targetElement.style.backgroundColor = 'rgba(249, 114, 154, 0.3)'
+              setTimeout(() => {
+                targetElement.style.backgroundColor = ''
+              }, 2000)
+            }
+          })
+        }
       },
       { immediate: true }
     )
