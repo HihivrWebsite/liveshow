@@ -109,6 +109,9 @@
     </div>
     
     <div v-else class="data-section">
+      <!-- 导航表格 -->
+      <NavigationTable :items="sessions" item-type="session" v-if="sessions.length > 0" />
+
       <!-- SC历史数据展示 -->
       <div v-if="scHistory && scHistory.list && scHistory.list.length > 0" class="sc-history-section hover-effect">
         <h3 style="color: #FFC633; margin-top: 0;">💬 SC历史记录</h3>
@@ -144,89 +147,88 @@
 
       <!-- 移动端：卡片布局 -->
       <div class="cards-container mobile-cards">
-        <div
+        <BaseCard
           v-for="(session, index) in sessions"
           :key="index"
-          class="session-card"
+          card-type="session"
+          :rank="index + 1"
+          :title="session.title"
+          :subtitle="''"
+          :fields="[
+            {
+              label: '开始时间',
+              value: session.start_time.split(' ')[0] + '<br>' + session.start_time.split(' ')[1],
+              type: 'datetime'
+            },
+            {
+              label: '结束时间',
+              value: (session.end_time.split(' ')[0] || '-') + '<br>' + (session.end_time.split(' ')[1] || '-'),
+              type: 'datetime'
+            },
+            {
+              label: '总直播时间',
+              value: formatDurationCell(session.start_time, session.end_time),
+              type: 'duration'
+            },
+            {
+              label: '新增总督',
+              value: (session.end_guard_3 != null ? session.end_guard_3 : 0) - (session.start_guard_3 != null ? session.start_guard_3 : 0),
+              type: 'number'
+            },
+            {
+              label: '新增提督',
+              value: (session.end_guard_2 != null ? session.end_guard_2 : 0) - (session.start_guard_2 != null ? session.start_guard_2 : 0),
+              type: 'number'
+            },
+            {
+              label: '新增舰长',
+              value: (session.end_guard_1 != null ? session.end_guard_1 : 0) - (session.start_guard_1 != null ? session.start_guard_1 : 0),
+              type: 'number'
+            },
+            {
+              label: '新增粉丝团',
+              value: formatNumber((session.end_fans_count != null ? session.end_fans_count : 0) - (session.start_fans_count != null ? session.start_fans_count : 0)),
+              type: 'number'
+            },
+            {
+              label: '弹幕数',
+              value: formatNumber(session.danmaku_count != null ? session.danmaku_count : 0),
+              type: 'number'
+            },
+            {
+              label: '礼物收入',
+              value: formatCurrency(session.gift) + '<br>(' + calculatePercentage(session.gift, calculateTotalRevenue(session)) + '%)',
+              type: 'currency'
+            },
+            {
+              label: '舰长收入',
+              value: formatCurrency(session.guard) + '<br>(' + calculatePercentage(session.guard, calculateTotalRevenue(session)) + '%)',
+              type: 'currency'
+            },
+            {
+              label: 'SC收入',
+              value: formatCurrency(session.super_chat) + '<br>(' + calculatePercentage(session.super_chat, calculateTotalRevenue(session)) + '%)',
+              type: 'currency'
+            },
+            {
+              label: '总营收',
+              value: formatCurrency(calculateTotalRevenue(session)),
+              type: 'currency'
+            }
+          ]"
+          :action-button="{ text: '查看SuperChat详情', className: 'sc-btn hover-effect' }"
+          :action-data="session"
+          @action-click="viewSuperChatDetails(session.start_time, session.end_time)"
         >
-          <div class="card-header">
-            <div class="card-index">#{{ index + 1 }}</div>
-            <div class="card-title">{{ session.title }}</div>
-          </div>
-          <div class="card-body">
-            <div class="field-box">
-              <div class="field-label">开始时间</div>
-              <div class="field-value datetime-cell">
-                <div class="start-time">{{ session.start_time.split(' ')[0] }}</div>
-                <div class="start-time">{{ session.start_time.split(' ')[1] }}</div>
-              </div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">结束时间</div>
-              <div class="field-value datetime-cell">
-                <div class="end-time">{{ session.end_time.split(' ')[0] || '-' }}</div>
-                <div class="end-time">{{ session.end_time.split(' ')[1] || '-' }}</div>
-              </div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">总直播时间</div>
-              <div class="field-value" v-html="formatDurationCell(session.start_time, session.end_time)"></div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">新增总督</div>
-              <div class="field-value number-cell">{{ (session.end_guard_3 != null ? session.end_guard_3 : 0) - (session.start_guard_3 != null ? session.start_guard_3 : 0) }}</div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">新增提督</div>
-              <div class="field-value number-cell">{{ (session.end_guard_2 != null ? session.end_guard_2 : 0) - (session.start_guard_2 != null ? session.start_guard_2 : 0) }}</div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">新增舰长</div>
-              <div class="field-value number-cell">{{ (session.end_guard_1 != null ? session.end_guard_1 : 0) - (session.start_guard_1 != null ? session.start_guard_1 : 0) }}</div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">新增粉丝团</div>
-              <div class="field-value number-cell">{{ formatNumber((session.end_fans_count != null ? session.end_fans_count : 0) - (session.start_fans_count != null ? session.start_fans_count : 0)) }}</div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">弹幕数</div>
-              <div class="field-value number-cell">{{ formatNumber(session.danmaku_count != null ? session.danmaku_count : 0) }}</div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">礼物收入</div>
-              <div class="field-value revenue-cell">
-                <span class="amount">{{ formatCurrency(session.gift) }}</span>
-                <span class="percentage">({{ calculatePercentage(session.gift, calculateTotalRevenue(session)) }}%)</span>
-              </div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">舰长收入</div>
-              <div class="field-value revenue-cell">
-                <span class="amount">{{ formatCurrency(session.guard) }}</span>
-                <span class="percentage">({{ calculatePercentage(session.guard, calculateTotalRevenue(session)) }}%)</span>
-              </div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">SC收入</div>
-              <div class="field-value revenue-cell">
-                <span class="amount">{{ formatCurrency(session.super_chat) }}</span>
-                <span class="percentage">({{ calculatePercentage(session.super_chat, calculateTotalRevenue(session)) }}%)</span>
-              </div>
-            </div>
-            <div class="field-box">
-              <div class="field-label">总营收</div>
-              <div class="field-value total-revenue">{{ formatCurrency(calculateTotalRevenue(session)) }}</div>
-            </div>
-          </div>
-          <div class="card-footer">
+          <template #actions>
             <button
               @click="viewSuperChatDetails(session.start_time, session.end_time)"
               class="sc-btn hover-effect"
             >
               查看SuperChat详情
             </button>
-          </div>
-        </div>
+          </template>
+        </BaseCard>
       </div>
       </div>
     </div>
@@ -234,15 +236,22 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Chart, registerables } from 'chart.js'
 import { anchorAPI } from '@/api'
+import BaseCard from '@/components/BaseCard.vue'
+import NavigationTable from '@/components/NavigationTable.vue'
+import { provideGlobalCardState } from '@/composables/useGlobalCardState'
 
 Chart.register(...registerables)
 
 export default {
   name: 'LiveSessions',
+  components: {
+    BaseCard,
+    NavigationTable
+  },
   setup() {
     const router = useRouter()
     const route = useRoute()
@@ -256,6 +265,10 @@ export default {
     const error = ref(null)
     let sessionChart = null
     const chartCanvas = ref(null)
+
+    // 创建并提供全局卡片状态
+    const globalCardState = provideGlobalCardState()
+    provide('globalCardState', globalCardState)
 
     // 从路由参数获取数据
     const room_id = route.query.room_id
@@ -279,6 +292,7 @@ export default {
     const goBack = () => {
       router.go(-1)
     }
+
 
     // 月份选择器相关
     const showMonthSelector = ref(false)
@@ -662,6 +676,7 @@ export default {
         title.value = `${year}年${monthNum}月直播数据`
         refreshTime.value = response.refresh_time || new Date().toLocaleString()
         console.log('设置标题和刷新时间完成') // 添加调试日志
+
       } catch (err) {
         console.error('获取直播会话数据失败:', err)
         error.value = '获取数据失败，请稍后重试'
@@ -2311,6 +2326,12 @@ export default {
   .field-value {
     font-size: 0.9em; /* 调整字体大小 */
   }
+}
+
+.queried-anchor-card {
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
 }
 
 /* 触屏设备优化 */

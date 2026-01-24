@@ -385,115 +385,66 @@
     </div>
 
     <div v-else class="data-section">
+      <!-- 导航表格 -->
+      <NavigationTable :items="anchors" item-type="anchor" v-if="anchors.length > 0" />
+
       <div class="grid-container">
-          <div
-            v-for="(anchor, index) in anchors"
-            :key="anchor.room_id || index"
-            :class="['anchor-grid-item', { 'live-grid-item': anchor.status === 1 }]"
-          >
-            <div class="grid-header">
-              <div class="grid-rank">#{{ index + 1 }}</div>
-              <div class="grid-name">{{ anchor.anchor_name }}</div>
-              <div class="grid-union">{{ anchor.union }}</div>
-            </div>
-            <div class="grid-fields">
-              <div class="field-box">
-                <div class="field-label">关注数</div>
-                <div class="field-value">{{ formatNumber(anchor.attention) }}</div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">有效天</div>
-                <div class="field-value">{{ anchor.effective_days }}</div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">开播时长</div>
-                <div class="field-value duration-value" v-html="formatDurationWithBreak(anchor.live_duration)"></div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">开播状态</div>
-                <div class="field-value status-field">
-                  <span
-                    :class="[
-                      'status-badge',
-                      { live: anchor.status === 1, offline: anchor.status !== 1 }
-                    ]"
-                  >
-                    <template v-if="anchor.status === 1">
-                      <a
-                        :href="`https://live.bilibili.com/${anchor.room_id}`"
-                        target="_blank"
-                        class="live-link"
-                        :title="`点击跳转到 ${anchor.anchor_name} 的 Bilibili 直播间`"
-                      >
-                        正在直播
-                      </a>
-                    </template>
-                    <template v-else>
-                      未开播
-                    </template>
-                  </span>
-                </div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">总督</div>
-                <div class="field-value">{{ anchor.guard_3 || 0 }}</div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">提督</div>
-                <div class="field-value">{{ anchor.guard_2 || 0 }}</div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">舰长</div>
-                <div class="field-value">{{ anchor.guard_1 || 0 }}</div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">粉丝团</div>
-                <div class="field-value">{{ formatNumber(anchor.fans_count || 0) }}</div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">礼物收入</div>
-                <div class="field-value">{{ formatCurrency(anchor.gift) }}</div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">舰长收入</div>
-                <div class="field-value">{{ formatCurrency(anchor.guard) }}</div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">SC收入</div>
-                <div class="field-value">{{ formatCurrency(anchor.super_chat) }}</div>
-              </div>
-              <div class="field-box">
-                <div class="field-label">总营收</div>
-                <div class="field-value total-revenue">
-                  {{ formatCurrency(calculateTotalRevenue(anchor)) }}
-                </div>
-              </div>
-            </div>
-            <div class="grid-footer">
-              <button
-                @click="viewLiveSessions(anchor.room_id, anchor.union)"
-                class="view-btn"
-              >
-                查看详细数据
-              </button>
-            </div>
-          </div>
-        </div>
+        <BaseCard
+          v-for="(anchor, index) in anchors"
+          :key="anchor.room_id || index"
+          card-type="anchor"
+          :rank="index + 1"
+          :title="anchor.anchor_name + ' [' + anchor.union + ']'"
+          :subtitle="''"
+          :fields="[
+            { label: '关注数', value: formatNumber(anchor.attention), type: 'number' },
+            { label: '有效天', value: anchor.effective_days },
+            { label: '开播时长', value: anchor.live_duration, type: 'duration' },
+            { label: '开播状态', value: anchor.status === 1 ? '正在直播' : '未开播' },
+            { label: '总督', value: anchor.guard_3 || 0 },
+            { label: '提督', value: anchor.guard_2 || 0 },
+            { label: '舰长', value: anchor.guard_1 || 0 },
+            { label: '粉丝团', value: formatNumber(anchor.fans_count || 0), type: 'number' },
+            { label: '礼物收入', value: formatCurrency(anchor.gift), type: 'currency' },
+            { label: '舰长收入', value: formatCurrency(anchor.guard), type: 'currency' },
+            { label: 'SC收入', value: formatCurrency(anchor.super_chat), type: 'currency' },
+            { label: '总营收', value: formatCurrency(calculateTotalRevenue(anchor)), type: 'currency' }
+          ]"
+          :action-button="{ text: '查看详细数据', className: 'view-btn' }"
+          :action-data="anchor"
+          @action-click="viewLiveSessions(anchor.room_id, anchor.union)"
+        >
+          <template #actions>
+            <button
+              @click="viewLiveSessions(anchor.room_id, anchor.union)"
+              class="view-btn"
+            >
+              查看详细数据
+            </button>
+          </template>
+        </BaseCard>
       </div>
     </div>
-
+  </div>
 </template>
 
 <script>
-import { ref, onMounted, watch, nextTick, computed } from 'vue'
+import { ref, onMounted, watch, nextTick, computed, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Chart, registerables } from 'chart.js'
 import { anchorAPI } from '@/api'
+import BaseCard from '@/components/BaseCard.vue'
+import NavigationTable from '@/components/NavigationTable.vue'
+import { provideGlobalCardState } from '@/composables/useGlobalCardState'
 
 Chart.register(...registerables)
 
 export default {
   name: 'AnchorList',
+  components: {
+    BaseCard,
+    NavigationTable
+  },
   setup() {
     const router = useRouter()
     const route = useRoute()
@@ -506,6 +457,10 @@ export default {
     const error = ref(null)
     let currentChart = null
     const chartCanvas = ref(null)
+
+    // 创建并提供全局卡片状态
+    const globalCardState = provideGlobalCardState()
+    provide('globalCardState', globalCardState)
 
     // 从路由参数获取初始值
     const filterFromRoute = route.query.filter || 'all'
@@ -554,6 +509,12 @@ export default {
         path: '/',
         query: { ...route.query, filter: filterType }
       })
+    }
+
+    // 控制所有卡片展开/收起的方法 - 使用全局状态展开所有卡片
+    const toggleAllCards = () => {
+      // 使用全局卡片状态管理器来切换所有卡片的展开状态
+      globalCardState.toggleAllCards();
     }
 
     // 月份选择器相关
@@ -2549,7 +2510,8 @@ export default {
       performClusterAnalysis,
       closeClusterAnalysis,
       drawCluster2DChart,
-      drawCluster3DChart
+      drawCluster3DChart,
+      globalCardState
     }
   }
 }
