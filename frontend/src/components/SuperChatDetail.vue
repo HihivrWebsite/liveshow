@@ -38,6 +38,7 @@
           :style="{ backgroundColor: getSCColor(sc.price) }"
         >
           <div class="sc-header">
+            <span class="sc-additional-text">https<em><strong>斜杠dc点hihivr点top</strong></em></span>
             <span class="sc-name">{{ sc.uname }}</span>
             <span class="sc-uid">UID: {{ sc.uid }}</span>
             <span class="sc-time">{{ sc.send_time }}</span>
@@ -469,6 +470,14 @@ export default {
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7); /* 阴影效果 */
 }
 
+.sc-additional-text {
+  font-size: 0.9rem;
+  color: #cccccc; /* 浅灰色，与sc-uid保持一致 */
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7); /* 阴影效果 */
+  font-style: italic; /* 斜体 */
+  font-weight: bold; /* 加粗 */
+}
+
 .sc-content {
   display: flex;
   justify-content: space-between;
@@ -550,6 +559,10 @@ export default {
     gap: 5px;
   }
 
+  .sc-additional-text {
+    font-size: 0.8rem;
+  }
+
   .action-btn {
     width: 100%;
     max-width: 200px;
@@ -589,6 +602,10 @@ export default {
 
   .sc-price {
     font-size: 1.5rem; /* 进一步减小字体 */
+  }
+
+  .sc-additional-text {
+    font-size: 0.75rem;
   }
 }
 

@@ -17,6 +17,8 @@
 - **前端**: Vue 3 + Vite + Vue Router + Chart.js
 - **API协议**: RESTful API
 - **数据来源**: 从外部API获取主播数据
+- **优化配置**: 包含性能优化的Cargo.toml.optimized配置文件
+- **组件架构**: 采用可复用的BaseCard组件和导航表格
 
 ### 核心功能
 - 展示维阿和PSP工会主播的收入数据
@@ -33,8 +35,19 @@
 liveshow/
 ├── APIDOC.md                       # API文档
 ├── readme.md                       # 项目介绍
+├── responsive_test_optimized.html  # 响应式测试优化页面
+├── RESPONSIVE_TEST_REPORT.md       # 响应式测试报告
+├── responsive_test.html            # 响应式测试页面
+├── scroll_test.html                # 滚动测试页面
+├── simple_start.bat                # 简易Windows启动脚本
+├── snapshot.html                   # 快照页面
 ├── start.bat                       # Windows启动脚本
 ├── start.sh                        # Linux/Mac启动脚本
+├── test_responsive.js              # 响应式测试脚本
+├── test_server_only.bat            # 仅测试服务器批处理
+├── testf.md                        # 测试文档
+├── verify_changes_fixed.js         # 验证更改修复脚本
+├── verify_changes.js               # 验证更改脚本
 ├── frontend/                       # Vue前端项目
 │   ├── package.json                # 前端依赖配置
 │   ├── babel.config.js             # Babel配置文件
@@ -43,6 +56,7 @@ liveshow/
 │   ├── vite.config.js              # Vite构建工具配置
 │   ├── vue.config.js               # Vue CLI配置
 │   ├── public/                     # 静态资源
+│   ├── Douchong/                   # 斗虫榜相关资源
 │   ├── dist/                       # 构建输出目录
 │   ├── src/                        # 前端源代码
 │   │   ├── main.js                 # 前端入口文件
@@ -53,14 +67,18 @@ liveshow/
 │   │   │   └── style.css           # 样式文件
 │   │   ├── components/             # Vue组件
 │   │   │   ├── AnchorList.vue      # 主播列表组件
-│   │   │   ├── SimpleAnchorList.vue # 简化主播列表组件
+│   │   │   ├── BaseCard.vue        # 基础卡片组件
+│   │   │   ├── ExpandedView.vue    # 展开视图组件
 │   │   │   ├── LiveSessions.vue    # 直播会话组件
+│   │   │   ├── NavigationTable.vue # 导航表格组件
 │   │   │   ├── ChartComponent.vue  # 图表组件
 │   │   │   ├── ErrorPage.vue       # 错误页面组件
 │   │   │   ├── HeaderSection.vue   # 页眉组件
 │   │   │   ├── FooterSection.vue   # 页脚组件
 │   │   │   ├── SuperChatDetail.vue # SC详情组件
 │   │   │   └── HelloWorld.vue      # 示例组件
+│   │   ├── composables/            # Vue组合式API函数
+│   │   │   └── useGlobalCardState.js # 全局卡片状态管理
 │   │   ├── router/                 # 路由配置
 │   │   │   └── index.js            # 路由定义
 │   │   └── utils/                  # 工具函数
@@ -68,6 +86,7 @@ liveshow/
 │   └── node_modules/               # 依赖包目录
 └── rust_backend/                   # Rust后端项目
     ├── Cargo.toml                  # Rust依赖配置
+    ├── Cargo.toml.optimized        # 优化版Rust依赖配置
     ├── Cargo.lock                  # Rust依赖锁定文件
     ├── README.md                   # 后端项目说明
     ├── src/                        # 后端源代码
@@ -82,105 +101,52 @@ liveshow/
 graph TB
     subgraph Frontend ["前端应用 (Vue 3)"]
         app[App.vue - 根组件]
-        header[HeaderSection.vue - 页眉组件]
-        anchorlist[AnchorList.vue - 主播列表组件\n- 营收占比分析\n- VR/PSP对比图\n- 回归分析\n- 聚类分析]
-        livesessions[LiveSessions.vue - 直播会话组件\n- 直播数据折线图\n- SC历史记录\n- 多月份统计]
-        footer[FooterSection.vue - 页脚组件]
-        superchatdetail[SuperChatDetail.vue - SC详情组件\n- SC历史详情\n- 时间段筛选]
-        errorpage[ErrorPage.vue - 错误页面组件]
-        chartcomp[ChartComponent.vue - 图表组件\n- Chart.js实现\n- 响应式图表]
+        anchorlist[AnchorList.vue - 主播列表]
+        livesessions[LiveSessions.vue - 直播会话详情]
+        expandedview[ExpandedView.vue - 全展开视图]
+        superchatdetail[SuperChatDetail.vue - SC详情]
+        basecard[BaseCard.vue - 基础卡片组件]
+        navtable[NavigationTable.vue - 导航表格]
+        header[HeaderSection.vue - 页眉]
+        footer[FooterSection.vue - 页脚]
 
-        router[Vue Router - 路由管理\n- / 路由到AnchorList\n- /by-month 路由到AnchorList\n- /live-sessions 路由到LiveSessions\n- /superchat-detail 路由到SuperChatDetail]
-        axios[Axios API - HTTP客户端\n- 请求拦截\n- 响应拦截\n- 错误处理]
-        dataproc[dataProcessor.js - 数据处理工具\n- formatCurrency: 格式化货币\n- formatNumber: 格式化数字\n- calculatePercentage: 计算百分比\n- calculateDuration: 计算持续时间\n- calculateTotalRevenue: 计算总收入\n- debounce: 防抖函数\n- throttle: 节流函数]
-        api_def[api/index.js - API接口定义\n- getAnchors: 获取主播列表\n- getAnchorsByMonth: 按月份获取主播数据\n- getLiveSessions: 获取直播会话详情\n- getSuperChatHistory: 获取SC历史数据]
+        router[Vue Router - 页面路由]
+        api[API接口 - 数据请求]
+        utils[工具函数 - 数据处理]
     end
 
-    subgraph Backend ["后端应用 (Rust/Axum)"]
-        main_rs[main.rs - 主程序入口\n- tokio异步运行时\n- 全局HTTP客户端\n- 请求计数器]
-        axum_router[Axum Router - 路由处理器\n- GET /gift\n- GET /gift/by_month\n- GET /gift/live_sessions\n- GET /gift/sc]
-
-        subgraph Middleware ["HTTP中间件"]
-            cors[CorsLayer - 跨域处理\n- 多域名支持\n- 预检缓存]
-            compress[CompressionLayer - 响应压缩\n- br/gzip压缩\n- 性能优化]
-            trace[TraceLayer - 请求跟踪\n- 日志记录\n- 性能监控]
-        end
-
-        subgraph BusinessLogic ["业务逻辑层"]
-            get_anc[get_anchors - 获取主播列表\n- 参数过滤\n- 并发请求VR/PSP]
-            get_anc_month[get_anchors_by_month - 按月获取主播数据\n- 月份参数处理]
-            get_sess[get_live_sessions - 获取直播会话详情\n- 房间ID验证\n- 工会识别]
-            get_sc_hist[get_sc_history - 获取SC历史数据\n- 数据清洗\n- 格式转换]
-            fetch_anc[fetch_anchor_data - 获取主播数据\n- VR/PSP过滤\n- 数据合并\n- 总营收计算]
-            fetch_ext[fetch_external_api - 获取外部API数据\n- JSON解析\n- 错误处理\n- 数据映射]
-            fetch_sess[fetch_live_session_data - 获取直播会话数据\n- 月份参数\n- 工会判断]
-        end
-
-        subgraph DataModels ["数据模型"]
-            anchor_model[Anchor - 主播数据模型\n- anchor_name: 主播名\n- attention: 关注数\n- effective_days: 有效天\n- fans_count: 粉丝团\n- gift: 礼物收入\n- guard: 舰长收入\n- guard_1, guard_2, guard_3: 舰长数量\n- live_duration: 直播时长\n- room_id: 房间ID\n- status: 状态\n- super_chat: SC收入\n- total_revenue: 总营收\n- union: 工会]
-            session_model[LiveSession - 直播会话模型\n- start_time: 开始时间\n- end_time: 结束时间\n- duration_minutes: 持续分钟\n- 舰长变化: start/end_guard_1/2/3\n- 粉丝团变化: start/end_fans_count\n- danmaku_count: 弹幕数\n- gift: 礼物收入\n- guard: 舰长收入\n- super_chat: SC收入\n- total_revenue: 总营收\n- title: 标题]
-            sc_model[SuperChat - SC消息模型\n- send_time: 发送时间\n- uname: 用户名\n- uid: 用户ID\n- price: 价格\n- message: 消息内容]
-            api_resp[ApiResponse - API响应模型\n- anchors: 主播列表\n- refresh_time: 刷新时间\n- filter: 过滤条件]
-        end
+    subgraph Backend ["后端服务 (Rust/Axum)"]
+        main[main.rs - 主程序]
+        router_b[路由处理器 - API端点]
+        logic[业务逻辑 - 数据处理]
+        models[数据模型 - 类型定义]
     end
 
-    subgraph ExternalAPI ["外部API数据源"]
-        vr_api[VR API - 虚拟主播工会]
-        psp_api[PSP API - PSP工会]
+    subgraph ExternalAPI ["外部数据源"]
+        vr_api[VR API]
+        psp_api[PSP API]
     end
 
-    subgraph ProcessFlow ["数据处理流程"]
-        user_req[用户请求]
-        front_call[前端API调用]
-        back_route[后端路由处理]
-        ext_api[外部API获取]
-        data_proc[数据处理]
-        resp_back[响应返回]
-        front_render[前端渲染]
-    end
-
-    %% 连接关系
     app --> header
     app --> anchorlist
     app --> livesessions
-    app --> footer
+    app --> expandedview
     app --> superchatdetail
-    app --> errorpage
-    app --> chartcomp
+    app --> footer
+    anchorlist --> basecard
+    anchorlist --> navtable
+    livesessions --> basecard
+    livesessions --> navtable
+    expandedview --> basecard
+
     app --> router
+    anchorlist --> api
+    livesessions --> api
+    superchatdetail --> api
+    api --> utils
 
-    anchorlist --> axios
-    livesessions --> axios
-    superchatdetail --> axios
-
-    axios --> front_call
-    front_call --> back_route
-    back_route --> get_anc
-    back_route --> get_anc_month
-    back_route --> get_sess
-    back_route --> get_sc_hist
-
-    get_anc --> fetch_anc
-    get_anc_month --> fetch_anc
-    get_sess --> fetch_sess
-    get_sc_hist --> fetch_ext
-
-    fetch_anc --> ext_api
-    fetch_sess --> ext_api
-    fetch_ext --> ext_api
-
-    ext_api --> vr_api
-    ext_api --> psp_api
-
-    vr_api --> data_proc
-    psp_api --> data_proc
-
-    data_proc --> resp_back
-    resp_back --> front_render
-
-    front_render --> anchorlist
-    front_render --> livesessions
-    front_render --> superchatdetail
+    api --> Backend
+    Backend --> ExternalAPI
 ```
 
 ## 详细功能模块说明
@@ -211,6 +177,8 @@ graph TB
   - 支持回归分析和聚类分析
   - 包含查看详细数据按钮，可跳转到直播会话页面
   - 响应式设计，适配不同屏幕尺寸
+  - 使用BaseCard组件显示主播信息
+  - 集成NavigationTable组件提供快速导航
 
 - **LiveSessions.vue**: 直播会话组件，展示特定主播的详细直播数据
   - 显示指定主播的直播会话详情
@@ -218,15 +186,38 @@ graph TB
   - 显示SC历史记录
   - 支持多月份统计数据
   - 包含跳转到直播间按钮
+  - 使用BaseCard组件显示会话信息
+  - 集成NavigationTable组件提供快速导航
 
 - **SuperChatDetail.vue**: SC详情组件，展示Super Chat历史记录
   - 显示Super Chat历史消息
   - 按时间排序显示
   - 包含发送者信息和金额
+  - 显示额外的网站推广信息
 
 - **ErrorPage.vue**: 错误页面组件，处理页面错误和404
   - 显示错误信息
   - 提供返回首页按钮
+
+- **BaseCard.vue**: 基础卡片组件，用于统一显示主播和会话信息
+  - 可复用的基础卡片组件
+  - 支持自定义字段显示
+  - 包含标题、副标题和操作按钮
+  - 支持货币、数字、时长等格式化显示
+  - 响应式设计，适配不同屏幕尺寸
+  - 包含悬停动画效果
+
+- **NavigationTable.vue**: 导航表格组件，提供快速跳转功能
+  - 显示主播或会话的简要信息
+  - 支持点击跳转到对应卡片位置
+  - 包含平滑滚动和高亮效果
+  - 适配不同类型的数据显示
+
+- **ExpandedView.vue**: 展开视图组件，显示全部展开的卡片
+  - 显示所有卡片默认展开状态
+  - 提供从锚点列表或直播会话页面跳转的视图
+  - 支持返回原页面功能
+  - 包含完整的数据展示
 
 #### 2. 功能组件
 - **ChartComponent.vue**: 图表组件，用于数据可视化
@@ -262,7 +253,14 @@ graph TB
   - /live-sessions 路由到LiveSessions组件
   - /superchat-detail 路由到SuperChatDetail组件
   - /error 路由到ErrorPage组件
+  - /expanded-view 路由到ExpandedView组件
+  - /expanded-view/:source 路由到ExpandedView组件
   - 通配符路由处理404错误
+
+- **composables/useGlobalCardState.js**: 全局卡片状态管理器
+  - provideGlobalCardState(): 提供全局卡片状态
+  - toggleAllCards(): 切换所有卡片的展开/收起状态
+  - 管理所有卡片的展开/收起状态
 
 ### 后端模块
 
@@ -506,6 +504,8 @@ npm run dev
 - `/by-month` - 按月查看主播数据
 - `/live-sessions` - 直播会话详情页面
 - `/superchat-detail` - Super Chat详情页面
+- `/expanded-view` - 全部展开的卡片视图
+- `/expanded-view/:source` - 来源于特定页面的展开视图
 
 ## 构建生产版本
 
@@ -525,17 +525,46 @@ npm run build
 
 ## 特性
 
-- 高性能异步后端处理
+- 高性能异步后端处理（Rust/Axum）
 - 实时主播数据展示
 - 收入统计和可视化
-- 工会对比分析
+- 工会对比分析（VR/PSP）
 - 月份历史数据查询
-- 响应式设计
-- 数据图表可视化
+- 响应式设计，支持多设备访问
+- 数据图表可视化（Chart.js）
 - 直播会话详情
 - Super Chat历史记录
 - 回归分析功能
 - 聚类分析功能
+- 前后端分离架构
+- 自动化测试和验证功能
+- 响应式设计测试工具
+- 服务器状态监控
+- 可复用的卡片组件（BaseCard）
+- 快速导航表格（NavigationTable）
+- 全局卡片状态管理
+- 全部展开视图（ExpandedView）
+- 优化的UI/UX体验
+- 增强的移动端适配
+
+## 新增功能与工具
+
+### 测试与验证工具
+项目中包含了多个测试和验证工具，用于确保应用的稳定性和响应式设计的有效性：
+
+- **test_responsive.js**: 响应式测试脚本，用于自动化测试不同屏幕尺寸下的页面表现
+- **verify_changes.js**: 验证更改脚本，用于检查代码修改对应用功能的影响
+- **verify_changes_fixed.js**: 修复后的验证脚本，用于确认问题已被解决
+- **responsive_test.html**: 响应式测试页面，用于手动测试不同设备尺寸下的显示效果
+- **responsive_test_optimized.html**: 优化后的响应式测试页面，提供更全面的测试场景
+- **RESPONSIVE_TEST_REPORT.md**: 响应式测试报告，记录测试结果和发现的问题
+- **scroll_test.html**: 滚动测试页面，用于测试长页面滚动行为
+- **snapshot.html**: 快照页面，用于捕获和比较UI状态
+- **test_server_only.bat**: 仅测试服务器的批处理脚本，用于验证后端服务状态
+
+### 辅助脚本
+- **simple_start.bat**: 简化的Windows启动脚本，快速启动前后端服务
+- **testf.md**: 测试文档，记录测试过程和结果
 
 ## 开发约定
 
@@ -583,6 +612,15 @@ npm run build
 - 添加数据导出功能
 - 优化移动端用户体验
 - 增加实时数据推送功能
+- 完善自动化测试覆盖范围
+- 增强响应式设计测试工具
+- 优化后端性能配置文件
+- 添加更多数据可视化选项
+- 增强卡片组件的可定制性
+- 优化全局状态管理机制
+- 添加更多的数据筛选和排序功能
+- 增强无障碍访问支持
+- 优化SEO和元数据管理
 
 ## 故障排除
 
@@ -590,6 +628,13 @@ npm run build
 1. **API请求失败**: 检查外部API服务是否正常运行
 2. **跨域问题**: 后端已配置CORS，确保前端请求正确
 3. **构建错误**: 确保所有依赖项都已正确安装
+4. **响应式测试失败**: 检查 test_responsive.js 中的断点设置是否与CSS一致
+5. **服务器启动失败**: 使用 test_server_only.bat 验证后端服务是否正常运行
+6. **性能问题**: 检查是否使用了 Cargo.toml.optimized 中的优化配置
+7. **卡片组件不显示**: 确认BaseCard组件的props传入正确
+8. **导航表格无法跳转**: 检查NavigationTable组件中的ID绑定是否正确
+9. **全局状态管理异常**: 验证useGlobalCardState composable是否正确提供
+10. **展开视图加载失败**: 确认ExpandedView路由参数传递正确
 
 ### 调试信息
 - 后端启动时会在控制台输出调试信息
