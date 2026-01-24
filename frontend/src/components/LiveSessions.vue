@@ -214,6 +214,21 @@
               label: '总营收',
               value: formatCurrency(calculateTotalRevenue(session)),
               type: 'currency'
+            },
+            {
+              label: '平均同接',
+              value: session.avg_concurrency !== null ? session.avg_concurrency.toFixed(2) : 'N/A',
+              type: session.avg_concurrency !== null ? 'number' : 'text'
+            },
+            {
+              label: '最高同接',
+              value: session.max_concurrency !== null ? formatNumber(session.max_concurrency) : 'N/A',
+              type: session.max_concurrency !== null ? 'number' : 'text'
+            },
+            {
+              label: '即时同接',
+              value: session.current_concurrency !== null ? formatNumber(session.current_concurrency) : '未开播',
+              type: session.current_concurrency !== null ? 'number' : 'text'
             }
           ]"
           :action-button="{ text: '查看SuperChat详情', className: 'sc-btn hover-effect' }"
@@ -829,6 +844,23 @@ export default {
 
         const newMonth = newQuery.month || month
         fetchData(newMonth)
+
+        // 检查是否有scrollTo参数，如果有则跳转到指定元素
+        if (newQuery.scrollTo) {
+          nextTick(() => {
+            const targetElement = document.getElementById(newQuery.scrollTo)
+            if (targetElement) {
+              targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+              // 添加临时高亮效果
+              targetElement.style.transition = 'background-color 0.5s ease'
+              targetElement.style.backgroundColor = 'rgba(249, 114, 154, 0.3)'
+              setTimeout(() => {
+                targetElement.style.backgroundColor = ''
+              }, 2000)
+            }
+          })
+        }
       }
     )
 
