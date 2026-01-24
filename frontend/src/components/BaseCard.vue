@@ -1,5 +1,5 @@
 <template>
-  <div :class="['base-card', cardType ? `${cardType}-card` : '']" :id="'card-' + (rank || Math.random())">
+  <div :class="['base-card', cardType ? `${cardType}-card` : '', {'live-card': isLive}]" :id="'card-' + (rank || Math.random())">
     <div class="card-header" v-if="showHeader">
       <div class="header-main">
         <div v-if="rank !== undefined" class="card-rank">#{{ rank }}</div>
@@ -91,6 +91,10 @@ export default {
     actionData: {
       type: [Object, String, Number],
       default: null
+    },
+    isLive: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['action-click'],
@@ -158,6 +162,12 @@ export default {
   transform: translateY(-8px) scale(1.02); /* 上浮并轻微放大 */
   box-shadow: 0 12px 30px rgba(255, 198, 51, 0.4); /* 增强阴影 */
   border-color: #FFA500; /* 边框颜色变化 */
+}
+
+/* 直播状态卡片样式 */
+.base-card.live-card {
+  border: 2px solid #f9729a; /* 洋红色边框表示直播中 */
+  background: #FFF8E1; /* 浅黄色背景 */
 }
 
 /* 光泽扫过效果 */
@@ -334,6 +344,34 @@ export default {
 .field-label:hover {
   color: #FF6600; /* 悬停时更深的颜色 */
   background-color: rgba(255, 165, 0, 0.25); /* 悬停时更深的背景色 */
+}
+
+/* 直播状态字段样式 - 只改变值的样式 */
+.field-box.live-status-field .field-value {
+  background: #f9729a !important; /* 洋红色背景 */
+  color: white !important; /* 白色文字 */
+  border-radius: 30px; /* 胶囊形圆角 */
+  padding: 6px 12px !important; /* 调整内边距 */
+  font-weight: bold; /* 加粗 */
+  text-align: center !important; /* 居中对齐 */
+  display: inline-block; /* 行内块显示 */
+  min-width: 80px; /* 最小宽度 */
+  margin-left: 10px; /* 改为添加左边距，使值靠左对齐 */
+  vertical-align: middle; /* 垂直居中对齐 */
+}
+
+/* 未开播状态字段样式 - 只改变值的样式 */
+.field-box.offline-status-field .field-value {
+  background: #ccc !important; /* 灰色背景 */
+  color: white !important; /* 白色文字 */
+  border-radius: 30px; /* 胶囊形圆角 */
+  padding: 6px 12px !important; /* 调整内边距 */
+  font-weight: bold; /* 加粗 */
+  text-align: center !important; /* 居中对齐 */
+  display: inline-block; /* 行内块显示 */
+  min-width: 80px; /* 最小宽度 */
+  margin-left: 10px; /* 改为添加左边距，使值靠左对齐 */
+  vertical-align: middle; /* 垂直居中对齐 */
 }
 
 .field-value {

@@ -77,5 +77,10 @@ export const anchorAPI = {
 
     console.log('调用SC历史数据API:', `/gift/sc?${params.toString()}`) // 添加调试日志
     return apiClient.get(`/gift/sc?${params.toString()}`)
+  },
+
+  // 获取缓存统计信息
+  getCacheStats: () => {
+    return apiClient.get('/cache/stats')
   }
 }

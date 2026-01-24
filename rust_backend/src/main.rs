@@ -22,6 +22,161 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::timeout;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use lru::LruCache;
+use std::hash::Hash;
+use std::num::NonZeroUsize;
+
+// ==================== 缓存相关定义 ====================
+
+// 缓存条目结构，包含数据和大小估算
+#[derive(Clone)]
+struct CacheEntry {
+    data: Vec<Anchor>,
+    size_estimate: usize,  // 大小估算（字节）
+    timestamp: std::time::SystemTime,  // 缓存时间戳
+}
+
+// 全局缓存，使用LRU策略，限制为5GB (5 * 1024 * 1024 * 1024 bytes)
+const MAX_CACHE_SIZE: usize = 5 * 1024 * 1024 * 1024; // 5GB
+
+// 全局缓存实例
+lazy_static::lazy_static! {
+    static ref GLOBAL_CACHE: Arc<RwLock<CacheManager>> = Arc::new(RwLock::new(CacheManager::new()));
+}
+
+// 缓存管理器
+struct CacheManager {
+    cache: LruCache<String, CacheEntry>,
+    current_size: usize,
+    hit_count: usize,      // 缓存命中次数
+    miss_count: usize,     // 缓存未命中次数
+}
+
+impl CacheManager {
+    fn new() -> Self {
+        // 限制缓存条目数量，配合大小限制
+        let max_entries = 1000; // 合理的条目数量限制
+        let capacity = std::num::NonZeroUsize::new(max_entries).unwrap();
+        CacheManager {
+            cache: LruCache::new(capacity),
+            current_size: 0,
+            hit_count: 0,
+            miss_count: 0,
+        }
+    }
+
+    fn get(&mut self, key: &str) -> Option<&CacheEntry> {
+        if let Some(entry) = self.cache.get(key) {
+            self.hit_count += 1;
+            Some(entry)
+        } else {
+            self.miss_count += 1;
+            None
+        }
+    }
+
+    fn put(&mut self, key: String, entry: CacheEntry) -> bool {
+        // 检查是否会超出大小限制
+        if self.current_size + entry.size_estimate > MAX_CACHE_SIZE {
+            // 如果超出限制，先清理一些旧条目
+            self.evict_old_entries(entry.size_estimate);
+        }
+
+        // 检查是否仍然超出限制
+        if entry.size_estimate <= MAX_CACHE_SIZE {
+            // 移除旧条目（如果存在）并更新大小
+            let old_entry_size = if let Some(old_entry) = self.cache.put(key, entry.clone()) {
+                old_entry.size_estimate
+            } else {
+                0
+            };
+
+            // 更新当前缓存大小
+            self.current_size = self.current_size.saturating_sub(old_entry_size);
+            self.current_size += entry.size_estimate;
+            true
+        } else {
+            false // 单个条目就超过了大小限制
+        }
+    }
+
+    fn evict_old_entries(&mut self, new_entry_size: usize) {
+        // 清理旧条目直到有足够的空间
+        while self.current_size + new_entry_size > MAX_CACHE_SIZE {
+            if let Some((_key, entry)) = self.cache.pop_lru() {
+                self.current_size = self.current_size.saturating_sub(entry.size_estimate);
+                if self.cache.len() == 0 {
+                    break; // 如果缓存为空，跳出循环
+                }
+            } else {
+                break; // 没有更多条目可以清除
+            }
+        }
+    }
+
+    fn get_current_size(&self) -> usize {
+        self.current_size
+    }
+
+    fn get_entry_count(&self) -> usize {
+        self.cache.len()
+    }
+
+    fn get_hit_count(&self) -> usize {
+        self.hit_count
+    }
+
+    fn get_miss_count(&self) -> usize {
+        self.miss_count
+    }
+
+    fn get_hit_rate(&self) -> f64 {
+        let total_requests = self.hit_count + self.miss_count;
+        if total_requests == 0 {
+            0.0
+        } else {
+            self.hit_count as f64 / total_requests as f64
+        }
+    }
+
+    fn reset_stats(&mut self) {
+        self.hit_count = 0;
+        self.miss_count = 0;
+    }
+}
+
+// 获取缓存实例的函数
+async fn get_cache_entry(key: &str) -> Option<CacheEntry> {
+    let mut cache = GLOBAL_CACHE.write().await;
+    if let Some(entry) = cache.get(key) {
+        Some(entry.clone())
+    } else {
+        None
+    }
+}
+
+async fn put_cache_entry(key: String, entry: CacheEntry) -> bool {
+    GLOBAL_CACHE.write().await.put(key, entry)
+}
+
+async fn get_cache_stats() -> (usize, usize) {
+    let cache = GLOBAL_CACHE.read().await;
+    (cache.get_current_size(), cache.get_entry_count())
+}
+
+// 获取缓存命中率统计
+async fn get_cache_hit_stats() -> (usize, usize, f64) {
+    let cache = GLOBAL_CACHE.read().await;
+    let hits = cache.get_hit_count();
+    let misses = cache.get_miss_count();
+    let hit_rate = cache.get_hit_rate();
+    (hits, misses, hit_rate)
+}
+
+// 重置缓存统计
+async fn reset_cache_stats() {
+    GLOBAL_CACHE.write().await.reset_stats();
+}
 
 // ==================== 数据模型定义 ====================
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +199,7 @@ pub struct Anchor {
     pub title: String,
     pub total_revenue: f64,
     pub union: String,
+    pub current_concurrency: Option<i32>,  // 即时同接人数，开播时显示具体数值，未开播时为null
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,6 +221,9 @@ pub struct LiveSession {
     pub super_chat: f64,
     pub total_revenue: f64,
     pub title: String,
+    pub avg_concurrency: Option<f64>,      // 平均同接人数
+    pub current_concurrency: Option<i32>,  // 即时同接人数
+    pub max_concurrency: Option<i32>,      // 最高同接人数
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -192,6 +351,7 @@ async fn main() {
         .route("/gift/by_month", get(get_anchors_by_month))
         .route("/gift/live_sessions", get(get_live_sessions))
         .route("/gift/sc", get(get_sc_history))
+        .route("/cache/stats", get(get_cache_stats_endpoint))
         .nest_service("/assets", get_service(ServeDir::new("../rust_backend/dist/assets")))
         .route("/favicon.ico", get(favicon))
         .fallback(index_handler)
@@ -444,6 +604,29 @@ async fn get_sc_history(
 }
 
 async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Vec<Anchor> {
+    // 生成缓存键
+    let cache_key = format!("{}_{}", filter, month.unwrap_or("current"));
+
+    // 检查是否为过去月份的数据
+    let is_past_month = if let Some(requested_month) = month {
+        // 获取当前月份
+        let current_date = chrono::Utc::now();
+        let current_month = current_date.format("%Y%m").to_string();
+
+        // 比较请求的月份是否早于当前月份
+        requested_month < current_month.as_str()
+    } else {
+        false // 如果没有指定月份，则为当前数据，不缓存
+    };
+
+    // 如果是过去月份的数据，尝试从缓存获取
+    if is_past_month {
+        if let Some(cached_entry) = get_cache_entry(&cache_key).await {
+            println!("从缓存获取数据: {}", cache_key);
+            return cached_entry.data;
+        }
+    }
+
     let mut all_data = Vec::new();
 
     if filter == "all" || filter == "vr" {
@@ -491,7 +674,54 @@ async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Vec<Anchor> {
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
+    // 如果是过去月份的数据，将其缓存
+    if is_past_month {
+        // 估算数据大小（简单估算，实际项目中可能需要更精确的估算）
+        let size_estimate = std::mem::size_of_val(&all_data);
+
+        let cache_entry = CacheEntry {
+            data: all_data.clone(),
+            size_estimate,
+            timestamp: std::time::SystemTime::now(),
+        };
+
+        let success = put_cache_entry(cache_key.clone(), cache_entry).await;
+        if success {
+            let (current_size, entry_count) = get_cache_stats().await;
+            println!("数据已缓存: {}, 当前缓存大小: {} bytes, 条目数: {}, 缓存键: {}",
+                     success, current_size, entry_count, cache_key);
+        } else {
+            println!("缓存失败，数据可能过大");
+        }
+    }
+
     all_data
+}
+
+// 缓存统计信息响应结构
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CacheStatsResponse {
+    hits: usize,
+    misses: usize,
+    hit_rate: f64,
+    current_size: usize,
+    entry_count: usize,
+    max_size: usize,
+}
+
+// 获取缓存统计信息的API端点
+async fn get_cache_stats_endpoint() -> Result<Json<CacheStatsResponse>, StatusCode> {
+    let (hits, misses, hit_rate) = get_cache_hit_stats().await;
+    let (current_size, entry_count) = get_cache_stats().await;
+
+    Ok(Json(CacheStatsResponse {
+        hits,
+        misses,
+        hit_rate,
+        current_size,
+        entry_count,
+        max_size: MAX_CACHE_SIZE,
+    }))
 }
 
 async fn fetch_anchor_data_by_url(url: &str) -> Result<Vec<Anchor>, Box<dyn std::error::Error + Send + Sync>> {
@@ -554,6 +784,7 @@ async fn fetch_external_api(client: &Client, api_url: &str) -> Result<Vec<Anchor
                 title,
                 total_revenue: 0.0,
                 union: "".to_string(),
+                current_concurrency: item.get("current_concurrency").and_then(|v| v.as_i64()).map(|v| v as i32),  // 从外部API获取current_concurrency值
             });
         }
     }
@@ -653,6 +884,9 @@ async fn fetch_live_session_from_api(client: &Client, api_url: &str) -> Result<V
             super_chat,
             total_revenue,
             title,
+            avg_concurrency: item.get("avg_concurrency").and_then(|v| v.as_f64()),
+            current_concurrency: item.get("current_concurrency").and_then(|v| v.as_i64()).map(|v| v as i32),
+            max_concurrency: item.get("max_concurrency").and_then(|v| v.as_i64()).map(|v| v as i32),
         };
 
         println!("Created LiveSession: start_time={}, duration_minutes={}, gift={}, guard={}, super_chat={}",

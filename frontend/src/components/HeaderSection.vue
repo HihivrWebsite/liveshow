@@ -4,28 +4,43 @@
       <div class="logo-section">
         <div class="logo-images">
           <a href="https://smms.app/image/BvHWJNoL2iscPXl" target="_blank">
-            <img 
-              src="https://s2.loli.net/2024/11/16/BvHWJNoL2iscPXl.png" 
-              alt="h222.png" 
+            <img
+              src="https://s2.loli.net/2024/11/16/BvHWJNoL2iscPXl.png"
+              alt="h222.png"
               class="logo-img"
             >
           </a>
           <a href="https://smms.app/image/Q2i7IUqjMDb3pev" target="_blank">
-            <img 
-              src="https://s2.loli.net/2024/11/16/Q2i7IUqjMDb3pev.png" 
-              alt="hihi.png" 
+            <img
+              src="https://s2.loli.net/2024/11/16/Q2i7IUqjMDb3pev.png"
+              alt="hihi.png"
               class="logo-img"
             >
           </a>
         </div>
         <h1 class="site-title">{{ title }}</h1>
       </div>
-      
+
+      <div class="cache-stats">
+        <div class="cache-stat-item stat-orange-full">
+          <span class="stat-label stat-orange">缓存命中率:</span>
+          <span class="stat-value stat-orange">{{ cacheHitRateDisplay }}</span>
+        </div>
+        <div class="cache-stat-item stat-orange-full">
+          <span class="stat-label stat-orange">缓存大小:</span>
+          <span class="stat-value stat-orange">{{ cacheSizeDisplay }}</span>
+        </div>
+        <div class="cache-stat-item stat-orange-full">
+          <span class="stat-label stat-orange">缓存条目:</span>
+          <span class="stat-value stat-orange">{{ cacheEntryCount }}</span>
+        </div>
+      </div>
+
       <div class="header-actions">
         <button @click="goToMainSite" class="action-btn primary">
-          进入向阳Hihi粉丝站主站
+          进入向阳Hihi粉丝站主站<br>为成为向阳人而骄傲
         </button>
-        
+
         <div class="creator-info">
           <p class="creator-text-large">
             特别感谢某热心小礼猫-千秋紫莹提供的斗虫数据API，感谢其对本项目提供了巨大的帮助
@@ -40,14 +55,20 @@
 </template>
 
 <script>
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { anchorAPI } from '@/api'
 
 export default {
   name: 'HeaderSection',
   setup() {
     const route = useRoute()
-    
+
+    // 缓存统计信息
+    const cacheHitRate = ref('N/A')
+    const cacheSize = ref('N/A')
+    const cacheEntryCount = ref('N/A')
+
     const title = computed(() => {
       const filter = route.query.filter || 'all'
       const month = route.query.month
@@ -62,6 +83,47 @@ export default {
       }
     })
 
+    // 格式化字节单位
+    const formatBytes = (bytes) => {
+      if (bytes === 0) return '0 Bytes'
+      const k = 1024
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+      const i = Math.floor(Math.log(bytes) / Math.log(k))
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+    }
+
+    // 获取缓存统计信息
+    const fetchCacheStats = async () => {
+      try {
+        const response = await anchorAPI.getCacheStats()
+        const stats = response.data
+
+        // 更新缓存统计信息
+        cacheHitRate.value = stats.hit_rate ? (stats.hit_rate * 100).toFixed(2) + '%' : 'N/A'
+        cacheSize.value = formatBytes(stats.current_size)
+        cacheEntryCount.value = stats.entry_count || 'N/A'
+      } catch (error) {
+        console.error('获取缓存统计信息失败:', error)
+      }
+    }
+
+    // 每30秒更新一次缓存统计信息
+    let cacheStatsInterval
+    onMounted(() => {
+      // 立即获取一次缓存统计信息
+      fetchCacheStats()
+
+      // 设置定时器定期更新
+      cacheStatsInterval = setInterval(fetchCacheStats, 30000)
+    })
+
+    // 组件卸载时清除定时器
+    onUnmounted(() => {
+      if (cacheStatsInterval) {
+        clearInterval(cacheStatsInterval)
+      }
+    })
+
     const goToMainSite = () => {
       window.open('https://hihivr.top', '_blank')
     }
@@ -73,7 +135,10 @@ export default {
     return {
       title,
       goToMainSite,
-      followCreator
+      followCreator,
+      cacheHitRate,
+      cacheSize,
+      cacheEntryCount
     }
   }
 }
@@ -147,6 +212,44 @@ export default {
   font-size: 1.2rem; /* 缩小一倍 */
   margin-bottom: 10px;
   line-height: 1.4;
+  font-weight: bold;
+}
+
+.cache-stats {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin: 15px 0;
+  flex-wrap: wrap;
+}
+
+.cache-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  margin-bottom: 5px;
+  color: #666;
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #333;
+}
+
+/* Cache statistics orange styling for all screen sizes */
+.stat-orange {
+  color: #FFA500 !important; /* 橙色文字 */
+  font-weight: bold;
+}
+
+.stat-orange-full {
+  color: #FFA500 !important; /* 橙色文字 */
   font-weight: bold;
 }
 

@@ -106,7 +106,7 @@ graph TB
         expandedview[ExpandedView.vue - 全展开视图]
         superchatdetail[SuperChatDetail.vue - SC详情]
         basecard[BaseCard.vue - 基础卡片组件]
-        navtable[NavigationTable.vue - 导航表格]
+        navtable[NavigationTable.vue - 导航表格<br/>支持中键点击新标签页打开]
         header[HeaderSection.vue - 页眉]
         footer[FooterSection.vue - 页脚]
 
@@ -120,6 +120,7 @@ graph TB
         router_b[路由处理器 - API端点]
         logic[业务逻辑 - 数据处理]
         models[数据模型 - 类型定义]
+        cache[CacheManager - 智能缓存<br/>5GB上限，LRU算法，命中率统计]
     end
 
     subgraph ExternalAPI ["外部数据源"]
@@ -146,6 +147,7 @@ graph TB
     api --> utils
 
     api --> Backend
+    Backend --> cache
     Backend --> ExternalAPI
 ```
 
@@ -218,6 +220,13 @@ graph TB
   - 提供从锚点列表或直播会话页面跳转的视图
   - 支持返回原页面功能
   - 包含完整的数据展示
+
+- **NavigationTable.vue**: 导航表格组件，提供快速跳转功能
+  - 显示主播或会话的简要信息
+  - 支持点击跳转到对应卡片位置
+  - 支持中键点击在新标签页打开页面
+  - 包含平滑滚动和高亮效果
+  - 适配不同类型的数据显示
 
 #### 2. 功能组件
 - **ChartComponent.vue**: 图表组件，用于数据可视化
@@ -325,6 +334,16 @@ graph TB
 - **fetch_sc_history**: 获取SC历史数据
   - 根据房间ID和工会获取SC历史
   - 解析返回的SC消息列表
+
+- **CacheManager**: 缓存管理器，实现智能缓存机制
+  - 使用LRU算法管理缓存条目
+  - 限制缓存大小为5GB上限
+  - 仅对过去月份的数据进行缓存
+  - 当前月份数据不缓存以确保实时性
+  - 自动清理旧条目以维持大小限制
+  - 记录缓存命中和未命中次数
+  - 计算并提供缓存命中率统计
+  - 提供重置统计信息功能
 
 #### 3. 数据模型
 - **Anchor**: 主播数据模型
@@ -546,6 +565,8 @@ npm run build
 - 全部展开视图（ExpandedView）
 - 优化的UI/UX体验
 - 增强的移动端适配
+- 中键点击导航按钮在新标签页打开页面
+- 后端智能缓存机制（5GB上限）
 
 ## 新增功能与工具
 
@@ -621,6 +642,8 @@ npm run build
 - 添加更多的数据筛选和排序功能
 - 增强无障碍访问支持
 - 优化SEO和元数据管理
+- 增强导航表格的交互功能（支持中键点击在新标签页打开）
+- 优化后端缓存策略（实现5GB智能缓存机制）
 
 ## 故障排除
 
@@ -635,6 +658,8 @@ npm run build
 8. **导航表格无法跳转**: 检查NavigationTable组件中的ID绑定是否正确
 9. **全局状态管理异常**: 验证useGlobalCardState composable是否正确提供
 10. **展开视图加载失败**: 确认ExpandedView路由参数传递正确
+11. **中键点击导航无响应**: 检查NavigationTable组件中的mousedown事件处理是否正确
+12. **缓存功能异常**: 验证后端CacheManager是否正常工作，检查缓存大小限制是否生效
 
 ### 调试信息
 - 后端启动时会在控制台输出调试信息
