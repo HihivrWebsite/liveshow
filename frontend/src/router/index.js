@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AnchorList from '@/components/AnchorList.vue'
 import LiveSessions from '@/components/LiveSessions.vue'
 import SuperChatDetail from '@/components/SuperChatDetail.vue'
+import ExpandedView from '@/components/ExpandedView.vue'
 import ErrorPage from '@/components/ErrorPage.vue'
 
 const routes = [
@@ -29,6 +30,18 @@ const routes = [
     path: '/error',
     name: 'Error',
     component: ErrorPage,
+    props: true
+  },
+  {
+    path: '/expanded-view',
+    name: 'ExpandedView',
+    component: ExpandedView,
+    props: true
+  },
+  {
+    path: '/expanded-view/:source',
+    name: 'ExpandedViewWithSource',
+    component: ExpandedView,
     props: true
   },
   {
