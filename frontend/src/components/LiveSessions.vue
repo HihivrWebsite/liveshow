@@ -359,8 +359,26 @@ export default {
       if (!startTime || !endTime) return 'N/A'
 
       try {
-        const start = new Date(startTime.replace(' ', 'T'));
-        const end = new Date(endTime.replace(' ', 'T'));
+        // 处理时间格式，确保能正确解析
+        let startStr = startTime;
+        let endStr = endTime;
+
+        // 如果时间格式包含空格，替换为T以便Date.parse能正确解析
+        if (startStr.includes(' ') && !startStr.includes('T')) {
+          startStr = startStr.replace(' ', 'T');
+        }
+        if (endStr.includes(' ') && !endStr.includes('T')) {
+          endStr = endStr.replace(' ', 'T');
+        }
+
+        const start = new Date(startStr);
+        const end = new Date(endStr);
+
+        // 检查日期是否有效
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          console.error('无效的日期格式:', startTime, endTime);
+          return 'N/A';
+        }
 
         const diffMs = end.getTime() - start.getTime();
         const diffMins = Math.round(diffMs / 60000);
@@ -388,7 +406,16 @@ export default {
     }
 
     const formatNumber = (value) => {
-      return parseInt(value || 0).toLocaleString()
+      // 确保处理大数值时不会发生精度丢失
+      const num = Number(value);
+      // 检查是否为有效数字，如果不是则返回0
+      if (isNaN(num) || num === null || num === undefined) {
+        return '0';
+      }
+      // 使用 toLocaleString 进行格式化，这是更安全的方式
+      return num.toLocaleString('en-US', {
+        maximumFractionDigits: 0  // 不显示小数部分
+      });
     }
 
     const formatDurationCell = (startTime, endTime) => {
@@ -424,18 +451,18 @@ export default {
       sessions.value.forEach((session, index) => {
         console.log(`处理第${index+1}个会话:`, session) // 添加调试日志
         const startTime = session.start_time
-        // API返回中没有duration_minutes字段，需要在前端计算
-        const durationMinutes = parseFloat(calculateDuration(session.start_time, session.end_time).split('分钟')[0]) || 0
+        // 使用后端返回的duration_minutes，如果没有则在前端计算
+        const durationMinutes = session.duration_minutes || parseFloat(calculateDuration(session.start_time, session.end_time).split('分钟')[0]) || 0
         const gift = parseFloat(session.gift) || 0
         const guard = parseFloat(session.guard) || 0
         const superChat = parseFloat(session.super_chat) || 0
         const totalRevenue = parseFloat(calculateTotalRevenue(session)) || 0
         // 计算新增数量
-        const newGuard3 = (session.end_guard_3 != null ? session.end_guard_3 : 0) - (session.start_guard_3 != null ? session.start_guard_3 : 0)
-        const newGuard2 = (session.end_guard_2 != null ? session.end_guard_2 : 0) - (session.start_guard_2 != null ? session.start_guard_2 : 0)
-        const newGuard1 = (session.end_guard_1 != null ? session.end_guard_1 : 0) - (session.start_guard_1 != null ? session.start_guard_1 : 0)
-        const newFans = (session.end_fans_count != null ? session.end_fans_count : 0) - (session.start_fans_count != null ? session.start_fans_count : 0)
-        const danmakuCount = session.danmaku_count != null ? session.danmaku_count : 0
+        const newGuard3 = (session.end_guard_3 != null ? Number(session.end_guard_3) : 0) - (session.start_guard_3 != null ? Number(session.start_guard_3) : 0)
+        const newGuard2 = (session.end_guard_2 != null ? Number(session.end_guard_2) : 0) - (session.start_guard_2 != null ? Number(session.start_guard_2) : 0)
+        const newGuard1 = (session.end_guard_1 != null ? Number(session.end_guard_1) : 0) - (session.start_guard_1 != null ? Number(session.start_guard_1) : 0)
+        const newFans = (session.end_fans_count != null ? Number(session.end_fans_count) : 0) - (session.start_fans_count != null ? Number(session.start_fans_count) : 0)
+        const danmakuCount = session.danmaku_count != null ? Number(session.danmaku_count) : 0
 
         labels.push((startTime.split(' ')[0] || '直播场次'))
         giftData.push(gift)
@@ -679,6 +706,35 @@ export default {
         sessions.value = response.sessions || []
         console.log('设置会话数据，数量:', sessions.value.length) // 添加调试日志
 
+        // 输出第一个会话的详细数据，用于调试
+        if (sessions.value.length > 0) {
+          console.log('第一个会话的详细数据:', sessions.value[0]);
+          console.log('第一个会话的关键字段值:', {
+            start_time: sessions.value[0].start_time,
+            end_time: sessions.value[0].end_time,
+            duration_minutes: sessions.value[0].duration_minutes,
+            start_fans_count: sessions.value[0].start_fans_count,
+            end_fans_count: sessions.value[0].end_fans_count,
+            danmaku_count: sessions.value[0].danmaku_count,
+            max_concurrency: sessions.value[0].max_concurrency,
+            start_guard_1: sessions.value[0].start_guard_1,
+            end_guard_1: sessions.value[0].end_guard_1,
+            gift: sessions.value[0].gift,
+            guard: sessions.value[0].guard,
+            super_chat: sessions.value[0].super_chat
+          });
+
+          // 额外调试：检查特定会话（如泽音Melody的周年庆）
+          const meloAnniversary = sessions.value.find(session =>
+            session.title.includes('周年') && session.title.includes('泽音Melody')
+          );
+          if (meloAnniversary) {
+            console.log('泽音Melody周年庆会话数据:', meloAnniversary);
+            console.log('danmaku_count:', meloAnniversary.danmaku_count, typeof meloAnniversary.danmaku_count);
+            console.log('max_concurrency:', meloAnniversary.max_concurrency, typeof meloAnniversary.max_concurrency);
+          }
+        }
+
         if (response.queried_user) {
           queriedUser.value = response.queried_user
         } else if (response.queried_user) {  // 修正拼写错误
@@ -793,19 +849,20 @@ export default {
 
             // 累加每个会话的数据
             sessionsForMonth.forEach(session => {
-              // 将数值字段转换为数字
+              // 将数值字段转换为数字，使用Number()处理大数值
               session.gift = parseFloat(session.gift) || 0
               session.guard = parseFloat(session.guard) || 0
               session.super_chat = parseFloat(session.super_chat) || 0
-              session.start_guard_1 = parseInt(session.start_guard_1) || 0
-              session.start_guard_2 = parseInt(session.start_guard_2) || 0
-              session.start_guard_3 = parseInt(session.start_guard_3) || 0
-              session.end_guard_1 = parseInt(session.end_guard_1) || 0
-              session.end_guard_2 = parseInt(session.end_guard_2) || 0
-              session.end_guard_3 = parseInt(session.end_guard_3) || 0
-              session.start_fans_count = parseInt(session.start_fans_count) || 0
-              session.end_fans_count = parseInt(session.end_fans_count) || 0
-              session.danmaku_count = parseInt(session.danmaku_count) || 0
+              session.start_guard_1 = Number(session.start_guard_1) || 0
+              session.start_guard_2 = Number(session.start_guard_2) || 0
+              session.start_guard_3 = Number(session.start_guard_3) || 0
+              session.end_guard_1 = Number(session.end_guard_1) || 0
+              session.end_guard_2 = Number(session.end_guard_2) || 0
+              session.end_guard_3 = Number(session.end_guard_3) || 0
+              session.start_fans_count = Number(session.start_fans_count) || 0
+              session.end_fans_count = Number(session.end_fans_count) || 0
+              session.danmaku_count = Number(session.danmaku_count) || 0
+              session.duration_minutes = Number(session.duration_minutes) || 0
 
               combinedSessions.push(session)
             })

@@ -18,8 +18,34 @@ export const formatCurrency = (value) => {
  * @returns {string} 格式化后的数字字符串
  */
 export const formatNumber = (value) => {
-  const num = parseInt(value || 0)
-  return isNaN(num) ? '0' : new Intl.NumberFormat().format(num)
+  // 添加调试日志
+  console.log('formatNumber called with:', value, typeof value);
+  // 检查是否为null或undefined
+  if (value === null || value === undefined) {
+    console.log('Value is null or undefined, returning 0');
+    return '0';
+  }
+
+  // 如果已经是格式化后的字符串（包含逗号），先去除逗号再转换为数字
+  let cleanValue = value;
+  if (typeof value === 'string' && value.includes(',')) {
+    cleanValue = value.replace(/,/g, '');  // 去除所有逗号
+    console.log('Cleaned value (removed commas):', cleanValue);
+  }
+
+  const num = Number(cleanValue);
+  console.log('Converted to number:', num);
+  // 检查是否为有效数字
+  if (isNaN(num) || !isFinite(num)) {
+    console.log('Value is NaN or Infinity, returning 0');
+    return '0';
+  }
+  // 使用 toLocaleString 进行格式化，这是更安全的方式
+  const result = num.toLocaleString('en-US', {
+    maximumFractionDigits: 0  // 不显示小数部分
+  });
+  console.log('Final result:', result);
+  return result;
 }
 
 /**
