@@ -111,7 +111,12 @@ export default {
             anchors.value = response.sessions || response.data || [];
             title.value = `${anchorName || '主播'} 的直播会话详情（全部展开视图）`;
           } else {
-            throw new Error('缺少房间ID或工会信息');
+            // 如果缺少必要参数，显示提示信息而不是抛出错误
+            console.warn('缺少房间ID或工会信息，将显示空数据');
+            anchors.value = [];
+            title.value = '直播会话详情（缺少必要参数）';
+            refreshTime.value = new Date().toLocaleString();
+            return; // 提前返回，避免后续处理
           }
         } else {
           // 从AnchorList页面跳转来的，获取主播数据
@@ -126,7 +131,22 @@ export default {
         refreshTime.value = response.refresh_time || new Date().toLocaleString()
       } catch (err) {
         console.error('获取数据失败:', err)
-        error.value = '获取数据失败，请稍后重试'
+        console.error('错误详情:', err.response || err.message || err)
+
+        // 更详细的错误信息处理
+        let errorMessage = '获取数据失败，请稍后重试';
+        if (err.response) {
+          // 服务器响应了错误状态码
+          errorMessage = `服务器错误 (${err.response.status}): ${err.response.data?.message || '请求失败'}`;
+        } else if (err.request) {
+          // 请求已发出但没有收到响应
+          errorMessage = '网络连接失败，请检查网络连接';
+        } else {
+          // 其他错误
+          errorMessage = err.message || '发生未知错误';
+        }
+
+        error.value = errorMessage;
       } finally {
         loading.value = false
       }
