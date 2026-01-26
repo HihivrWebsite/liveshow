@@ -25,6 +25,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use lru::LruCache;
 use std::hash::Hash;
 use std::num::NonZeroUsize;
+use chrono::NaiveDateTime;
 
 // ==================== 缓存相关定义 ====================
 
@@ -178,28 +179,167 @@ async fn reset_cache_stats() {
     GLOBAL_CACHE.write().await.reset_stats();
 }
 
+// 计算两个时间字符串之间的持续时间（分钟）
+fn calculate_duration_minutes(start_time: &str, end_time: &str) -> i32 {
+    if start_time.is_empty() || end_time.is_empty() {
+        return 0;
+    }
+
+    // 解析时间字符串，格式如 "2026-01-01 19:55:04"
+    let start_naive = NaiveDateTime::parse_from_str(start_time, "%Y-%m-%d %H:%M:%S").ok();
+    let end_naive = NaiveDateTime::parse_from_str(end_time, "%Y-%m-%d %H:%M:%S").ok();
+
+    if let (Some(start), Some(end)) = (start_naive, end_naive) {
+        let duration = end.signed_duration_since(start);
+        duration.num_minutes() as i32
+    } else {
+        0 // 解析失败时返回0
+    }
+}
+
+// 将JSON值解析为i64，处理整数和浮点数
+fn parse_to_i64(value: Option<&serde_json::Value>) -> i64 {
+    match value {
+        Some(v) => {
+            if let Some(i) = v.as_i64() {
+                i
+            } else if let Some(f) = v.as_f64() {
+                f as i64  // 将浮点数转换为整数（截断小数部分）
+            } else if let Some(s) = v.as_str() {
+                s.parse::<i64>().unwrap_or(0)  // 尝试解析字符串为整数
+            } else {
+                0
+            }
+        }
+        None => 0,
+    }
+}
+
+// 安全解析为i64的辅助函数，防止类型错误导致崩溃
+fn safe_parse_to_i64(value: Option<&serde_json::Value>) -> i64 {
+    match value {
+        Some(v) => {
+            if v.is_null() {
+                0
+            } else if let Some(i) = v.as_i64() {
+                i
+            } else if let Some(u) = v.as_u64() {
+                u as i64
+            } else if let Some(f) = v.as_f64() {
+                // 检查浮点数是否在i64范围内
+                if f >= i64::MIN as f64 && f <= i64::MAX as f64 {
+                    f as i64
+                } else {
+                    0  // 超出范围则返回0
+                }
+            } else if let Some(s) = v.as_str() {
+                // 尝试解析字符串为整数，先移除可能的千位分隔符
+                let cleaned_str = s.replace(",", "");
+                cleaned_str.parse::<i64>().unwrap_or(0)
+            } else {
+                0  // 无法解析则返回0
+            }
+        }
+        None => 0,
+    }
+}
+
+// 安全解析为f64的辅助函数
+fn safe_parse_to_f64(value: Option<&serde_json::Value>) -> f64 {
+    match value {
+        Some(v) => {
+            if v.is_null() {
+                0.0
+            } else if let Some(i) = v.as_i64() {
+                i as f64
+            } else if let Some(u) = v.as_u64() {
+                u as f64
+            } else if let Some(f) = v.as_f64() {
+                f
+            } else if let Some(s) = v.as_str() {
+                // 尝试解析字符串为浮点数，先移除可能的千位分隔符
+                let cleaned_str = s.replace(",", "");
+                cleaned_str.parse::<f64>().unwrap_or(0.0)
+            } else {
+                0.0  // 无法解析则返回0
+            }
+        }
+        None => 0.0,
+    }
+}
+
+// 安全解析可选f64的辅助函数
+fn safe_parse_optional_f64(value: Option<&serde_json::Value>) -> Option<f64> {
+    match value {
+        Some(v) => {
+            if v.is_null() {
+                None
+            } else if let Some(i) = v.as_i64() {
+                Some(i as f64)
+            } else if let Some(u) = v.as_u64() {
+                Some(u as f64)
+            } else if let Some(f) = v.as_f64() {
+                Some(f)
+            } else if let Some(s) = v.as_str() {
+                let cleaned_str = s.replace(",", "");
+                cleaned_str.parse::<f64>().ok()
+            } else {
+                None  // 无法解析则返回None
+            }
+        }
+        None => None,
+    }
+}
+
+// 安全解析可选i64的辅助函数
+fn safe_parse_optional_i64(value: Option<&serde_json::Value>) -> Option<i64> {
+    match value {
+        Some(v) => {
+            if v.is_null() {
+                None
+            } else if let Some(i) = v.as_i64() {
+                Some(i)
+            } else if let Some(u) = v.as_u64() {
+                Some(u as i64)
+            } else if let Some(f) = v.as_f64() {
+                if f >= i64::MIN as f64 && f <= i64::MAX as f64 {
+                    Some(f as i64)
+                } else {
+                    None  // 超出范围则返回None
+                }
+            } else if let Some(s) = v.as_str() {
+                let cleaned_str = s.replace(",", "");
+                cleaned_str.parse::<i64>().ok()
+            } else {
+                None  // 无法解析则返回None
+            }
+        }
+        None => None,
+    }
+}
+
 // ==================== 数据模型定义 ====================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Anchor {
     pub anchor_name: String,
     pub attention: i64,
-    pub effective_days: i32,
-    pub fans_count: i32,
+    pub effective_days: i64,
+    pub fans_count: i64,
     pub gift: f64,
     pub guard: f64,
-    pub guard_1: i32,
-    pub guard_2: i32,
-    pub guard_3: i32,
+    pub guard_1: i64,
+    pub guard_2: i64,
+    pub guard_3: i64,
     pub live_duration: String,
     pub live_time: String,
     pub month: String,
     pub room_id: u64,
-    pub status: i32,
+    pub status: i64,
     pub super_chat: f64,
     pub title: String,
     pub total_revenue: f64,
     pub union: String,
-    pub current_concurrency: Option<i32>,  // 即时同接人数，开播时显示具体数值，未开播时为null
+    pub current_concurrency: Option<i64>,  // 即时同接人数，开播时显示具体数值，未开播时为null
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,23 +347,23 @@ pub struct LiveSession {
     pub start_time: String,
     pub end_time: String,
     pub duration_minutes: i32,
-    pub start_guard_1: i32,
-    pub start_guard_2: i32,
-    pub start_guard_3: i32,
-    pub end_guard_1: i32,
-    pub end_guard_2: i32,
-    pub end_guard_3: i32,
-    pub start_fans_count: i32,
-    pub end_fans_count: i32,
-    pub danmaku_count: i32,
+    pub start_guard_1: i64,
+    pub start_guard_2: i64,
+    pub start_guard_3: i64,
+    pub end_guard_1: i64,
+    pub end_guard_2: i64,
+    pub end_guard_3: i64,
+    pub start_fans_count: i64,
+    pub end_fans_count: i64,
+    pub danmaku_count: i64,
     pub gift: f64,
     pub guard: f64,
     pub super_chat: f64,
     pub total_revenue: f64,
     pub title: String,
-    pub avg_concurrency: Option<f64>,      // 平均同接人数
-    pub current_concurrency: Option<i32>,  // 即时同接人数
-    pub max_concurrency: Option<i32>,      // 最高同接人数
+    pub avg_concurrency: Option<f64>,
+    pub current_concurrency: Option<i64>,
+    pub max_concurrency: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -750,18 +890,18 @@ async fn fetch_external_api(client: &Client, api_url: &str) -> Result<Vec<Anchor
         for item in items {
             let anchor_name = item.get("anchor_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
             let attention = item.get("attention").and_then(|v| v.as_i64()).unwrap_or(0);
-            let effective_days = item.get("effective_days").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-            let fans_count = item.get("fans_count").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+            let effective_days = parse_to_i64(item.get("effective_days"));
+            let fans_count = parse_to_i64(item.get("fans_count"));
             let gift = item.get("gift").and_then(|v| v.as_f64()).unwrap_or(0.0);
             let guard = item.get("guard").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let guard_1 = item.get("guard_1").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-            let guard_2 = item.get("guard_2").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-            let guard_3 = item.get("guard_3").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+            let guard_1 = parse_to_i64(item.get("guard_1"));
+            let guard_2 = parse_to_i64(item.get("guard_2"));
+            let guard_3 = parse_to_i64(item.get("guard_3"));
             let live_duration = item.get("live_duration").and_then(|v| v.as_str()).unwrap_or("").to_string();
             let live_time = item.get("live_time").and_then(|v| v.as_str()).unwrap_or("").to_string();
             let month = item.get("month").and_then(|v| v.as_str()).unwrap_or(&chrono::Utc::now().format("%Y%m").to_string()).to_string();
             let room_id = item.get("room_id").and_then(|v| v.as_u64()).unwrap_or(0);
-            let status = item.get("status").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+            let status = parse_to_i64(item.get("status"));
             let super_chat = item.get("super_chat").and_then(|v| v.as_f64()).unwrap_or(0.0);
             let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
@@ -784,7 +924,7 @@ async fn fetch_external_api(client: &Client, api_url: &str) -> Result<Vec<Anchor
                 title,
                 total_revenue: 0.0,
                 union: "".to_string(),
-                current_concurrency: item.get("current_concurrency").and_then(|v| v.as_i64()).map(|v| v as i32),  // 从外部API获取current_concurrency值
+                current_concurrency: item.get("current_concurrency").and_then(|v| v.as_i64()),
             });
         }
     }
@@ -846,25 +986,35 @@ async fn fetch_live_session_from_api(client: &Client, api_url: &str) -> Result<V
 
     let mut sessions = Vec::new();
 
-    for item in sessions_array {
+    for (index, item) in sessions_array.iter().enumerate() {
+        // 安全地获取字符串值
         let start_time = item.get("start_time").and_then(|v| v.as_str()).unwrap_or("").to_string();
         let end_time = item.get("end_time").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let duration_minutes = 0;
-        let start_guard_1 = item.get("start_guard_1").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-        let start_guard_2 = item.get("start_guard_2").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-        let start_guard_3 = item.get("start_guard_3").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-        let end_guard_1 = item.get("end_guard_1").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-        let end_guard_2 = item.get("end_guard_2").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-        let end_guard_3 = item.get("end_guard_3").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-        let start_fans_count = item.get("start_fans_count").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-        let end_fans_count = item.get("end_fans_count").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-        let danmaku_count = item.get("danmaku_count").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-        let gift = item.get("gift").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let guard = item.get("guard").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let super_chat = item.get("super_chat").and_then(|v| v.as_f64()).unwrap_or(0.0);
+
+        // 计算持续时间（分钟）
+        let duration_minutes = calculate_duration_minutes(&start_time, &end_time);
+
+        // 安全地解析数值，防止类型错误导致崩溃
+        let start_guard_1 = safe_parse_to_i64(item.get("start_guard_1"));
+        let start_guard_2 = safe_parse_to_i64(item.get("start_guard_2"));
+        let start_guard_3 = safe_parse_to_i64(item.get("start_guard_3"));
+        let end_guard_1 = safe_parse_to_i64(item.get("end_guard_1"));
+        let end_guard_2 = safe_parse_to_i64(item.get("end_guard_2"));
+        let end_guard_3 = safe_parse_to_i64(item.get("end_guard_3"));
+        let start_fans_count = safe_parse_to_i64(item.get("start_fans_count"));
+        let end_fans_count = safe_parse_to_i64(item.get("end_fans_count"));
+        let danmaku_count = safe_parse_to_i64(item.get("danmaku_count"));
+        let gift = safe_parse_to_f64(item.get("gift"));
+        let guard = safe_parse_to_f64(item.get("guard"));
+        let super_chat = safe_parse_to_f64(item.get("super_chat"));
         let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
         let total_revenue = gift + guard + super_chat;
+
+        // 安全地处理可选字段
+        let avg_concurrency = safe_parse_optional_f64(item.get("avg_concurrency"));
+        let current_concurrency = safe_parse_optional_i64(item.get("current_concurrency"));
+        let max_concurrency = safe_parse_optional_i64(item.get("max_concurrency"));
 
         let live_session = LiveSession {
             start_time,
@@ -884,13 +1034,13 @@ async fn fetch_live_session_from_api(client: &Client, api_url: &str) -> Result<V
             super_chat,
             total_revenue,
             title,
-            avg_concurrency: item.get("avg_concurrency").and_then(|v| v.as_f64()),
-            current_concurrency: item.get("current_concurrency").and_then(|v| v.as_i64()).map(|v| v as i32),
-            max_concurrency: item.get("max_concurrency").and_then(|v| v.as_i64()).map(|v| v as i32),
+            avg_concurrency,
+            current_concurrency,
+            max_concurrency,
         };
 
-        println!("Created LiveSession: start_time={}, duration_minutes={}, gift={}, guard={}, super_chat={}",
-                 live_session.start_time, live_session.duration_minutes, live_session.gift, live_session.guard, live_session.super_chat);
+        println!("Created LiveSession {}: start_time={}, duration_minutes={}, gift={}, guard={}, super_chat={}",
+                 index, live_session.start_time, live_session.duration_minutes, live_session.gift, live_session.guard, live_session.super_chat);
 
         sessions.push(live_session);
     }
