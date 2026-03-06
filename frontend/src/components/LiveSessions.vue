@@ -177,17 +177,17 @@
             },
             {
               label: '新增提督',
-              value: (session.end_guard_2 != null ? session.end_guard_2 : 0) - (session.start_guard_2 != null ? session.start_guard_2 : 0),
+              value: session.end_time === null || session.end_time === '' ? '-' : (session.end_guard_2 != null ? session.end_guard_2 : 0) - (session.start_guard_2 != null ? session.start_guard_2 : 0),
               type: 'number'
             },
             {
               label: '新增舰长',
-              value: (session.end_guard_1 != null ? session.end_guard_1 : 0) - (session.start_guard_1 != null ? session.start_guard_1 : 0),
+              value: session.end_time === null || session.end_time === '' ? '-' : (session.end_guard_1 != null ? session.end_guard_1 : 0) - (session.start_guard_1 != null ? session.start_guard_1 : 0),
               type: 'number'
             },
             {
               label: '新增粉丝团',
-              value: formatNumber((session.end_fans_count != null ? session.end_fans_count : 0) - (session.start_fans_count != null ? session.start_fans_count : 0)),
+              value: session.end_time === null || session.end_time === '' ? '-' : formatNumber((session.end_fans_count != null ? session.end_fans_count : 0) - (session.start_fans_count != null ? session.start_fans_count : 0)),
               type: 'number'
             },
             {
@@ -457,11 +457,11 @@ export default {
         const guard = parseFloat(session.guard) || 0
         const superChat = parseFloat(session.super_chat) || 0
         const totalRevenue = parseFloat(calculateTotalRevenue(session)) || 0
-        // 计算新增数量
+        // 计算新增数量，如果直播正在进行中则显示为 0
         const newGuard3 = (session.end_guard_3 != null ? Number(session.end_guard_3) : 0) - (session.start_guard_3 != null ? Number(session.start_guard_3) : 0)
-        const newGuard2 = (session.end_guard_2 != null ? Number(session.end_guard_2) : 0) - (session.start_guard_2 != null ? Number(session.start_guard_2) : 0)
-        const newGuard1 = (session.end_guard_1 != null ? Number(session.end_guard_1) : 0) - (session.start_guard_1 != null ? Number(session.start_guard_1) : 0)
-        const newFans = (session.end_fans_count != null ? Number(session.end_fans_count) : 0) - (session.start_fans_count != null ? Number(session.start_fans_count) : 0)
+        const newGuard2 = session.end_time === null || session.end_time === '' ? 0 : (session.end_guard_2 != null ? Number(session.end_guard_2) : 0) - (session.start_guard_2 != null ? Number(session.start_guard_2) : 0)
+        const newGuard1 = session.end_time === null || session.end_time === '' ? 0 : (session.end_guard_1 != null ? Number(session.end_guard_1) : 0) - (session.start_guard_1 != null ? Number(session.start_guard_1) : 0)
+        const newFans = session.end_time === null || session.end_time === '' ? 0 : (session.end_fans_count != null ? Number(session.end_fans_count) : 0) - (session.start_fans_count != null ? Number(session.start_fans_count) : 0)
         const danmakuCount = session.danmaku_count != null ? Number(session.danmaku_count) : 0
 
         labels.push((startTime.split(' ')[0] || '直播场次'))
