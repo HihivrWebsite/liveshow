@@ -2363,13 +2363,13 @@ export default {
                 combinedAnchors[key].super_chat = parseFloat(anchor.super_chat) || 0
                 combinedAnchors[key].total_revenue = parseFloat(anchor.total_revenue) || 0
               } else {
-                // 累加数据
-                combinedAnchors[key].attention += parseFloat(anchor.attention) || 0
+                // 累加数据（但关注数和粉丝团数使用最后一个月的数据，不累加）
+                combinedAnchors[key].attention = parseFloat(anchor.attention) || 0  // 使用最后一个月的数据
                 combinedAnchors[key].effective_days += parseInt(anchor.effective_days) || 0
                 combinedAnchors[key].guard_1 += parseInt(anchor.guard_1) || 0
                 combinedAnchors[key].guard_2 += parseInt(anchor.guard_2) || 0
                 combinedAnchors[key].guard_3 += parseInt(anchor.guard_3) || 0
-                combinedAnchors[key].fans_count += parseInt(anchor.fans_count) || 0
+                combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0  // 使用最后一个月的数据
                 combinedAnchors[key].gift += parseFloat(anchor.gift) || 0
                 combinedAnchors[key].guard += parseFloat(anchor.guard) || 0
                 combinedAnchors[key].super_chat += parseFloat(anchor.super_chat) || 0

@@ -96,7 +96,7 @@ export default {
     const fetchCacheStats = async () => {
       try {
         const response = await anchorAPI.getCacheStats()
-        const stats = response.data
+        const stats = response
 
         // 更新缓存统计信息
         cacheHitRate.value = stats.hit_rate ? (stats.hit_rate * 100).toFixed(2) + '%' : 'N/A'
@@ -136,8 +136,8 @@ export default {
       title,
       goToMainSite,
       followCreator,
-      cacheHitRate,
-      cacheSize,
+      cacheHitRateDisplay: cacheHitRate,
+      cacheSizeDisplay: cacheSize,
       cacheEntryCount
     }
   }

@@ -90,13 +90,15 @@ export default {
     };
 
     const getItemTitle = (item) => {
+      let title;
       if (props.itemType === 'session') {
         // 直播会话数据
-        return item.title || item.anchor_name || `直播会话 ${item.rank || item.id || 'N/A'}`;
+        title = item.title || item.anchor_name || `直播会话 ${item.rank || item.id || 'N/A'}`;
       } else {
         // 主播数据
-        return item.anchor_name || item.name || `项目 ${item.rank || item.id || 'N/A'}`;
+        title = item.anchor_name || item.name || `项目 ${item.rank || item.id || 'N/A'}`;
       }
+      return title + ' -dc 点 hihivr 点 top';
     };
 
     const getStatus = (item) => {
@@ -123,7 +125,7 @@ export default {
       }
     };
 
-    const titleColumn = props.itemType === 'session' ? '直播标题' : '主播名称';
+    const titleColumn = props.itemType === 'session' ? '直播标题-dc 点 hihivr 点 top' : '主播名称-dc 点 hihivr 点 top';
 
     return {
       scrollToCard,
@@ -147,6 +149,8 @@ export default {
   padding: 15px;
   margin: 20px 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
 }
 
 .table-title {
@@ -167,6 +171,8 @@ export default {
   border-radius: 15px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 5;
 }
 
 .navigation-table th,
