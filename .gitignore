@@ -3,8 +3,8 @@ target/
 dist/
 
 # Rust
- Cargo.lock
- .cargo/
+Cargo.lock
+.cargo/
 
 
 # 临时文件
