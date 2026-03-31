@@ -4,7 +4,7 @@ import axios from 'axios'
 // 创建axios实例
 const apiClient = axios.create({
   baseURL: '/', // 直接调用根路径，后端会处理路由
-  timeout: 10000,
+  timeout: 30000, // 30 秒超时，应对慢响应 API
   headers: {
     'Content-Type': 'application/json'
   }
@@ -82,5 +82,14 @@ export const anchorAPI = {
   // 获取缓存统计信息
   getCacheStats: () => {
     return apiClient.get('/cache/stats')
+  },
+
+  // 获取粉丝数快照
+  getAttention: (roomId, month) => {
+    const params = new URLSearchParams()
+    params.append('room_id', roomId)
+    if (month) params.append('month', month)
+
+    return apiClient.get(`/gift/attention?${params.toString()}`)
   }
 }

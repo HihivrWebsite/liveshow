@@ -364,6 +364,7 @@ pub struct LiveSession {
     pub avg_concurrency: Option<f64>,
     pub current_concurrency: Option<i64>,
     pub max_concurrency: Option<i64>,
+    pub new_fans_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -443,6 +444,12 @@ struct SCQuery {
     union: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct AttentionQuery {
+    room_id: Option<String>,
+    month: Option<String>,
+}
+
 type SharedData = Arc<RwLock<HashMap<String, Vec<Anchor>>>>;
 
 // 全局HTTP客户端，复用连接
@@ -491,6 +498,7 @@ async fn main() {
         .route("/gift/by_month", get(get_anchors_by_month))
         .route("/gift/live_sessions", get(get_live_sessions))
         .route("/gift/sc", get(get_sc_history))
+        .route("/gift/attention", get(get_attention_data))
         .route("/cache/stats", get(get_cache_stats_endpoint))
         .nest_service("/assets", get_service(ServeDir::new("../rust_backend/dist/assets")))
         .route("/favicon.ico", get(favicon))
@@ -596,7 +604,7 @@ async fn get_live_sessions(
 
     println!("Queried user: {}", queried_user);
 
-    let sessions = fetch_live_session_data(&room_id, &union, &month).await;
+    let sessions = fetch_live_session_data(&HTTP_CLIENT, &room_id, &union, &month).await;
 
     Ok(Json(LiveSessionResponse {
         sessions,
@@ -932,7 +940,12 @@ async fn fetch_external_api(client: &Client, api_url: &str) -> Result<Vec<Anchor
     Ok(anchors)
 }
 
-async fn fetch_live_session_data(room_id: &str, union: &str, month: &str) -> Vec<LiveSession> {
+async fn fetch_live_session_data(
+    client: &Client,
+    room_id: &str,
+    union: &str,
+    month: &str,
+) -> Vec<LiveSession> {
     let base_url = if union == "VirtuaReal" || union.starts_with("vr") {
         "https://vr.qianqiuzy.cn"
     } else {
@@ -943,7 +956,7 @@ async fn fetch_live_session_data(room_id: &str, union: &str, month: &str) -> Vec
 
     println!("Fetching live sessions from: {}", api_url);
 
-    match fetch_live_session_from_api(&HTTP_CLIENT, &api_url).await {
+    let mut sessions = match fetch_live_session_from_api(client, &api_url).await {
         Ok(sessions) => {
             println!("Successfully fetched {} sessions", sessions.len());
             sessions
@@ -952,7 +965,20 @@ async fn fetch_live_session_data(room_id: &str, union: &str, month: &str) -> Vec
             println!("Failed to fetch live sessions: {}", e);
             vec![]
         }
+    };
+
+    // 为每个会话计算新增粉丝数
+    for session in &mut sessions {
+        session.new_fans_count = calculate_session_fans_change(
+            client,
+            &session.start_time,
+            &session.end_time,
+            room_id,
+            union,
+        ).await;
     }
+
+    sessions
 }
 
 async fn fetch_live_session_from_api(client: &Client, api_url: &str) -> Result<Vec<LiveSession>, Box<dyn std::error::Error + Send + Sync>> {
@@ -1037,6 +1063,7 @@ async fn fetch_live_session_from_api(client: &Client, api_url: &str) -> Result<V
             avg_concurrency,
             current_concurrency,
             max_concurrency,
+            new_fans_count: -1, // 暂时设为 -1，后续通过 attention API 计算
         };
 
         println!("Created LiveSession {}: start_time={}, duration_minutes={}, gift={}, guard={}, super_chat={}",
@@ -1047,6 +1074,168 @@ async fn fetch_live_session_from_api(client: &Client, api_url: &str) -> Result<V
 
     println!("Parsed {} sessions", sessions.len());
     Ok(sessions)
+}
+
+/// 获取粉丝数快照数据
+async fn get_attention_data(
+    Query(query): Query<AttentionQuery>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let room_id = match query.room_id {
+        Some(id) => id,
+        None => return Err(StatusCode::BAD_REQUEST),
+    };
+
+    // 验证 room_id 为正整数
+    if !room_id.chars().all(|c| c.is_ascii_digit()) || room_id.parse::<u64>().unwrap_or(0) == 0 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let month = query.month.unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
+
+    // 构建外部 API URL - 根据月份判断使用哪个 API
+    // 注意：这里默认使用 vr.qianqiuzy.cn，实际可能需要根据 union 参数决定
+    let base_url = "https://vr.qianqiuzy.cn";
+    let api_url = format!("{}/gift/attention?room_id={}&month={}", base_url, room_id, month);
+
+    println!("Fetching attention data from: {}", api_url);
+
+    match fetch_attention_from_api(&HTTP_CLIENT, &api_url).await {
+        Ok(data) => Ok(Json(data)),
+        Err(e) => {
+            eprintln!("获取粉丝数快照失败：{}, URL: {}", e, api_url);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// 从外部 API 获取粉丝数快照数据
+async fn fetch_attention_from_api(
+    client: &Client,
+    api_url: &str,
+) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+    let response = timeout(
+        Duration::from_secs(10),
+        client.get(api_url)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .header("Accept", "application/json")
+            .send()
+    ).await??;
+
+    let json_text = timeout(
+        Duration::from_secs(10),
+        response.text()
+    ).await??;
+
+    let data: serde_json::Value = serde_json::from_str(&json_text)?;
+    Ok(data)
+}
+
+/// 从日期时间字符串中提取日期部分 (YYYYMMDD 格式)
+fn parse_date_from_datetime(datetime: &str) -> String {
+    if datetime.is_empty() {
+        return String::new();
+    }
+    // 格式："2026-01-01 19:55:04" -> "20260101"
+    let date_part = datetime.split(' ').next().unwrap_or("");
+    date_part.replace("-", "")
+}
+
+/// 获取前一天的日期 (YYYYMMDD 格式)
+fn get_previous_date(date_str: &str) -> Option<String> {
+    if date_str.len() != 8 {
+        return None;
+    }
+
+    let year = date_str[..4].parse::<i32>().ok()?;
+    let month = date_str[4..6].parse::<u32>().ok()?;
+    let day = date_str[6..8].parse::<u32>().ok()?;
+
+    let current_date = chrono::NaiveDate::from_ymd_opt(year, month, day)?;
+    let prev_date = current_date.pred_opt()?;
+
+    Some(prev_date.format("%Y%m%d").to_string())
+}
+
+/// 获取指定日期的粉丝数
+async fn get_attention_for_date(
+    client: &Client,
+    base_url: &str,
+    room_id: &str,
+    date: &str,  // YYYYMMDD
+) -> Option<i64> {
+    let month = &date[..6]; // YYYYMM
+    let api_url = format!("{}/gift/attention?room_id={}&month={}", base_url, room_id, month);
+
+    match fetch_attention_from_api(client, &api_url).await {
+        Ok(response) => {
+            // 从 attention 数组中查找对应日期
+            if let Some(attention_array) = response.get("attention").and_then(|v| v.as_array()) {
+                for snapshot in attention_array {
+                    if let Some(count) = snapshot.get(date).and_then(|v| v.as_str()) {
+                        return count.parse::<i64>().ok();
+                    }
+                }
+            }
+            None
+        }
+        Err(_) => None,
+    }
+}
+
+/// 计算单次直播的粉丝数变化
+async fn calculate_session_fans_change(
+    client: &Client,
+    start_time: &str,
+    end_time: &str,
+    room_id: &str,
+    union: &str,
+) -> i64 {
+    // 1. 解析开始和结束时间
+    let start_date = parse_date_from_datetime(start_time);
+    
+    if start_date.is_empty() {
+        return -1;
+    }
+
+    // 2. 计算结束日期（如果未下播则使用当前时间）
+    let end_date = if end_time.is_empty() {
+        chrono::Utc::now().format("%Y%m%d").to_string()
+    } else {
+        parse_date_from_datetime(end_time)
+    };
+
+    // 3. 计算前一天
+    let start_date_prev = match get_previous_date(&start_date) {
+        Some(d) => d,
+        None => return -1,
+    };
+    
+    let end_date_prev = match get_previous_date(&end_date) {
+        Some(d) => d,
+        None => return -1,
+    };
+
+    // 4. 获取 base_url
+    let base_url = if union == "VirtuaReal" || union.starts_with("vr") {
+        "https://vr.qianqiuzy.cn"
+    } else {
+        "https://psp.qianqiuzy.cn"
+    };
+
+    // 5. 获取开始日期的粉丝数
+    let start_attention = match get_attention_for_date(client, &base_url, room_id, &start_date_prev).await {
+        Some(count) => count,
+        None => return -1,
+    };
+
+    // 6. 获取结束日期的粉丝数
+    let end_attention = match get_attention_for_date(client, &base_url, room_id, &end_date_prev).await {
+        Some(count) => count,
+        None => return -1,
+    };
+
+    // 7. 计算变化
+    end_attention - start_attention
 }
 
 async fn index_handler() -> Html<String> {

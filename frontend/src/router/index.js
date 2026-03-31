@@ -4,6 +4,7 @@ import LiveSessions from '@/components/LiveSessions.vue'
 import SuperChatDetail from '@/components/SuperChatDetail.vue'
 import ExpandedView from '@/components/ExpandedView.vue'
 import ErrorPage from '@/components/ErrorPage.vue'
+import AnchorBattle from '@/components/AnchorBattle.vue'
 
 const routes = [
   {
@@ -42,6 +43,12 @@ const routes = [
     path: '/expanded-view/:source',
     name: 'ExpandedViewWithSource',
     component: ExpandedView,
+    props: true
+  },
+  {
+    path: '/anchor-battle',
+    name: 'AnchorBattle',
+    component: AnchorBattle,
     props: true
   },
   {

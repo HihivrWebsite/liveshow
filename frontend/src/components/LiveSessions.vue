@@ -191,6 +191,13 @@
               type: 'number'
             },
             {
+              label: '新增粉丝数',
+              value: session.new_fans_count !== undefined && session.new_fans_count !== -1 
+                ? formatNumber(session.new_fans_count) 
+                : '-1',
+              type: 'number'
+            },
+            {
               label: '弹幕数',
               value: formatNumber(session.danmaku_count != null ? session.danmaku_count : 0),
               type: 'number'
@@ -446,6 +453,9 @@ export default {
       const newGuard1Data = []  // 新增舰长
       const newFansData = []    // 新增粉丝团
       const danmakuData = []    // 弹幕数
+      const avgConcurrencyData = []  // 平均同接
+      const maxConcurrencyData = []  // 最高同接
+      const newFansCountData = []    // 新增粉丝数 (从后端 API 计算)
 
       console.log('开始处理会话数据，共', sessions.value.length, '个会话') // 添加调试日志
       sessions.value.forEach((session, index) => {
@@ -463,6 +473,11 @@ export default {
         const newGuard1 = session.end_time === null || session.end_time === '' ? 0 : (session.end_guard_1 != null ? Number(session.end_guard_1) : 0) - (session.start_guard_1 != null ? Number(session.start_guard_1) : 0)
         const newFans = session.end_time === null || session.end_time === '' ? 0 : (session.end_fans_count != null ? Number(session.end_fans_count) : 0) - (session.start_fans_count != null ? Number(session.start_fans_count) : 0)
         const danmakuCount = session.danmaku_count != null ? Number(session.danmaku_count) : 0
+        // 同接人数和新增粉丝数
+        const avgConcurrency = session.avg_concurrency !== null ? Number(session.avg_concurrency) : 0
+        const maxConcurrency = session.max_concurrency !== null ? Number(session.max_concurrency) : 0
+        const newFansCount = session.new_fans_count !== undefined && session.new_fans_count !== -1 
+          ? Number(session.new_fans_count) : 0
 
         labels.push((startTime.split(' ')[0] || '直播场次'))
         giftData.push(gift)
@@ -475,6 +490,9 @@ export default {
         newGuard1Data.push(newGuard1)
         newFansData.push(newFans)
         danmakuData.push(danmakuCount)
+        avgConcurrencyData.push(avgConcurrency)
+        maxConcurrencyData.push(maxConcurrency)
+        newFansCountData.push(newFansCount)
         console.log(`会话${index+1}处理完成，数据:`, {
           durationMinutes,
           gift,
@@ -485,7 +503,10 @@ export default {
           newGuard2,
           newGuard1,
           newFans,
-          danmakuCount
+          danmakuCount,
+          avgConcurrency,
+          maxConcurrency,
+          newFansCount
         }) // 添加调试日志
       })
 
@@ -630,6 +651,42 @@ export default {
               pointHoverRadius: 10,
               tension: 0.4,
               pointStyle: 'circle'  // 圆形，加粗显示
+            },
+            {
+              label: '平均同接',
+              data: avgConcurrencyData,
+              borderColor: '#2E86AB',
+              backgroundColor: 'rgba(46, 134, 171, 0.1)',
+              yAxisID: 'y2',
+              fill: true,
+              pointRadius: 5,
+              pointHoverRadius: 8,
+              tension: 0.4,
+              pointStyle: 'circle'  // 圆形
+            },
+            {
+              label: '最高同接',
+              data: maxConcurrencyData,
+              borderColor: '#A23B72',
+              backgroundColor: 'rgba(162, 59, 114, 0.1)',
+              yAxisID: 'y2',
+              fill: true,
+              pointRadius: 5,
+              pointHoverRadius: 8,
+              tension: 0.4,
+              pointStyle: 'triangle'  // 三角形
+            },
+            {
+              label: '新增粉丝数',
+              data: newFansCountData,
+              borderColor: '#F18F01',
+              backgroundColor: 'rgba(241, 143, 1, 0.1)',
+              yAxisID: 'y2',
+              fill: true,
+              pointRadius: 5,
+              pointHoverRadius: 8,
+              tension: 0.4,
+              pointStyle: 'rect'  // 矩形
             }
           ]
         },
@@ -665,6 +722,18 @@ export default {
               title: {
                 display: true,
                 text: '收入 (元)'
+              },
+              grid: {
+                drawOnChartArea: false,
+              },
+            },
+            y2: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: '人数'
               },
               grid: {
                 drawOnChartArea: false,
