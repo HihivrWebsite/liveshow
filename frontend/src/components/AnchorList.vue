@@ -386,7 +386,19 @@
 
     <div v-else class="data-section">
       <!-- 导航表格 -->
-      <NavigationTable :items="anchors" item-type="anchor" v-if="anchors.length > 0" />
+      <NavigationTable 
+        :items="anchors" 
+        item-type="anchor" 
+        v-if="anchors.length > 0"
+        @open-battle="openBattleModal"
+      />
+
+      <!-- 恶意斗虫组件 -->
+      <AnchorBattle 
+        v-if="showBattle"
+        :initial-anchors="battleAnchors"
+        @close="closeBattleModal"
+      />
 
       <div class="grid-container">
         <BaseCard
@@ -437,6 +449,7 @@ import { Chart, registerables } from 'chart.js'
 import { anchorAPI } from '@/api'
 import BaseCard from '@/components/BaseCard.vue'
 import NavigationTable from '@/components/NavigationTable.vue'
+import AnchorBattle from '@/components/AnchorBattle.vue'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
 
 Chart.register(...registerables)
@@ -445,7 +458,8 @@ export default {
   name: 'AnchorList',
   components: {
     BaseCard,
-    NavigationTable
+    NavigationTable,
+    AnchorBattle
   },
   setup() {
     const router = useRouter()
@@ -460,6 +474,21 @@ export default {
     let currentChart = null
     const chartCanvas = ref(null)
 
+
+
+    // 恶意斗虫相关
+    const showBattle = ref(false)
+    const battleAnchors = ref([])
+
+    const openBattleModal = (selectedAnchors) => {
+      battleAnchors.value = selectedAnchors
+      showBattle.value = true
+    }
+
+    const closeBattleModal = () => {
+      showBattle.value = false
+      battleAnchors.value = []
+    }
     // 创建并提供全局卡片状态
     const globalCardState = provideGlobalCardState()
     provide('globalCardState', globalCardState)
@@ -2530,6 +2559,11 @@ export default {
       closeClusterAnalysis,
       drawCluster2DChart,
       drawCluster3DChart,
+      // 恶意斗虫相关
+      showBattle,
+      battleAnchors,
+      openBattleModal,
+      closeBattleModal,
       globalCardState
     }
   }
