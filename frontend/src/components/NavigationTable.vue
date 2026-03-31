@@ -1,24 +1,12 @@
 <template>
   <div class="navigation-table-container">
     <h3 class="table-title">📋 快速导航</h3>
-    
-    <!-- 恶意斗虫控制按钮 -->
-    <div class="battle-controls" v-if="itemType === 'anchor'">
-      <button 
-        v-if="selectedAnchors.length > 0" 
-        @click.stop="openBattleModal"
-        class="battle-btn">
-        🎯 恶意斗虫 ({{ selectedAnchors.length }})
-      </button>
-    </div>
-    
     <div class="table-wrapper">
       <table class="navigation-table">
         <thead>
           <tr>
             <th class="rank-col">排名</th>
             <th class="title-col">{{ titleColumn }}</th>
-            <th class="battle-col">恶意对比</th>
             <th class="status-col">开播状态</th>
             <th class="revenue-col">总营收</th>
             <th class="action-col">操作</th>
@@ -33,14 +21,6 @@
           >
             <td class="rank-cell">{{ index + 1 }}</td>
             <td class="title-cell">{{ getItemTitle(item) }}</td>
-            <td class="battle-cell" @click.stop>
-              <input 
-                type="checkbox" 
-                :id="'battle-' + item.room_id"
-                :checked="selectedAnchors.some(a => a.room_id === item.room_id)"
-                @change="toggleBattleSelect(item)">
-              <label :for="'battle-' + item.room_id">对比</label>
-            </td>
             <td class="status-cell" :class="{ 'live-status': isLive(item) }">{{ getStatus(item) }}</td>
             <td class="revenue-cell">{{ formatCurrency(calculateTotalRevenue(item)) }}</td>
             <td class="action-cell">
@@ -70,38 +50,7 @@ export default {
     },
     itemType: {
       type: String,
-      default: 'anchor'
-    }
-  },
-  data() {
-    return {
-      selectedAnchors: []
-    }
-  },
-  methods: {
-    toggleBattleSelect(item) {
-      const index = this.selectedAnchors.findIndex(a => a.room_id === item.room_id);
-      if (index > -1) {
-        this.selectedAnchors.splice(index, 1);
-      } else {
-        if (this.selectedAnchors.length >= 10) {
-          alert('最多只能选择 10 个主播进行对比');
-          return;
-        }
-        // 确保传递 union 字段
-        this.selectedAnchors.push({
-          room_id: item.room_id,
-          anchor_name: item.anchor_name,
-          union: item.union || 'VirtuaReal'
-        });
-      }
-    },
-    openBattleModal() {
-      if (this.selectedAnchors.length < 2) {
-        alert('请至少选择 2 个主播进行对比');
-        return;
-      }
-      this.$emit('open-battle', this.selectedAnchors);
+      default: 'anchor' // 'anchor' for anchors, 'session' for live sessions
     }
   },
   setup(props) {
@@ -112,6 +61,8 @@ export default {
           behavior: 'smooth',
           block: 'start'
         });
+
+        // 添加临时高亮效果
         cardElement.style.transition = 'background-color 0.5s ease';
         cardElement.style.backgroundColor = 'rgba(249, 114, 154, 0.3)';
         setTimeout(() => {
@@ -121,8 +72,11 @@ export default {
     };
 
     const handleMiddleClick = (event, index) => {
-      if (event.button === 1) {
+      if (event.button === 1) { // 中键点击 (鼠标滚轮)
+        // 获取目标卡片元素的ID
         const targetId = `card-${index + 1}`;
+
+        // 在新标签页中打开当前页面，但需要通过查询参数传递目标ID
         const newUrl = `${window.location.origin}${window.location.pathname}?scrollTo=${targetId}`;
         window.open(newUrl, '_blank');
       }
@@ -138,8 +92,10 @@ export default {
     const getItemTitle = (item) => {
       let title;
       if (props.itemType === 'session') {
+        // 直播会话数据
         title = item.title || item.anchor_name || `直播会话 ${item.rank || item.id || 'N/A'}`;
       } else {
+        // 主播数据
         title = item.anchor_name || item.name || `项目 ${item.rank || item.id || 'N/A'}`;
       }
       return title + ' -dc 点 hihivr 点 top';
@@ -147,8 +103,10 @@ export default {
 
     const getStatus = (item) => {
       if (props.itemType === 'session') {
+        // 直播会话数据，不显示状态
         return '-';
       } else {
+        // 主播数据，显示开播状态
         if (item.status === 1) {
           return '直播中';
         } else {
@@ -159,8 +117,10 @@ export default {
 
     const isLive = (item) => {
       if (props.itemType === 'session') {
+        // 直播会话数据，不适用
         return false;
       } else {
+        // 主播数据，判断是否直播
         return item.status === 1;
       }
     };
@@ -200,29 +160,6 @@ export default {
   font-size: 1.2em;
 }
 
-.battle-controls {
-  text-align: center;
-  margin: 15px 0;
-}
-
-.battle-btn {
-  background: linear-gradient(45deg, #ff6b6b, #ff4757);
-  color: white;
-  padding: 12px 24px;
-  border: none;
-  border-radius: 25px;
-  font-size: 1rem;
-  font-weight: bold;
-  cursor: pointer;
-  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
-  transition: all 0.3s ease;
-}
-
-.battle-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
-}
-
 .table-wrapper {
   overflow-x: auto;
 }
@@ -240,10 +177,9 @@ export default {
 
 .navigation-table th,
 .navigation-table td {
-  padding: 12px 10px;
+  padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid #FFC633;
-  font-size: 1rem;
 }
 
 .navigation-table th {
@@ -253,7 +189,6 @@ export default {
   position: sticky;
   top: 0;
   z-index: 10;
-  font-size: 1.05rem;
 }
 
 .nav-row {
@@ -267,72 +202,55 @@ export default {
 
 .rank-col, .rank-cell {
   text-align: center;
-  width: 100px;
+  width: 80px;
 }
 
 .title-col, .title-cell {
-  min-width: 250px;
-}
-
-.battle-col, .battle-cell {
-  text-align: center;
-  width: 120px;
-}
-
-.battle-cell input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  margin-right: 6px;
-  cursor: pointer;
-}
-
-.battle-cell label {
-  cursor: pointer;
-  color: #f9729a;
-  font-weight: bold;
-  font-size: 0.95rem;
-  padding: 4px 8px;
+  min-width: 200px;
 }
 
 .status-col, .status-cell {
   text-align: center;
-  width: 100px;
+  width: 80px;
 }
 
 .status-cell.live-status {
-  background-color: #f9729a;
+  background-color: #f9729a; /* 洋红色背景表示直播中 */
   color: white;
   font-weight: bold;
-  border-radius: 30px;
-  padding: 5px 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 90px;
-  height: 28px;
-  box-sizing: border-box;
-  font-size: 0.9rem;
+  border-radius: 30px; /* 胶囊形圆角 */
+  padding: 3px 8px; /* 调整内边距以匹配按钮样式 */
+  display: inline-block; /* 行内块显示 */
+  min-width: 80px; /* 最小宽度 */
+  text-align: center; /* 居中对齐 */
+  line-height: 1.4; /* 调整行高以实现垂直居中 */
+  box-sizing: border-box; /* 确保padding不会超出边界 */
+  vertical-align: middle; /* 垂直居中对齐 */
+  align-self: center; /* 自身居中对齐 */
+  height: calc(1.4em + 6px); /* 设置高度以匹配按钮样式 */
+  display: flex; /* 使用flex布局 */
+  align-items: center; /* 垂直居中内容 */
+  justify-content: center; /* 水平居中内容 */
 }
 
 .revenue-col, .revenue-cell {
   text-align: right;
-  width: 150px;
-  font-size: 1rem;
+  width: 120px;
 }
 
 .action-col, .action-cell {
   text-align: center;
-  width: 100px;
+  width: 80px;
 }
 
 .jump-btn {
   background: #f9729a;
   color: white;
   border: none;
-  border-radius: 18px;
-  padding: 6px 16px;
+  border-radius: 15px;
+  padding: 4px 12px;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.8em;
   transition: background 0.3s ease;
 }
 
@@ -346,11 +264,11 @@ export default {
     padding: 8px 5px;
     font-size: 0.85em;
   }
-
+  
   .title-col, .title-cell {
     min-width: 150px;
   }
-
+  
   .revenue-col, .revenue-cell {
     width: 100px;
   }
@@ -360,16 +278,16 @@ export default {
   .navigation-table {
     font-size: 0.8em;
   }
-
+  
   .navigation-table th,
   .navigation-table td {
     padding: 6px 4px;
   }
-
+  
   .title-col, .title-cell {
     min-width: 120px;
   }
-
+  
   .revenue-col, .revenue-cell {
     width: 80px;
   }

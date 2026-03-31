@@ -1,4 +1,4 @@
-﻿# 维阿PSP斗虫榜
+# 维阿PSP斗虫榜
 
 一个用于展示维阿（VirtuaReal）和PSP（PSPlive）工会主播直播数据的应用。
 
@@ -28,20 +28,6 @@
 - 按工会筛选功能（VR/PSP/全部）
 - Super Chat历史记录查看
 - 回归分析和聚类分析功能
-- **恶意斗虫功能**：多主播数据对比分析
-  - 支持选择多个主播进行对比
-  - 支持选择日期范围（起始月份和结束月份）
-  - 支持切换对比指标（13 种指标可选）
-  - 支持显示/隐藏特定主播的折线
-  - 支持导出图表为 PNG 图片
-  - 支持 Debug 面板查看原始数据
-  - 超大图表尺寸（8000x1800px），支持横向滚动
-  - **数据获取优化**：
-    - 30 秒超时配置，应对慢响应 API
-    - 自动重试机制（最多 3 次，间隔 2 秒）
-    - 智能检测数据完整性
-    - 🔄 刷新/补全数据功能
-    - 数据缺失警告提示
 
 ## 项目结构
 
@@ -49,19 +35,8 @@
 liveshow/
 ├── APIDOC.md                       # API文档
 ├── readme.md                       # 项目介绍
-├── responsive_test_optimized.html  # 响应式测试优化页面
-├── RESPONSIVE_TEST_REPORT.md       # 响应式测试报告
-├── responsive_test.html            # 响应式测试页面
-├── scroll_test.html                # 滚动测试页面
-├── simple_start.bat                # 简易Windows启动脚本
-├── snapshot.html                   # 快照页面
 ├── start.bat                       # Windows启动脚本
 ├── start.sh                        # Linux/Mac启动脚本
-├── test_responsive.js              # 响应式测试脚本
-├── test_server_only.bat            # 仅测试服务器批处理
-├── testf.md                        # 测试文档
-├── verify_changes_fixed.js         # 验证更改修复脚本
-├── verify_changes.js               # 验证更改脚本
 ├── frontend/                       # Vue前端项目
 │   ├── package.json                # 前端依赖配置
 │   ├── babel.config.js             # Babel配置文件
@@ -70,8 +45,6 @@ liveshow/
 │   ├── vite.config.js              # Vite构建工具配置
 │   ├── vue.config.js               # Vue CLI配置
 │   ├── public/                     # 静态资源
-│   ├── Douchong/                   # 斗虫榜相关资源
-│   ├── dist/                       # 构建输出目录
 │   ├── src/                        # 前端源代码
 │   │   ├── main.js                 # 前端入口文件
 │   │   ├── App.vue                 # 根组件
@@ -97,7 +70,6 @@ liveshow/
 │   │   │   └── index.js            # 路由定义
 │   │   └── utils/                  # 工具函数
 │   │       └── dataProcessor.js    # 数据处理工具
-│   └── node_modules/               # 依赖包目录
 └── rust_backend/                   # Rust后端项目
     ├── Cargo.toml                  # Rust依赖配置
     ├── Cargo.toml.optimized        # 优化版Rust依赖配置
@@ -105,7 +77,6 @@ liveshow/
     ├── README.md                   # 后端项目说明
     ├── src/                        # 后端源代码
     │   └── main.rs                 # 后端主程序
-    ├── dist/                       # 分发目录
     └── target/                     # 编译输出目录
 ```
 
@@ -554,7 +525,7 @@ cargo build --release
 cd frontend
 npm run build
 ```
-构建结果位于 `dist/` 目录
+前端构建结果位于 `frontend/dist/` 目录
 
 ## 特性
 
@@ -582,24 +553,10 @@ npm run build
 - 中键点击导航按钮在新标签页打开页面
 - 后端智能缓存机制（5GB上限）
 
-## 新增功能与工具
+## 启动脚本
 
-### 测试与验证工具
-项目中包含了多个测试和验证工具，用于确保应用的稳定性和响应式设计的有效性：
-
-- **test_responsive.js**: 响应式测试脚本，用于自动化测试不同屏幕尺寸下的页面表现
-- **verify_changes.js**: 验证更改脚本，用于检查代码修改对应用功能的影响
-- **verify_changes_fixed.js**: 修复后的验证脚本，用于确认问题已被解决
-- **responsive_test.html**: 响应式测试页面，用于手动测试不同设备尺寸下的显示效果
-- **responsive_test_optimized.html**: 优化后的响应式测试页面，提供更全面的测试场景
-- **RESPONSIVE_TEST_REPORT.md**: 响应式测试报告，记录测试结果和发现的问题
-- **scroll_test.html**: 滚动测试页面，用于测试长页面滚动行为
-- **snapshot.html**: 快照页面，用于捕获和比较UI状态
-- **test_server_only.bat**: 仅测试服务器的批处理脚本，用于验证后端服务状态
-
-### 辅助脚本
-- **simple_start.bat**: 简化的Windows启动脚本，快速启动前后端服务
-- **testf.md**: 测试文档，记录测试过程和结果
+- **start.bat**: Windows 一键启动前后端服务
+- **start.sh**: Linux/Mac 一键启动前后端服务
 
 ## 开发约定
 
@@ -665,8 +622,8 @@ npm run build
 1. **API请求失败**: 检查外部API服务是否正常运行
 2. **跨域问题**: 后端已配置CORS，确保前端请求正确
 3. **构建错误**: 确保所有依赖项都已正确安装
-4. **响应式测试失败**: 检查 test_responsive.js 中的断点设置是否与CSS一致
-5. **服务器启动失败**: 使用 test_server_only.bat 验证后端服务是否正常运行
+4. **响应式布局异常**: 检查 `frontend/src/assets/style.css` 与相关 Vue 组件中的断点设置是否一致
+5. **服务器启动失败**: 直接运行 `start.bat` / `start.sh`，或进入 `rust_backend` 执行 `cargo run` 查看报错
 6. **性能问题**: 检查是否使用了 Cargo.toml.optimized 中的优化配置
 7. **卡片组件不显示**: 确认BaseCard组件的props传入正确
 8. **导航表格无法跳转**: 检查NavigationTable组件中的ID绑定是否正确
