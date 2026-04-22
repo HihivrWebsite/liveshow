@@ -21,18 +21,31 @@
         <h1 class="site-title">{{ title }}</h1>
       </div>
 
-      <div class="cache-stats">
-        <div class="cache-stat-item stat-orange-full">
-          <span class="stat-label stat-orange">缓存命中率:</span>
-          <span class="stat-value stat-orange">{{ cacheHitRateDisplay }}</span>
+      <div class="cache-stats-grid">
+        <div class="cache-stat-item">
+          <span class="stat-label">缓存命中率</span>
+          <span class="stat-value">{{ cacheHitRateDisplay }}</span>
         </div>
-        <div class="cache-stat-item stat-orange-full">
-          <span class="stat-label stat-orange">缓存大小:</span>
-          <span class="stat-value stat-orange">{{ cacheSizeDisplay }}</span>
+        <div class="cache-stat-item">
+          <span class="stat-label">缓存占用</span>
+          <span class="stat-value">{{ cacheSizeDisplay }}</span>
+          <span class="stat-subvalue">最大容量 {{ cacheMaxSizeDisplay }}</span>
         </div>
-        <div class="cache-stat-item stat-orange-full">
-          <span class="stat-label stat-orange">缓存条目:</span>
-          <span class="stat-value stat-orange">{{ cacheEntryCount }}</span>
+        <div class="cache-stat-item">
+          <span class="stat-label">缓存总条目</span>
+          <span class="stat-value">{{ cacheEntryCount }}</span>
+        </div>
+        <div class="cache-stat-item">
+          <span class="stat-label">Attention缓存条目</span>
+          <span class="stat-value">{{ attentionEntries }}</span>
+        </div>
+        <div class="cache-stat-item">
+          <span class="stat-label">LiveSessions缓存条目</span>
+          <span class="stat-value">{{ liveSessionsEntries }}</span>
+        </div>
+        <div class="cache-stat-item cache-status-card">
+          <span class="stat-label">缓存策略</span>
+          <span class="stat-value">{{ cacheStatus }}</span>
         </div>
       </div>
 
@@ -68,6 +81,10 @@ export default {
     const cacheHitRate = ref('N/A')
     const cacheSize = ref('N/A')
     const cacheEntryCount = ref('N/A')
+    const cacheMaxSize = ref('N/A')
+    const attentionEntries = ref('N/A')
+    const liveSessionsEntries = ref('N/A')
+    const cacheStatus = ref('加载中...')
 
     const title = computed(() => {
       const filter = route.query.filter || 'all'
@@ -83,15 +100,6 @@ export default {
       }
     })
 
-    // 格式化字节单位
-    const formatBytes = (bytes) => {
-      if (bytes === 0) return '0 Bytes'
-      const k = 1024
-      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
-      const i = Math.floor(Math.log(bytes) / Math.log(k))
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-    }
-
     // 获取缓存统计信息
     const fetchCacheStats = async () => {
       try {
@@ -99,11 +107,16 @@ export default {
         const stats = response
 
         // 更新缓存统计信息
-        cacheHitRate.value = stats.hit_rate ? (stats.hit_rate * 100).toFixed(2) + '%' : 'N/A'
-        cacheSize.value = formatBytes(stats.current_size)
-        cacheEntryCount.value = stats.entry_count || 'N/A'
+        cacheHitRate.value = typeof stats.hit_rate === 'number' ? (stats.hit_rate * 100).toFixed(2) + '%' : 'N/A'
+        cacheSize.value = stats.current_size_mb || '0 MB'
+        cacheMaxSize.value = stats.max_size_mb || '0 MB'
+        cacheEntryCount.value = stats.entry_count !== undefined ? String(stats.entry_count) : 'N/A'
+        attentionEntries.value = stats.attention_entries !== undefined ? String(stats.attention_entries) : 'N/A'
+        liveSessionsEntries.value = stats.live_sessions_entries !== undefined ? String(stats.live_sessions_entries) : 'N/A'
+        cacheStatus.value = '历史月永久缓存，当前月每日1:30刷新'
       } catch (error) {
         console.error('获取缓存统计信息失败:', error)
+        cacheStatus.value = '缓存统计获取失败'
       }
     }
 
@@ -138,7 +151,11 @@ export default {
       followCreator,
       cacheHitRateDisplay: cacheHitRate,
       cacheSizeDisplay: cacheSize,
-      cacheEntryCount
+      cacheEntryCount,
+      cacheMaxSizeDisplay: cacheMaxSize,
+      attentionEntries,
+      liveSessionsEntries,
+      cacheStatus
     }
   }
 }
@@ -215,31 +232,48 @@ export default {
   font-weight: bold;
 }
 
-.cache-stats {
-  display: flex;
-  gap: 20px;
-  justify-content: center;
+.cache-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  justify-items: center;
+  align-items: stretch;
   margin: 15px 0;
-  flex-wrap: wrap;
 }
 
 .cache-stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 100px;
+  background: #FFF4DD;
+  border: 1px solid rgba(255, 165, 0, 0.25);
+  border-radius: 18px;
+  padding: 18px 16px;
+  min-width: 180px;
+  width: 100%;
+  max-width: 280px;
+  box-shadow: 0 10px 25px rgba(255, 165, 0, 0.12);
+  text-align: center;
+}
+
+.cache-stat-item.cache-status-card {
+  min-width: 240px;
 }
 
 .stat-label {
-  font-size: 0.9rem;
-  margin-bottom: 5px;
-  color: #666;
+  font-size: 0.95rem;
+  margin-bottom: 10px;
+  color: #555;
+}
+
+.stat-subvalue {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: #777;
 }
 
 .stat-value {
   font-size: 1.1rem;
   font-weight: bold;
-  color: #333;
+  color: #FF7A00;
 }
 
 /* Cache statistics orange styling for all screen sizes */

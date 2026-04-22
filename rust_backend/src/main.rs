@@ -123,6 +123,40 @@ async fn load_cache_from_file(key: &str, is_past_month: bool) -> Option<serde_js
     }
 }
 
+async fn count_cache_files_by_prefix(prefix: &str) -> usize {
+    let mut total = 0;
+    for dir in ["cache_data/current_month", "cache_data/previous_months"] {
+        if let Ok(mut entries) = tokio::fs::read_dir(dir).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                if let Ok(file_name) = entry.file_name().into_string() {
+                    if file_name.starts_with(prefix) && file_name.ends_with(".json") {
+                        total += 1;
+                    }
+                }
+            }
+        }
+    }
+    total
+}
+
+async fn sum_cache_file_sizes_by_prefix(prefix: &str) -> usize {
+    let mut total = 0;
+    for dir in ["cache_data/current_month", "cache_data/previous_months"] {
+        if let Ok(mut entries) = tokio::fs::read_dir(dir).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                if let Ok(file_name) = entry.file_name().into_string() {
+                    if file_name.starts_with(prefix) && file_name.ends_with(".json") {
+                        if let Ok(metadata) = entry.metadata().await {
+                            total += metadata.len() as usize;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    total
+}
+
 // ==================== Attention缓存管理器 ====================
 
 /// 判断是否为上月数据
@@ -131,29 +165,18 @@ fn is_past_month(month: &str) -> bool {
     month < current_month.as_str()
 }
 
-/// 判断当月缓存是否有效（1小时内）
-fn is_cache_valid(
-    cached_timestamp: std::time::SystemTime,
-    current_time: std::time::SystemTime,
-) -> bool {
-    let duration_since_cache = current_time
-        .duration_since(cached_timestamp)
-        .unwrap_or_default();
-    duration_since_cache.as_secs() < 3600 // 1小时
-}
-
-/// 判断是否需要在此刻刷新（每天1:30到2:00之间）
-fn should_refresh_now(is_past_month: bool) -> bool {
-    if is_past_month {
-        return false; // 历史数据不刷新
-    }
-
+/// 判断当月缓存是否有效（当前月缓存每日凌晨1:30刷新一次）
+fn is_cache_valid(cached_timestamp: std::time::SystemTime) -> bool {
+    let cached_dt: chrono::DateTime<chrono::Local> = chrono::DateTime::from(cached_timestamp);
     let now = chrono::Local::now();
-    let hour = now.hour();
-    let minute = now.minute();
+    let today_refresh = now.date().and_hms(1, 30, 0);
+    let next_refresh = if cached_dt < today_refresh {
+        today_refresh
+    } else {
+        today_refresh + chrono::Duration::days(1)
+    };
 
-    // 每天1:30到次日2:00之间，允许刷新
-    (hour == 1 && minute >= 30) || hour == 2
+    now < next_refresh
 }
 
 /// 批量获取单月份所有日期的attention数据
@@ -212,26 +235,17 @@ async fn get_attention_cache_data(
             }
 
             // 当月数据检查是否有效
-            if is_cache_valid(entry.timestamp, current_time) {
+            if is_cache_valid(entry.timestamp) {
                 let size = estimate_json_size(&entry.data);
                 println!(
-                    "🎯 [缓存命中-内存] 当月数据 - key={} (1小时内有效) - 大小: {} bytes",
+                    "🎯 [缓存命中-内存] 当月数据 - key={} (有效至次日1:30) - 大小: {} bytes",
                     cache_key, size
                 );
                 return Ok(entry.data.clone());
             }
 
-            // 缓存过期，检查是否可以刷新
-            if !should_refresh_now(false) {
-                println!(
-                    "⏱️ [缓存过期-使用旧] 不在刷新时间窗口 - key={} (使用旧缓存)",
-                    cache_key
-                );
-                return Ok(entry.data.clone());
-            }
-
             println!(
-                "🔄 [缓存需刷新] 当月数据过期 - key={} (超过1小时且已过1:30)",
+                "🔄 [缓存需刷新] 当月数据过期 - key={} (已过当日1:30，刷新缓存)",
                 cache_key
             );
         }
@@ -301,7 +315,11 @@ async fn get_attention_cache_data(
         println!(
             "💾 [缓存保存-内存] 成功保存到内存 - key={} (过期策略: {})",
             cache_key,
-            if is_past { "永久" } else { "1小时" }
+            if is_past {
+                "永久"
+            } else {
+                "每日1:30刷新"
+            }
         );
     }
 
@@ -1341,18 +1359,46 @@ fn format_size_mb(bytes: usize) -> String {
 // 获取缓存统计信息的API端点 - 增强版
 async fn get_cache_stats_endpoint() -> Result<Json<CacheStatsResponse>, StatusCode> {
     let (hits, misses, hit_rate) = get_cache_hit_stats().await;
-    let (current_size, entry_count) = get_cache_stats().await;
+    let (memory_size, memory_entry_count) = get_cache_stats().await;
 
     // 获取Attention缓存条目数
-    let attention_entries = {
+    let memory_attention_entries = {
         let cache = ATTENTION_CACHE.read().await;
         cache.len()
     };
 
     // 获取LiveSessions缓存条目数
-    let live_sessions_entries = {
+    let memory_live_sessions_entries = {
         let cache = LIVE_SESSIONS_CACHE.read().await;
         cache.len()
+    };
+
+    let disk_attention_entries = count_cache_files_by_prefix("attention_").await;
+    let disk_live_sessions_entries = count_cache_files_by_prefix("livesessions_").await;
+    let disk_size = sum_cache_file_sizes_by_prefix("attention_").await
+        + sum_cache_file_sizes_by_prefix("livesessions_").await;
+
+    let attention_entries = if disk_attention_entries > 0 {
+        disk_attention_entries
+    } else {
+        memory_attention_entries
+    };
+    let live_sessions_entries = if disk_live_sessions_entries > 0 {
+        disk_live_sessions_entries
+    } else {
+        memory_live_sessions_entries
+    };
+
+    let current_size = if disk_size > memory_size {
+        disk_size
+    } else {
+        memory_size
+    };
+
+    let entry_count = if disk_attention_entries + disk_live_sessions_entries > memory_entry_count {
+        disk_attention_entries + disk_live_sessions_entries
+    } else {
+        memory_entry_count
     };
 
     let hit_rate_percentage = format!("{:.2}%", hit_rate * 100.0);

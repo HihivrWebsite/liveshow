@@ -1,0 +1,25 @@
+[
+  {
+    "avg_concurrency": null,
+    "current_concurrency": null,
+    "danmaku_count": 1459,
+    "duration_minutes": 134,
+    "end_fans_count": 547,
+    "end_guard_1": 49,
+    "end_guard_2": 0,
+    "end_guard_3": 0,
+    "end_time": "2026-01-02 01:01:25",
+    "gift": 273.4,
+    "guard": 840.0,
+    "max_concurrency": null,
+    "new_fans_count": -1,
+    "start_fans_count": 96,
+    "start_guard_1": 46,
+    "start_guard_2": 0,
+    "start_guard_3": 0,
+    "start_time": "2026-01-01 22:47:20",
+    "super_chat": 140.0,
+    "title": "Boom！",
+    "total_revenue": 1253.4
+  }
+]
