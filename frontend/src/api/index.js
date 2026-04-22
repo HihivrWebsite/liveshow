@@ -84,11 +84,12 @@ export const anchorAPI = {
     return apiClient.get('/cache/stats')
   },
 
-  // 获取粉丝数快照
-  getAttention: (roomId, month) => {
+  // 获取粉丝数快照 - 支持缓存机制
+  getAttention: (roomId, month, union = 'VirtuaReal') => {
     const params = new URLSearchParams()
     params.append('room_id', roomId)
     if (month) params.append('month', month)
+    params.append('union', union)  // 添加union参数以支持缓存键生成
 
     return apiClient.get(`/gift/attention?${params.toString()}`)
   }

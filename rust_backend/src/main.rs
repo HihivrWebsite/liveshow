@@ -1,31 +1,31 @@
+use axum::http::StatusCode;
 use axum::{
     extract::{Query, State},
     response::Html,
     routing::{get, get_service},
     Json, Router,
 };
-use axum::http::StatusCode;
+use chrono::{NaiveDateTime, Timelike};
+use lru::LruCache;
 use reqwest::Client;
+use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use tower_http::{
-    cors::CorsLayer,
-    services::ServeDir,
-    compression::CompressionLayer,
-    trace::TraceLayer,
-};
-use tracing_subscriber;
-use rust_decimal::prelude::*;
-use std::str::FromStr;
-use std::time::Duration;
-use tokio::time::timeout;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use lru::LruCache;
 use std::hash::Hash;
 use std::num::NonZeroUsize;
-use chrono::NaiveDateTime;
+use std::path::Path;
+use std::str::FromStr;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
+use tokio::sync::RwLock;
+use tokio::time::timeout;
+use tower_http::{
+    compression::CompressionLayer, cors::CorsLayer, services::ServeDir, trace::TraceLayer,
+};
+use tracing_subscriber;
 
 // ==================== 缓存相关定义 ====================
 
@@ -33,8 +33,297 @@ use chrono::NaiveDateTime;
 #[derive(Clone)]
 struct CacheEntry {
     data: Vec<Anchor>,
-    size_estimate: usize,  // 大小估算（字节）
-    timestamp: std::time::SystemTime,  // 缓存时间戳
+    size_estimate: usize,             // 大小估算（字节）
+    timestamp: std::time::SystemTime, // 缓存时间戳
+}
+
+// Attention数据缓存条目 - 存储某个月份的所有日期的关注数快照
+#[derive(Clone, Debug)]
+struct AttentionCacheEntry {
+    data: serde_json::Value, // 原始JSON数据 {"YYYYMMDD": count, ...}
+    timestamp: std::time::SystemTime,
+    is_past_month: bool, // 是否为上月及更早数据
+}
+
+// LiveSessions数据缓存条目
+#[derive(Clone, Debug)]
+struct LiveSessionsCacheEntry {
+    data: Vec<LiveSession>,
+    timestamp: std::time::SystemTime,
+    is_past_month: bool,
+}
+
+// 全局Attention缓存管理器
+lazy_static::lazy_static! {
+    static ref ATTENTION_CACHE: Arc<RwLock<HashMap<String, AttentionCacheEntry>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+}
+
+// 全局LiveSessions缓存管理器
+lazy_static::lazy_static! {
+    static ref LIVE_SESSIONS_CACHE: Arc<RwLock<HashMap<String, LiveSessionsCacheEntry>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+}
+
+// ==================== 缓存JSON持久化函数 ====================
+
+/// 计算数据大小（字节数）
+fn estimate_json_size(json: &serde_json::Value) -> usize {
+    serde_json::to_string(json).unwrap_or_default().len()
+}
+
+/// 将缓存保存为JSON文件
+async fn save_cache_to_file(
+    key: &str,
+    data: &serde_json::Value,
+    is_past_month: bool,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let dir = if is_past_month {
+        "cache_data/previous_months"
+    } else {
+        "cache_data/current_month"
+    };
+
+    // 创建目录
+    tokio::fs::create_dir_all(dir).await?;
+
+    let file_path = format!("{}/{}.json", dir, key);
+    let json_str = serde_json::to_string_pretty(data)?;
+
+    let mut file = tokio::fs::File::create(&file_path).await?;
+    file.write_all(json_str.as_bytes()).await?;
+    file.flush().await?;
+
+    println!("💾 [缓存持久化] 已保存JSON文件 - {}", file_path);
+    Ok(())
+}
+
+/// 从JSON文件加载缓存
+async fn load_cache_from_file(key: &str, is_past_month: bool) -> Option<serde_json::Value> {
+    let dir = if is_past_month {
+        "cache_data/previous_months"
+    } else {
+        "cache_data/current_month"
+    };
+
+    let file_path = format!("{}/{}.json", dir, key);
+
+    match tokio::fs::read_to_string(&file_path).await {
+        Ok(content) => match serde_json::from_str(&content) {
+            Ok(data) => {
+                println!("📂 [缓存加载] 从磁盘加载 - {}", file_path);
+                Some(data)
+            }
+            Err(e) => {
+                eprintln!("❌ [缓存加载] JSON解析失败 - {}: {}", file_path, e);
+                None
+            }
+        },
+        Err(_) => None,
+    }
+}
+
+// ==================== Attention缓存管理器 ====================
+
+/// 判断是否为上月数据
+fn is_past_month(month: &str) -> bool {
+    let current_month = chrono::Utc::now().format("%Y%m").to_string();
+    month < current_month.as_str()
+}
+
+/// 判断当月缓存是否有效（1小时内）
+fn is_cache_valid(
+    cached_timestamp: std::time::SystemTime,
+    current_time: std::time::SystemTime,
+) -> bool {
+    let duration_since_cache = current_time
+        .duration_since(cached_timestamp)
+        .unwrap_or_default();
+    duration_since_cache.as_secs() < 3600 // 1小时
+}
+
+/// 判断是否需要在此刻刷新（每天1:30到2:00之间）
+fn should_refresh_now(is_past_month: bool) -> bool {
+    if is_past_month {
+        return false; // 历史数据不刷新
+    }
+
+    let now = chrono::Local::now();
+    let hour = now.hour();
+    let minute = now.minute();
+
+    // 每天1:30到次日2:00之间，允许刷新
+    (hour == 1 && minute >= 30) || hour == 2
+}
+
+/// 批量获取单月份所有日期的attention数据
+async fn fetch_attention_month_data(
+    client: &Client,
+    base_url: &str,
+    room_id: &str,
+    month: &str,
+) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+    let api_url = format!(
+        "{}/gift/attention?room_id={}&month={}",
+        base_url, room_id, month
+    );
+    println!("批量获取attention数据: {}", api_url);
+
+    let response = timeout(
+        Duration::from_secs(30), // 增加超时时间
+        client
+            .get(&api_url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
+            .header("Accept", "application/json")
+            .send(),
+    )
+    .await??;
+
+    let json_text = timeout(Duration::from_secs(10), response.text()).await??;
+    let json_value: serde_json::Value = serde_json::from_str(&json_text)?;
+    Ok(json_value)
+}
+
+/// 获取attention缓存数据，如果缓存无效则刷新
+async fn get_attention_cache_data(
+    client: &Client,
+    room_id: &str,
+    month: &str,
+    union: &str,
+) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+    let cache_key = format!("attention_{}_{}_{}", union, room_id, month);
+    let current_time = std::time::SystemTime::now();
+    let is_past = is_past_month(month);
+
+    // 检查内存缓存
+    {
+        let cache = ATTENTION_CACHE.read().await;
+        if let Some(entry) = cache.get(&cache_key) {
+            // 历史数据永久有效
+            if is_past {
+                println!(
+                    "🎯 [缓存命中-内存] 历史数据 - key={} (上月数据永久有效)",
+                    cache_key
+                );
+                return Ok(entry.data.clone());
+            }
+
+            // 当月数据检查是否有效
+            if is_cache_valid(entry.timestamp, current_time) {
+                let size = estimate_json_size(&entry.data);
+                println!(
+                    "🎯 [缓存命中-内存] 当月数据 - key={} (1小时内有效) - 大小: {} bytes",
+                    cache_key, size
+                );
+                return Ok(entry.data.clone());
+            }
+
+            // 缓存过期，检查是否可以刷新
+            if !should_refresh_now(false) {
+                println!(
+                    "⏱️ [缓存过期-使用旧] 不在刷新时间窗口 - key={} (使用旧缓存)",
+                    cache_key
+                );
+                return Ok(entry.data.clone());
+            }
+
+            println!(
+                "🔄 [缓存需刷新] 当月数据过期 - key={} (超过1小时且已过1:30)",
+                cache_key
+            );
+        }
+    }
+
+    // 尝试从磁盘加载缓存
+    if let Some(loaded_data) = load_cache_from_file(&cache_key, is_past).await {
+        let size = estimate_json_size(&loaded_data);
+        println!(
+            "📂 [缓存命中-磁盘] 从文件加载 - key={} - 大小: {} bytes",
+            cache_key, size
+        );
+
+        // 将磁盘缓存重新加入内存
+        {
+            let mut cache = ATTENTION_CACHE.write().await;
+            cache.insert(
+                cache_key.clone(),
+                AttentionCacheEntry {
+                    data: loaded_data.clone(),
+                    timestamp: current_time,
+                    is_past_month: is_past,
+                },
+            );
+        }
+
+        return Ok(loaded_data);
+    }
+
+    println!("📡 [缓存未命中] 需要调用外部API - key={}", cache_key);
+
+    // 需要获取新数据
+    println!(
+        "🌐 [API调用开始] 向外部服务获取数据 - room_id={}, month={}, union={}",
+        room_id, month, union
+    );
+    let base_url = if union == "VirtuaReal" || union.starts_with("vr") {
+        "https://vr.qianqiuzy.cn"
+    } else {
+        "https://psp.qianqiuzy.cn"
+    };
+
+    let data = fetch_attention_month_data(client, &base_url, room_id, month).await?;
+    let size = estimate_json_size(&data);
+
+    println!(
+        "✅ [API调用成功] 获取数据完成 - room_id={}, month={} - 大小: {} bytes",
+        room_id, month, size
+    );
+
+    // 保存到磁盘
+    if let Err(e) = save_cache_to_file(&cache_key, &data, is_past).await {
+        eprintln!("⚠️  [持久化失败] 无法保存JSON文件 - {}: {}", cache_key, e);
+    }
+
+    // 更新内存缓存
+    {
+        let mut cache = ATTENTION_CACHE.write().await;
+        cache.insert(
+            cache_key.clone(),
+            AttentionCacheEntry {
+                data: data.clone(),
+                timestamp: current_time,
+                is_past_month: is_past,
+            },
+        );
+        println!(
+            "💾 [缓存保存-内存] 成功保存到内存 - key={} (过期策略: {})",
+            cache_key,
+            if is_past { "永久" } else { "1小时" }
+        );
+    }
+
+    Ok(data)
+}
+
+/// 从缓存的attention数据中获取指定日期的粉丝数
+fn get_attention_from_cache(cache_data: &serde_json::Value, date: &str) -> Option<i64> {
+    if let Some(obj) = cache_data.as_object() {
+        if let Some(value) = obj.get(date) {
+            if let Some(num) = value.as_i64() {
+                return Some(num);
+            }
+            // 尝试作为字符串解析
+            if let Some(str_val) = value.as_str() {
+                if let Ok(num) = str_val.parse::<i64>() {
+                    return Some(num);
+                }
+            }
+        }
+    }
+    None
 }
 
 // 全局缓存，使用LRU策略，限制为5GB (5 * 1024 * 1024 * 1024 bytes)
@@ -49,8 +338,8 @@ lazy_static::lazy_static! {
 struct CacheManager {
     cache: LruCache<String, CacheEntry>,
     current_size: usize,
-    hit_count: usize,      // 缓存命中次数
-    miss_count: usize,     // 缓存未命中次数
+    hit_count: usize,  // 缓存命中次数
+    miss_count: usize, // 缓存未命中次数
 }
 
 impl CacheManager {
@@ -179,6 +468,126 @@ async fn reset_cache_stats() {
     GLOBAL_CACHE.write().await.reset_stats();
 }
 
+// ==================== Attention缓存管理 ====================
+
+/// 判断当月缓存是否仍然有效（距上次更新<1小时）
+fn is_attention_cache_valid(cached_timestamp: std::time::SystemTime) -> bool {
+    match std::time::SystemTime::now().duration_since(cached_timestamp) {
+        Ok(duration) => duration.as_secs() < 3600, // 1小时 = 3600秒
+        Err(_) => false,
+    }
+}
+
+/// 获取Attention缓存数据
+async fn get_attention_cache(
+    room_id: &str,
+    month: &str,
+    _union: &str,
+) -> Option<serde_json::Value> {
+    let cache_key = format!("attention_{}_{}", room_id, month);
+    let cache = ATTENTION_CACHE.read().await;
+
+    if let Some(entry) = cache.get(&cache_key) {
+        // 检查缓存有效性
+        if entry.is_past_month || is_attention_cache_valid(entry.timestamp) {
+            println!("✅ Attention缓存命中: {}", cache_key);
+            return Some(entry.data.clone());
+        }
+        println!("⏰ Attention缓存过期，需要重新获取");
+    }
+    None
+}
+
+/// 存储Attention缓存数据
+async fn put_attention_cache(room_id: &str, month: &str, data: serde_json::Value) {
+    let cache_key = format!("attention_{}_{}", room_id, month);
+    let is_past = is_past_month(month);
+
+    let mut cache = ATTENTION_CACHE.write().await;
+    cache.insert(
+        cache_key.clone(),
+        AttentionCacheEntry {
+            data,
+            timestamp: std::time::SystemTime::now(),
+            is_past_month: is_past,
+        },
+    );
+
+    println!(
+        "💾 Attention缓存已保存: {} (过去月份: {})",
+        cache_key, is_past
+    );
+}
+
+/// 清除指定月份的Attention缓存（用户手动刷新时调用）
+async fn clear_attention_cache_for_month(month: &str) {
+    let mut cache = ATTENTION_CACHE.write().await;
+    cache.retain(|key, _| !key.ends_with(month));
+    println!("🗑️ 已清除月份 {} 的Attention缓存", month);
+}
+
+// ==================== LiveSessions缓存管理 ====================
+
+/// 获取LiveSessions缓存数据
+async fn get_live_sessions_cache(
+    room_id: &str,
+    _union: &str,
+    month: &str,
+) -> Option<Vec<LiveSession>> {
+    let cache_key = format!("livesessions_{}_{}", room_id, month);
+    let cache = LIVE_SESSIONS_CACHE.read().await;
+
+    if let Some(entry) = cache.get(&cache_key) {
+        // 检查缓存有效性
+        if entry.is_past_month || is_attention_cache_valid(entry.timestamp) {
+            println!("✅ LiveSessions缓存命中: {}", cache_key);
+            return Some(entry.data.clone());
+        }
+        println!("⏰ LiveSessions缓存过期，需要重新获取");
+    }
+    None
+}
+
+/// 存储LiveSessions缓存数据
+async fn put_live_sessions_cache(room_id: &str, _union: &str, month: &str, data: Vec<LiveSession>) {
+    let cache_key = format!("livesessions_{}_{}", room_id, month);
+    let is_past = is_past_month(month);
+
+    // 保存到磁盘
+    let json_data = serde_json::to_value(&data).unwrap_or(serde_json::Value::Null);
+    if let Err(e) = save_cache_to_file(&cache_key, &json_data, is_past).await {
+        eprintln!(
+            "⚠️  [LiveSessions持久化失败] 无法保存JSON文件 - {}: {}",
+            cache_key, e
+        );
+    }
+
+    let mut cache = LIVE_SESSIONS_CACHE.write().await;
+    cache.insert(
+        cache_key.clone(),
+        LiveSessionsCacheEntry {
+            data,
+            timestamp: std::time::SystemTime::now(),
+            is_past_month: is_past,
+        },
+    );
+
+    println!(
+        "💾 LiveSessions缓存已保存: {} (过去月份: {})",
+        cache_key, is_past
+    );
+}
+
+/// 清除指定主播月份的LiveSessions缓存（用户手动刷新时调用）
+async fn clear_live_sessions_cache_for_month(room_id: &str, month: &str) {
+    let mut cache = LIVE_SESSIONS_CACHE.write().await;
+    cache.retain(|key, _| !key.contains(room_id) || !key.ends_with(month));
+    println!(
+        "🗑️ 已清除主播 {} 月份 {} 的LiveSessions缓存",
+        room_id, month
+    );
+}
+
 // 计算两个时间字符串之间的持续时间（分钟）
 fn calculate_duration_minutes(start_time: &str, end_time: &str) -> i32 {
     if start_time.is_empty() || end_time.is_empty() {
@@ -204,9 +613,9 @@ fn parse_to_i64(value: Option<&serde_json::Value>) -> i64 {
             if let Some(i) = v.as_i64() {
                 i
             } else if let Some(f) = v.as_f64() {
-                f as i64  // 将浮点数转换为整数（截断小数部分）
+                f as i64 // 将浮点数转换为整数（截断小数部分）
             } else if let Some(s) = v.as_str() {
-                s.parse::<i64>().unwrap_or(0)  // 尝试解析字符串为整数
+                s.parse::<i64>().unwrap_or(0) // 尝试解析字符串为整数
             } else {
                 0
             }
@@ -230,14 +639,14 @@ fn safe_parse_to_i64(value: Option<&serde_json::Value>) -> i64 {
                 if f >= i64::MIN as f64 && f <= i64::MAX as f64 {
                     f as i64
                 } else {
-                    0  // 超出范围则返回0
+                    0 // 超出范围则返回0
                 }
             } else if let Some(s) = v.as_str() {
                 // 尝试解析字符串为整数，先移除可能的千位分隔符
                 let cleaned_str = s.replace(",", "");
                 cleaned_str.parse::<i64>().unwrap_or(0)
             } else {
-                0  // 无法解析则返回0
+                0 // 无法解析则返回0
             }
         }
         None => 0,
@@ -261,7 +670,7 @@ fn safe_parse_to_f64(value: Option<&serde_json::Value>) -> f64 {
                 let cleaned_str = s.replace(",", "");
                 cleaned_str.parse::<f64>().unwrap_or(0.0)
             } else {
-                0.0  // 无法解析则返回0
+                0.0 // 无法解析则返回0
             }
         }
         None => 0.0,
@@ -284,7 +693,7 @@ fn safe_parse_optional_f64(value: Option<&serde_json::Value>) -> Option<f64> {
                 let cleaned_str = s.replace(",", "");
                 cleaned_str.parse::<f64>().ok()
             } else {
-                None  // 无法解析则返回None
+                None // 无法解析则返回None
             }
         }
         None => None,
@@ -305,13 +714,13 @@ fn safe_parse_optional_i64(value: Option<&serde_json::Value>) -> Option<i64> {
                 if f >= i64::MIN as f64 && f <= i64::MAX as f64 {
                     Some(f as i64)
                 } else {
-                    None  // 超出范围则返回None
+                    None // 超出范围则返回None
                 }
             } else if let Some(s) = v.as_str() {
                 let cleaned_str = s.replace(",", "");
                 cleaned_str.parse::<i64>().ok()
             } else {
-                None  // 无法解析则返回None
+                None // 无法解析则返回None
             }
         }
         None => None,
@@ -339,7 +748,7 @@ pub struct Anchor {
     pub title: String,
     pub total_revenue: f64,
     pub union: String,
-    pub current_concurrency: Option<i64>,  // 即时同接人数，开播时显示具体数值，未开播时为null
+    pub current_concurrency: Option<i64>, // 即时同接人数，开播时显示具体数值，未开播时为null
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -448,6 +857,15 @@ struct SCQuery {
 struct AttentionQuery {
     room_id: Option<String>,
     month: Option<String>,
+    union: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SessionFansChangeQuery {
+    room_id: Option<String>,
+    union: Option<String>,
+    start_time: String,
+    end_time: Option<String>,
 }
 
 type SharedData = Arc<RwLock<HashMap<String, Vec<Anchor>>>>;
@@ -478,10 +896,18 @@ async fn main() {
     // 创建安全的CORS中间件层
     let cors_layer = CorsLayer::new()
         .allow_origin([
-            "http://localhost:2992".parse::<axum::http::HeaderValue>().unwrap(),
-            "http://127.0.0.1:2992".parse::<axum::http::HeaderValue>().unwrap(),
-            "https://localhost:2992".parse::<axum::http::HeaderValue>().unwrap(),
-            "https://127.0.0.1:2992".parse::<axum::http::HeaderValue>().unwrap(),
+            "http://localhost:2992"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
+            "http://127.0.0.1:2992"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
+            "https://localhost:2992"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
+            "https://127.0.0.1:2992"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
         ])
         .allow_methods([axum::http::Method::GET, axum::http::Method::OPTIONS])
         .allow_headers([
@@ -497,16 +923,27 @@ async fn main() {
         .route("/gift", get(get_anchors))
         .route("/gift/by_month", get(get_anchors_by_month))
         .route("/gift/live_sessions", get(get_live_sessions))
+        .route(
+            "/gift/live_sessions_with_fans",
+            get(get_live_sessions_with_fans),
+        )
+        .route(
+            "/gift/session_fans_change",
+            get(calculate_session_fans_change_endpoint),
+        )
         .route("/gift/sc", get(get_sc_history))
         .route("/gift/attention", get(get_attention_data))
         .route("/cache/stats", get(get_cache_stats_endpoint))
-        .nest_service("/assets", get_service(ServeDir::new("../rust_backend/dist/assets")))
+        .nest_service(
+            "/assets",
+            get_service(ServeDir::new("../rust_backend/dist/assets")),
+        )
         .route("/favicon.ico", get(favicon))
         .fallback(index_handler)
         // 添加中间件
         .layer(TraceLayer::new_for_http()) // 请求跟踪
-        .layer(CompressionLayer::new())    // 响应压缩
-        .layer(cors_layer)                 // CORS
+        .layer(CompressionLayer::new()) // 响应压缩
+        .layer(cors_layer) // CORS
         .with_state(shared_data);
 
     // 绑定TCP监听器
@@ -523,7 +960,7 @@ async fn get_anchors(
 ) -> Result<Json<ApiResponse>, StatusCode> {
     // 增加请求计数
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
-    
+
     let filter = query.filter.unwrap_or_else(|| "all".to_string());
     let anchors = fetch_anchor_data(&filter, None).await;
 
@@ -540,8 +977,10 @@ async fn get_anchors_by_month(
 ) -> Result<Json<ByMonthResponse>, StatusCode> {
     // 增加请求计数
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
-    
-    let month = query.month.unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
+
+    let month = query
+        .month
+        .unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
     let filter = query.filter.unwrap_or_else(|| "all".to_string());
 
     let anchors = fetch_anchor_data(&filter, Some(&month)).await;
@@ -560,12 +999,17 @@ async fn get_live_sessions(
 ) -> Result<Json<LiveSessionResponse>, StatusCode> {
     // 增加请求计数
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
-    
+
     let room_id = query.room_id.unwrap_or_default();
     let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
-    let month = query.month.unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
+    let month = query
+        .month
+        .unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
 
-    println!("Received request for room_id: {}, union: {}, month: {}", room_id, union, month);
+    println!(
+        "📊 [/gift/live_sessions] room_id={}, union={}, month={}",
+        room_id, union, month
+    );
 
     if room_id.is_empty() {
         return Ok(Json(LiveSessionResponse {
@@ -591,18 +1035,20 @@ async fn get_live_sessions(
                 item.union = union.clone();
             }
             data_with_union
-        },
+        }
         Err(_) => vec![],
     };
 
-    let anchor_data = all_data.iter().find(|item| item.room_id.to_string() == room_id);
+    let anchor_data = all_data
+        .iter()
+        .find(|item| item.room_id.to_string() == room_id);
     let queried_user = if let Some(anchor) = anchor_data {
         anchor.anchor_name.clone()
     } else {
         "未知主播".to_string()
     };
 
-    println!("Queried user: {}", queried_user);
+    println!("👤 主播: {}", queried_user);
 
     let sessions = fetch_live_session_data(&HTTP_CLIENT, &room_id, &union, &month).await;
 
@@ -621,14 +1067,20 @@ async fn get_sc_history(
 ) -> Result<Json<SCResponse>, (StatusCode, String)> {
     // 增加请求计数
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
-    
+
     let room_id = query.room_id.ok_or_else(|| {
-        (StatusCode::BAD_REQUEST, "Missing room_id parameter".to_string())
+        (
+            StatusCode::BAD_REQUEST,
+            "Missing room_id parameter".to_string(),
+        )
     })?;
 
     // 验证room_id格式
     if !room_id.chars().all(|c| c.is_ascii_digit()) {
-        return Err((StatusCode::BAD_REQUEST, "Invalid room_id format".to_string()));
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Invalid room_id format".to_string(),
+        ));
     }
 
     let base_url = if query.union.as_deref().unwrap_or("VirtuaReal") == "PSPlive" {
@@ -642,15 +1094,24 @@ async fn get_sc_history(
     // 使用全局HTTP客户端
     let response = timeout(
         Duration::from_secs(15),
-        HTTP_CLIENT.get(&api_url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        HTTP_CLIENT
+            .get(&api_url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
             .header("Accept", "application/json")
-            .send()
-    ).await.map_err(|_| (StatusCode::REQUEST_TIMEOUT, "Request timeout".to_string()))?;
+            .send(),
+    )
+    .await
+    .map_err(|_| (StatusCode::REQUEST_TIMEOUT, "Request timeout".to_string()))?;
 
     let response = response.map_err(|e| {
         eprintln!("API请求失败: {}, URL: {}", e, api_url);
-        (StatusCode::INTERNAL_SERVER_ERROR, format!("API请求失败: {}", e))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("API请求失败: {}", e),
+        )
     })?;
 
     if !response.status().is_success() {
@@ -658,41 +1119,44 @@ async fn get_sc_history(
         return Err((StatusCode::BAD_GATEWAY, "上游API响应错误".to_string()));
     }
 
-    let json_text = timeout(
-        Duration::from_secs(10),
-        response.text()
-    ).await.map_err(|_| (StatusCode::REQUEST_TIMEOUT, "Response timeout".to_string()))?;
+    let json_text = timeout(Duration::from_secs(10), response.text())
+        .await
+        .map_err(|_| (StatusCode::REQUEST_TIMEOUT, "Response timeout".to_string()))?;
 
     let json_text = json_text.map_err(|e| {
         eprintln!("读取响应体失败: {}, URL: {}", e, api_url);
-        (StatusCode::INTERNAL_SERVER_ERROR, format!("读取响应体失败: {}", e))
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("读取响应体失败: {}", e),
+        )
     })?;
 
-    let raw_data: serde_json::Value = serde_json::from_str(&json_text)
-        .map_err(|e| {
-            eprintln!("JSON解析失败: {}, 响应内容: {:.200}", e, &json_text);
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("JSON解析失败: {}", e))
-        })?;
+    let raw_data: serde_json::Value = serde_json::from_str(&json_text).map_err(|e| {
+        eprintln!("JSON解析失败: {}, 响应内容: {:.200}", e, &json_text);
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("JSON解析失败: {}", e),
+        )
+    })?;
 
     let mut sc_list = Vec::new();
 
     if let Some(sc_array) = raw_data.as_array() {
         for item in sc_array {
-            let send_time = item.get("send_time")
+            let send_time = item
+                .get("send_time")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            let uname = item.get("uname")
+            let uname = item
+                .get("uname")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            let uid = item.get("uid")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0);
-            let price = item.get("price")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0);
-            let message = item.get("message")
+            let uid = item.get("uid").and_then(|v| v.as_u64()).unwrap_or(0);
+            let price = item.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let message = item
+                .get("message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
@@ -711,21 +1175,20 @@ async fn get_sc_history(
         }
     } else if let Some(sc_array) = raw_data.get("list").and_then(|v| v.as_array()) {
         for item in sc_array {
-            let send_time = item.get("send_time")
+            let send_time = item
+                .get("send_time")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            let uname = item.get("uname")
+            let uname = item
+                .get("uname")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            let uid = item.get("uid")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0);
-            let price = item.get("price")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0);
-            let message = item.get("message")
+            let uid = item.get("uid").and_then(|v| v.as_u64()).unwrap_or(0);
+            let price = item.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let message = item
+                .get("message")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
@@ -836,8 +1299,10 @@ async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Vec<Anchor> {
         let success = put_cache_entry(cache_key.clone(), cache_entry).await;
         if success {
             let (current_size, entry_count) = get_cache_stats().await;
-            println!("数据已缓存: {}, 当前缓存大小: {} bytes, 条目数: {}, 缓存键: {}",
-                     success, current_size, entry_count, cache_key);
+            println!(
+                "数据已缓存: {}, 当前缓存大小: {} bytes, 条目数: {}, 缓存键: {}",
+                success, current_size, entry_count, cache_key
+            );
         } else {
             println!("缓存失败，数据可能过大");
         }
@@ -846,49 +1311,93 @@ async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Vec<Anchor> {
     all_data
 }
 
-// 缓存统计信息响应结构
+// 缓存统计信息响应结构 - 增强版，包含更详细的信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CacheStatsResponse {
-    hits: usize,
-    misses: usize,
-    hit_rate: f64,
-    current_size: usize,
-    entry_count: usize,
-    max_size: usize,
+    // 缓存命中率统计
+    hits: usize,                 // 缓存命中次数
+    misses: usize,               // 缓存未命中次数
+    hit_rate: f64,               // 缓存命中率 (0-1)
+    hit_rate_percentage: String, // 缓存命中率百分比字符串
+
+    // 内存缓存统计
+    current_size: usize,     // 当前缓存大小（字节）
+    current_size_mb: String, // 当前缓存大小（MB格式）
+    entry_count: usize,      // 缓存条目数
+    max_size: usize,         // 最大缓存大小（字节）
+    max_size_mb: String,     // 最大缓存大小（MB格式）
+
+    // Attention缓存统计
+    attention_entries: usize,     // Attention缓存条目数
+    live_sessions_entries: usize, // LiveSessions缓存条目数
 }
 
-// 获取缓存统计信息的API端点
+// 计算大小格式字符串（字节转MB）
+fn format_size_mb(bytes: usize) -> String {
+    let mb = bytes as f64 / (1024.0 * 1024.0);
+    format!("{:.2} MB", mb)
+}
+
+// 获取缓存统计信息的API端点 - 增强版
 async fn get_cache_stats_endpoint() -> Result<Json<CacheStatsResponse>, StatusCode> {
     let (hits, misses, hit_rate) = get_cache_hit_stats().await;
     let (current_size, entry_count) = get_cache_stats().await;
+
+    // 获取Attention缓存条目数
+    let attention_entries = {
+        let cache = ATTENTION_CACHE.read().await;
+        cache.len()
+    };
+
+    // 获取LiveSessions缓存条目数
+    let live_sessions_entries = {
+        let cache = LIVE_SESSIONS_CACHE.read().await;
+        cache.len()
+    };
+
+    let hit_rate_percentage = format!("{:.2}%", hit_rate * 100.0);
+    let current_size_mb = format_size_mb(current_size);
+    let max_size_mb = format_size_mb(MAX_CACHE_SIZE);
 
     Ok(Json(CacheStatsResponse {
         hits,
         misses,
         hit_rate,
+        hit_rate_percentage,
         current_size,
+        current_size_mb,
         entry_count,
         max_size: MAX_CACHE_SIZE,
+        max_size_mb,
+        attention_entries,
+        live_sessions_entries,
     }))
 }
 
-async fn fetch_anchor_data_by_url(url: &str) -> Result<Vec<Anchor>, Box<dyn std::error::Error + Send + Sync>> {
+async fn fetch_anchor_data_by_url(
+    url: &str,
+) -> Result<Vec<Anchor>, Box<dyn std::error::Error + Send + Sync>> {
     let data = fetch_external_api(&HTTP_CLIENT, url).await?;
     Ok(data)
 }
 
-async fn fetch_external_api(client: &Client, api_url: &str) -> Result<Vec<Anchor>, Box<dyn std::error::Error + Send + Sync>> {
+async fn fetch_external_api(
+    client: &Client,
+    api_url: &str,
+) -> Result<Vec<Anchor>, Box<dyn std::error::Error + Send + Sync>> {
     let response = timeout(
         Duration::from_secs(10),
-        client.get(api_url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            .send()
-    ).await??;
+        client
+            .get(api_url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
+            .send(),
+    )
+    .await??;
 
-    let json_text = timeout(
-        Duration::from_secs(10),
-        response.text()
-    ).await??;
+    let json_text = timeout(Duration::from_secs(10), response.text()).await??;
 
     let raw_data: serde_json::Value = serde_json::from_str(&json_text)?;
 
@@ -896,7 +1405,11 @@ async fn fetch_external_api(client: &Client, api_url: &str) -> Result<Vec<Anchor
 
     if let serde_json::Value::Array(items) = raw_data {
         for item in items {
-            let anchor_name = item.get("anchor_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let anchor_name = item
+                .get("anchor_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let attention = item.get("attention").and_then(|v| v.as_i64()).unwrap_or(0);
             let effective_days = parse_to_i64(item.get("effective_days"));
             let fans_count = parse_to_i64(item.get("fans_count"));
@@ -905,13 +1418,32 @@ async fn fetch_external_api(client: &Client, api_url: &str) -> Result<Vec<Anchor
             let guard_1 = parse_to_i64(item.get("guard_1"));
             let guard_2 = parse_to_i64(item.get("guard_2"));
             let guard_3 = parse_to_i64(item.get("guard_3"));
-            let live_duration = item.get("live_duration").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let live_time = item.get("live_time").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let month = item.get("month").and_then(|v| v.as_str()).unwrap_or(&chrono::Utc::now().format("%Y%m").to_string()).to_string();
+            let live_duration = item
+                .get("live_duration")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let live_time = item
+                .get("live_time")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let month = item
+                .get("month")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&chrono::Utc::now().format("%Y%m").to_string())
+                .to_string();
             let room_id = item.get("room_id").and_then(|v| v.as_u64()).unwrap_or(0);
             let status = parse_to_i64(item.get("status"));
-            let super_chat = item.get("super_chat").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let super_chat = item
+                .get("super_chat")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
+            let title = item
+                .get("title")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
 
             anchors.push(Anchor {
                 anchor_name,
@@ -946,44 +1478,147 @@ async fn fetch_live_session_data(
     union: &str,
     month: &str,
 ) -> Vec<LiveSession> {
+    fetch_live_session_data_with_fans_calc(client, room_id, union, month, false).await
+}
+
+async fn fetch_live_session_data_with_fans_calc(
+    client: &Client,
+    room_id: &str,
+    union: &str,
+    month: &str,
+    calculate_fans_change: bool,
+) -> Vec<LiveSession> {
+    let cache_key = format!("livesessions_{}_{}", room_id, month);
+    let is_past = is_past_month(month);
+
+    // 首先检查内存缓存
+    if let Some(cached_sessions) = get_live_sessions_cache(room_id, union, month).await {
+        println!(
+            "🎯 [缓存命中-内存] LiveSessions数据 - room_id={}, month={}, union={} (缓存条目数: {})",
+            room_id,
+            month,
+            union,
+            cached_sessions.len()
+        );
+
+        let mut sessions = cached_sessions;
+
+        // 只有在需要时才计算新增粉丝数（懒加载）
+        if calculate_fans_change {
+            println!("🔄 [粉丝计算] 开始计算所有会话的新增粉丝数...");
+            for session in &mut sessions {
+                session.new_fans_count = calculate_session_fans_change(
+                    client,
+                    &session.start_time,
+                    &session.end_time,
+                    room_id,
+                    union,
+                )
+                .await;
+            }
+            println!("✅ [粉丝计算] 完成所有会话的粉丝数计算");
+        } else {
+            println!("⏭️ [跳过计算] 懒加载模式，跳过粉丝数计算");
+        }
+
+        return sessions;
+    }
+
+    // 尝试从磁盘加载缓存
+    if let Some(loaded_data) = load_cache_from_file(&cache_key, is_past).await {
+        if let Ok(sessions) = serde_json::from_value::<Vec<LiveSession>>(loaded_data.clone()) {
+            println!(
+                "📂 [缓存命中-磁盘] 从文件加载LiveSessions - room_id={}, month={}, union={} (条目数: {})",
+                room_id, month, union, sessions.len()
+            );
+
+            // 将磁盘缓存重新加入内存
+            put_live_sessions_cache(room_id, union, month, sessions.clone()).await;
+
+            let mut sessions = sessions;
+
+            // 只有在需要时才计算新增粉丝数（懒加载）
+            if calculate_fans_change {
+                println!("🔄 [粉丝计算] 开始计算所有会话的新增粉丝数...");
+                for session in &mut sessions {
+                    session.new_fans_count = calculate_session_fans_change(
+                        client,
+                        &session.start_time,
+                        &session.end_time,
+                        room_id,
+                        union,
+                    )
+                    .await;
+                }
+                println!("✅ [粉丝计算] 完成所有会话的粉丝数计算");
+            } else {
+                println!("⏭️ [跳过计算] 懒加载模式，跳过粉丝数计算");
+            }
+
+            return sessions;
+        }
+    }
+
+    // 缓存未命中，从API获取
     let base_url = if union == "VirtuaReal" || union.starts_with("vr") {
         "https://vr.qianqiuzy.cn"
     } else {
         "https://psp.qianqiuzy.cn"
     };
 
-    let api_url = format!("{}/gift/live_sessions?room_id={}&month={}", base_url, room_id, month);
+    let api_url = format!(
+        "{}/gift/live_sessions?room_id={}&month={}",
+        base_url, room_id, month
+    );
 
-    println!("Fetching live sessions from: {}", api_url);
+    println!(
+        "📡 [缓存未命中] 需要调用外部API获取LiveSessions - room_id={}, month={}, union={}",
+        room_id, month, union
+    );
+    println!("🌐 [API调用] Fetching live sessions from: {}", api_url);
 
     let mut sessions = match fetch_live_session_from_api(client, &api_url).await {
         Ok(sessions) => {
-            println!("Successfully fetched {} sessions", sessions.len());
+            println!("✅ [API调用成功] 获取到 {} 个直播会话", sessions.len());
             sessions
-        },
+        }
         Err(e) => {
-            println!("Failed to fetch live sessions: {}", e);
+            println!("❌ [API调用失败] 获取直播会话失败: {}", e);
             vec![]
         }
     };
 
-    // 为每个会话计算新增粉丝数
-    for session in &mut sessions {
-        session.new_fans_count = calculate_session_fans_change(
-            client,
-            &session.start_time,
-            &session.end_time,
-            room_id,
-            union,
-        ).await;
+    // 保存到缓存
+    if !sessions.is_empty() {
+        put_live_sessions_cache(room_id, union, month, sessions.clone()).await;
+    }
+
+    // 只有在需要时才计算新增粉丝数（懒加载）
+    if calculate_fans_change {
+        println!("🔄 [粉丝计算] 开始计算所有会话的新增粉丝数...");
+        for session in &mut sessions {
+            session.new_fans_count = calculate_session_fans_change(
+                client,
+                &session.start_time,
+                &session.end_time,
+                room_id,
+                union,
+            )
+            .await;
+        }
+        println!("✅ [粉丝计算] 完成所有会话的粉丝数计算");
+    } else {
+        println!("⏭️ [跳过计算] 懒加载模式，跳过粉丝数计算");
     }
 
     sessions
 }
 
-async fn fetch_live_session_from_api(client: &Client, api_url: &str) -> Result<Vec<LiveSession>, Box<dyn std::error::Error + Send + Sync>> {
-    println!("Making request to: {}", api_url);
-
+async fn fetch_live_session_from_api(
+    client: &Client,
+    api_url: &str,
+) -> Result<Vec<LiveSession>, Box<dyn std::error::Error + Send + Sync>> {
+    // 不显示详细的API调用日志，只在缓存未命中时显示
     let response = timeout(
         Duration::from_secs(15),
         client.get(api_url)
@@ -993,29 +1628,32 @@ async fn fetch_live_session_from_api(client: &Client, api_url: &str) -> Result<V
             .send()
     ).await??;
 
-    println!("Response status: {}", response.status());
-
-    let json_text = timeout(
-        Duration::from_secs(10),
-        response.text()
-    ).await??;
-
-    println!("Response body length: {}", json_text.len());
+    let json_text = timeout(Duration::from_secs(10), response.text()).await??;
 
     let raw_data: serde_json::Value = serde_json::from_str(&json_text)?;
 
     let sessions_array = if let Some(array) = raw_data.get("sessions").and_then(|v| v.as_array()) {
         array
     } else {
-        raw_data.as_array().ok_or("Response is not an array or object with sessions field")?
+        raw_data
+            .as_array()
+            .ok_or("Response is not an array or object with sessions field")?
     };
 
     let mut sessions = Vec::new();
 
     for (index, item) in sessions_array.iter().enumerate() {
         // 安全地获取字符串值
-        let start_time = item.get("start_time").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let end_time = item.get("end_time").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let start_time = item
+            .get("start_time")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let end_time = item
+            .get("end_time")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
 
         // 计算持续时间（分钟）
         let duration_minutes = calculate_duration_minutes(&start_time, &end_time);
@@ -1033,7 +1671,11 @@ async fn fetch_live_session_from_api(client: &Client, api_url: &str) -> Result<V
         let gift = safe_parse_to_f64(item.get("gift"));
         let guard = safe_parse_to_f64(item.get("guard"));
         let super_chat = safe_parse_to_f64(item.get("super_chat"));
-        let title = item.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let title = item
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
 
         let total_revenue = gift + guard + super_chat;
 
@@ -1066,17 +1708,13 @@ async fn fetch_live_session_from_api(client: &Client, api_url: &str) -> Result<V
             new_fans_count: -1, // 暂时设为 -1，后续通过 attention API 计算
         };
 
-        println!("Created LiveSession {}: start_time={}, duration_minutes={}, gift={}, guard={}, super_chat={}",
-                 index, live_session.start_time, live_session.duration_minutes, live_session.gift, live_session.guard, live_session.super_chat);
-
         sessions.push(live_session);
     }
 
-    println!("Parsed {} sessions", sessions.len());
     Ok(sessions)
 }
 
-/// 获取粉丝数快照数据
+/// 获取粉丝数快照数据 - 使用缓存机制
 async fn get_attention_data(
     Query(query): Query<AttentionQuery>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
@@ -1090,19 +1728,31 @@ async fn get_attention_data(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    let month = query.month.unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
+    let month = query
+        .month
+        .unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
 
-    // 构建外部 API URL - 根据月份判断使用哪个 API
-    // 注意：这里默认使用 vr.qianqiuzy.cn，实际可能需要根据 union 参数决定
-    let base_url = "https://vr.qianqiuzy.cn";
-    let api_url = format!("{}/gift/attention?room_id={}&month={}", base_url, room_id, month);
+    let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
 
-    println!("Fetching attention data from: {}", api_url);
+    println!(
+        "📊 [/gift/attention] room_id={}, month={}, union={}",
+        room_id, month, union
+    );
 
-    match fetch_attention_from_api(&HTTP_CLIENT, &api_url).await {
-        Ok(data) => Ok(Json(data)),
+    // 使用缓存机制获取数据
+    match get_attention_cache_data(&HTTP_CLIENT, &room_id, &month, &union).await {
+        Ok(data) => {
+            println!(
+                "✅ [/gift/attention] 缓存/API调用成功 - room_id={}, month={}",
+                room_id, month
+            );
+            Ok(Json(data))
+        }
         Err(e) => {
-            eprintln!("获取粉丝数快照失败：{}, URL: {}", e, api_url);
+            eprintln!(
+                "❌ [/gift/attention] 获取失败 - room_id={}, month={}, error={}",
+                room_id, month, e
+            );
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -1115,16 +1765,18 @@ async fn fetch_attention_from_api(
 ) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
     let response = timeout(
         Duration::from_secs(10),
-        client.get(api_url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        client
+            .get(api_url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
             .header("Accept", "application/json")
-            .send()
-    ).await??;
+            .send(),
+    )
+    .await??;
 
-    let json_text = timeout(
-        Duration::from_secs(10),
-        response.text()
-    ).await??;
+    let json_text = timeout(Duration::from_secs(10), response.text()).await??;
 
     let data: serde_json::Value = serde_json::from_str(&json_text)?;
     Ok(data)
@@ -1161,10 +1813,13 @@ async fn get_attention_for_date(
     client: &Client,
     base_url: &str,
     room_id: &str,
-    date: &str,  // YYYYMMDD
+    date: &str, // YYYYMMDD
 ) -> Option<i64> {
     let month = &date[..6]; // YYYYMM
-    let api_url = format!("{}/gift/attention?room_id={}&month={}", base_url, room_id, month);
+    let api_url = format!(
+        "{}/gift/attention?room_id={}&month={}",
+        base_url, room_id, month
+    );
 
     match fetch_attention_from_api(client, &api_url).await {
         Ok(response) => {
@@ -1192,7 +1847,7 @@ async fn calculate_session_fans_change(
 ) -> i64 {
     // 1. 解析开始和结束时间
     let start_date = parse_date_from_datetime(start_time);
-    
+
     if start_date.is_empty() {
         return -1;
     }
@@ -1209,33 +1864,171 @@ async fn calculate_session_fans_change(
         Some(d) => d,
         None => return -1,
     };
-    
+
     let end_date_prev = match get_previous_date(&end_date) {
         Some(d) => d,
         None => return -1,
     };
 
-    // 4. 获取 base_url
-    let base_url = if union == "VirtuaReal" || union.starts_with("vr") {
-        "https://vr.qianqiuzy.cn"
-    } else {
-        "https://psp.qianqiuzy.cn"
+    // 4. 获取月份（开始和结束应该在同一月份）
+    let month = &start_date[..6]; // YYYYMM
+
+    println!(
+        "📊 [粉丝变化计算] 开始 - room_id={}, 直播期间: {} 到 {}",
+        room_id, start_date, end_date
+    );
+
+    // 5. 从缓存获取attention数据
+    let attention_data = match get_attention_cache_data(client, room_id, month, union).await {
+        Ok(data) => {
+            println!(
+                "✅ [粉丝变化计算] 成功获取attention数据 - room_id={}, month={}",
+                room_id, month
+            );
+            data
+        }
+        Err(e) => {
+            eprintln!(
+                "❌ [粉丝变化计算] 获取attention数据失败 - room_id={}, error={}",
+                room_id, e
+            );
+            return -1;
+        }
     };
 
-    // 5. 获取开始日期的粉丝数
-    let start_attention = match get_attention_for_date(client, &base_url, room_id, &start_date_prev).await {
-        Some(count) => count,
-        None => return -1,
+    // 6. 从缓存数据中提取粉丝数
+    let start_attention = match get_attention_from_cache(&attention_data, &start_date_prev) {
+        Some(count) => {
+            println!("   📈 开始日期粉丝数 - {} = {}", start_date_prev, count);
+            count
+        }
+        None => {
+            eprintln!(
+                "❌ [粉丝变化计算] 缓存中未找到日期 {} 的粉丝数",
+                start_date_prev
+            );
+            return -1;
+        }
     };
 
-    // 6. 获取结束日期的粉丝数
-    let end_attention = match get_attention_for_date(client, &base_url, room_id, &end_date_prev).await {
-        Some(count) => count,
-        None => return -1,
+    let end_attention = match get_attention_from_cache(&attention_data, &end_date_prev) {
+        Some(count) => {
+            println!("   📈 结束日期粉丝数 - {} = {}", end_date_prev, count);
+            count
+        }
+        None => {
+            eprintln!(
+                "❌ [粉丝变化计算] 缓存中未找到日期 {} 的粉丝数",
+                end_date_prev
+            );
+            return -1;
+        }
     };
 
     // 7. 计算变化
-    end_attention - start_attention
+    let fans_change = end_attention - start_attention;
+    println!(
+        "✅ [粉丝变化计算] 完成 - room_id={}, 粉丝变化: {} - {} = {}",
+        room_id, end_attention, start_attention, fans_change
+    );
+    fans_change
+}
+
+/// 计算单个会话的粉丝变化（懒加载用）
+async fn calculate_session_fans_change_endpoint(
+    Query(query): Query<SessionFansChangeQuery>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let room_id = query.room_id.unwrap_or_default();
+    let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
+    let end_time = query.end_time.as_deref().unwrap_or("");
+
+    if room_id.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let fans_change =
+        calculate_session_fans_change(&HTTP_CLIENT, &query.start_time, end_time, &room_id, &union)
+            .await;
+
+    Ok(Json(serde_json::json!({
+        "fans_change": fans_change,
+        "room_id": room_id,
+        "union": union,
+        "start_time": query.start_time,
+        "end_time": query.end_time
+    })))
+}
+
+/// 获取包含粉丝计算的直播会话（完整模式）
+async fn get_live_sessions_with_fans(
+    Query(query): Query<LiveSessionQuery>,
+    _data: State<SharedData>,
+) -> Result<Json<LiveSessionResponse>, StatusCode> {
+    // 增加请求计数
+    REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
+
+    let room_id = query.room_id.unwrap_or_default();
+    let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
+    let month = query
+        .month
+        .unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
+
+    println!(
+        "📊 [/gift/live_sessions_with_fans] room_id={}, union={}, month={}",
+        room_id, union, month
+    );
+
+    if room_id.is_empty() {
+        return Ok(Json(LiveSessionResponse {
+            sessions: vec![],
+            room_id,
+            queried_user: "未知主播".to_string(),
+            union,
+            title: format!("{}年{}月直播数据", &month[..4], &month[4..]),
+            refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        }));
+    }
+
+    let base_api_url = if union == "PSPlive" {
+        "https://psp.qianqiuzy.cn/gift"
+    } else {
+        "https://vr.qianqiuzy.cn/gift"
+    };
+
+    let all_data = match fetch_anchor_data_by_url(base_api_url).await {
+        Ok(data) => {
+            let mut data_with_union = data;
+            for item in &mut data_with_union {
+                item.union = union.clone();
+            }
+            data_with_union
+        }
+        Err(_) => vec![],
+    };
+
+    let anchor_data = all_data
+        .iter()
+        .find(|item| item.room_id.to_string() == room_id);
+    let queried_user = if let Some(anchor) = anchor_data {
+        anchor.anchor_name.clone()
+    } else {
+        "未知主播".to_string()
+    };
+
+    println!("👤 主播: {}", queried_user);
+
+    // 使用完整计算模式
+    let sessions =
+        fetch_live_session_data_with_fans_calc(&HTTP_CLIENT, &room_id, &union, &month, true).await;
+
+    Ok(Json(LiveSessionResponse {
+        sessions,
+        room_id,
+        queried_user,
+        union,
+        title: format!("{}年{}月直播数据", &month[..4], &month[4..]),
+        refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+    }))
 }
 
 async fn index_handler() -> Html<String> {
@@ -1245,6 +2038,8 @@ async fn index_handler() -> Html<String> {
 async fn favicon() -> impl axum::response::IntoResponse {
     axum::response::Response::builder()
         .header("content-type", "image/x-icon")
-        .body(axum::body::Body::from(std::fs::read("../rust_backend/dist/favicon.ico").unwrap()))
+        .body(axum::body::Body::from(
+            std::fs::read("../rust_backend/dist/favicon.ico").unwrap(),
+        ))
         .unwrap()
 }
