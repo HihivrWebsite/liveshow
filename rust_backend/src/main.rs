@@ -5,15 +5,12 @@ use axum::{
     routing::{get, get_service},
     Json, Router,
 };
-use chrono::{NaiveDateTime, Timelike};
+use chrono::NaiveDateTime;
 use lru::LruCache;
 use reqwest::Client;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::hash::Hash;
-use std::num::NonZeroUsize;
-use std::path::Path;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -108,6 +105,28 @@ async fn load_cache_from_file(key: &str, is_past_month: bool) -> Option<serde_js
 
     let file_path = format!("{}/{}.json", dir, key);
 
+    // 检查文件是否存在
+    let metadata = match tokio::fs::metadata(&file_path).await {
+        Ok(meta) => meta,
+        Err(_) => return None,
+    };
+
+    // 对于当前月，检查缓存是否过期
+    if !is_past_month {
+        let modified_time = metadata.modified();
+        if let Ok(modified) = modified_time {
+            if !is_cache_valid(modified) {
+                // 缓存过期，删除文件
+                if let Err(e) = tokio::fs::remove_file(&file_path).await {
+                    eprintln!("❌ [缓存清理] 删除过期缓存文件失败 - {}: {}", file_path, e);
+                } else {
+                    println!("🗑️ [缓存清理] 删除过期缓存文件 - {}", file_path);
+                }
+                return None;
+            }
+        }
+    }
+
     match tokio::fs::read_to_string(&file_path).await {
         Ok(content) => match serde_json::from_str(&content) {
             Ok(data) => {
@@ -169,14 +188,14 @@ fn is_past_month(month: &str) -> bool {
 fn is_cache_valid(cached_timestamp: std::time::SystemTime) -> bool {
     let cached_dt: chrono::DateTime<chrono::Local> = chrono::DateTime::from(cached_timestamp);
     let now = chrono::Local::now();
-    let today_refresh = now.date().and_hms(1, 30, 0);
-    let next_refresh = if cached_dt < today_refresh {
+    let today_refresh = now.date_naive().and_hms_opt(1, 30, 0).unwrap();
+    let next_refresh = if cached_dt.naive_local() < today_refresh {
         today_refresh
     } else {
         today_refresh + chrono::Duration::days(1)
     };
 
-    now < next_refresh
+    now.naive_local() < next_refresh
 }
 
 /// 批量获取单月份所有日期的attention数据
@@ -556,8 +575,8 @@ async fn get_live_sessions_cache(
     let cache = LIVE_SESSIONS_CACHE.read().await;
 
     if let Some(entry) = cache.get(&cache_key) {
-        // 检查缓存有效性
-        if entry.is_past_month || is_attention_cache_valid(entry.timestamp) {
+        // 检查缓存有效性：过去月份永久有效，当前月每日1:30刷新
+        if entry.is_past_month || is_cache_valid(entry.timestamp) {
             println!("✅ LiveSessions缓存命中: {}", cache_key);
             return Some(entry.data.clone());
         }
@@ -1022,7 +1041,7 @@ async fn get_live_sessions(
     let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
     let month = query
         .month
-        .unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
+        .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
 
     println!(
         "📊 [/gift/live_sessions] room_id={}, union={}, month={}",

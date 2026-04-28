@@ -295,7 +295,10 @@ export default {
     // 从路由参数获取数据
     const room_id = route.query.room_id
     union.value = route.query.union || 'VirtuaReal'
-    const month = route.query.month || new Date().toISOString().slice(0, 7).replace('-', '').substring(0, 6)
+    const currentDate = new Date()
+    const currentYear = currentDate.getFullYear()
+    const currentMonth = String(currentDate.getMonth() + 1).padStart(2, '0')
+    const month = route.query.month || `${currentYear}${currentMonth}`
 
     title.value = `${month.substring(0, 4)}年${parseInt(month.substring(4, 6)).toString().padStart(2, '0')}月直播数据`
 
