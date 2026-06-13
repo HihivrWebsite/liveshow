@@ -9,11 +9,11 @@
         <h3>📅 选择日期范围</h3>
         <div class="form-group">
           <label>起始月份:</label>
-          <input type="month" v-model="startDate" class="month-input">
+          <input type="month" v-model="startDate" class="month-input" min="2025-08">
         </div>
         <div class="form-group">
           <label>结束月份:</label>
-          <input type="month" v-model="endDate" class="month-input">
+          <input type="month" v-model="endDate" class="month-input" min="2025-08">
         </div>
         <p class="hint">💡 可选择任意月份范围</p>
         <div class="button-group">
@@ -168,6 +168,7 @@
 <script>
 import { Chart, registerables } from 'chart.js'
 import { anchorAPI } from '@/api'
+import { getMonthRange } from '@/utils/monthUtils'
 import HeaderSection from '@/components/HeaderSection.vue'
 import FooterSection from '@/components/FooterSection.vue'
 
@@ -374,7 +375,7 @@ export default {
     
     // 获取单个主播的数据
     async fetchAnchorData(anchor) {
-      const months = this.getMonthsBetween(this.startDate, this.endDate)
+      const months = getMonthRange(this.startDate, this.endDate)
       const sessions = []
 
       console.log(`📡 获取 ${anchor.anchor_name} 的数据...`)
@@ -384,7 +385,7 @@ export default {
           const response = await anchorAPI.getLiveSessions(
             anchor.room_id,
             anchor.union || 'VirtuaReal',
-            month.replace('-', '')
+            month
           )
           const sessionList = response.sessions || []
           sessionList.forEach(session => {
@@ -406,7 +407,7 @@ export default {
     // 获取单个主播的数据（用于串行获取和刷新）
     async fetchSingleAnchorData(anchor, index) {
       try {
-        const months = this.getMonthsBetween(this.startDate, this.endDate)
+        const months = getMonthRange(this.startDate, this.endDate)
         const sessions = []
         const failedMonths = []
 
@@ -426,7 +427,7 @@ export default {
               const response = await anchorAPI.getLiveSessions(
                 anchor.room_id,
                 anchor.union || 'VirtuaReal',
-                month.replace('-', '')
+                month
               )
               const sessionList = response.sessions || []
               sessionList.forEach(session => {
@@ -701,18 +702,6 @@ export default {
     },
     
     // 辅助方法
-    getMonthsBetween(startDate, endDate) {
-      const months = []
-      const start = new Date(startDate + '-01')
-      const end = new Date(endDate + '-01')
-      const current = new Date(start)
-      while (current <= end) {
-        months.push(`${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`)
-        current.setMonth(current.getMonth() + 1)
-      }
-      return months
-    },
-    
     getCacheKey() {
       return this.selectedAnchors.map(a => a.room_id).sort().join('_') + '_' + this.startDate + '_' + this.endDate
     },

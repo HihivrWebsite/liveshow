@@ -27,43 +27,21 @@
         -->
       </div>
 
-      <!-- 月份选择器模态框 -->
-      <div v-if="showMonthSelector" class="modal-overlay" @click="closeMonthSelector">
-        <div class="modal-content" @click.stop>
-          <h3>切换月份</h3>
-          <div class="modal-form">
-            <div class="form-group">
-              <label>选择月份:</label>
-              <input type="month" v-model="monthSelection" class="month-input">
-            </div>
-            <div class="button-group">
-              <button @click="performMonthSwitch" class="confirm-btn">确定</button>
-              <button @click="closeMonthSelector" class="cancel-btn">取消</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <MonthSelector
+        :visible="showMonthSelector"
+        title="切换月份"
+        mode="single"
+        @confirm="performMonthSwitch"
+        @cancel="closeMonthSelector"
+      />
 
-      <!-- 多月份统计模态框 -->
-      <div v-if="showMultiMonthModal" class="modal-overlay" @click="closeMultiMonthModal">
-        <div class="modal-content" @click.stop>
-          <h3>多月份共同统计</h3>
-          <div class="modal-form">
-            <div class="form-group">
-              <label>起始月份:</label>
-              <input type="month" v-model="startMonth" class="month-input">
-            </div>
-            <div class="form-group">
-              <label>结束月份:</label>
-              <input type="month" v-model="endMonth" class="month-input">
-            </div>
-            <div class="button-group">
-              <button @click="performMultiMonthQuery" class="confirm-btn">确定</button>
-              <button @click="closeMultiMonthModal" class="cancel-btn">取消</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <MonthSelector
+        :visible="showMultiMonthModal"
+        title="多月份共同统计"
+        mode="range"
+        @confirm="performMultiMonthQuery"
+        @cancel="closeMultiMonthModal"
+      />
     </div>
 
     <div class="info-section">
@@ -264,6 +242,8 @@ import { Chart, registerables } from 'chart.js'
 import { anchorAPI } from '@/api'
 import BaseCard from '@/components/BaseCard.vue'
 import NavigationTable from '@/components/NavigationTable.vue'
+import MonthSelector from '@/components/MonthSelector.vue'
+import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
 
 Chart.register(...registerables)
@@ -272,7 +252,8 @@ export default {
   name: 'LiveSessions',
   components: {
     BaseCard,
-    NavigationTable
+    NavigationTable,
+    MonthSelector
   },
   setup() {
     const router = useRouter()
@@ -321,14 +302,8 @@ export default {
 
     // 月份选择器相关
     const showMonthSelector = ref(false)
-    const monthSelection = ref('')
 
     const openMonthSelector = () => {
-      // 设置默认值为当前年月
-      const now = new Date()
-      const currentYear = now.getFullYear()
-      const currentMonth = String(now.getMonth() + 1).padStart(2, '0')
-      monthSelection.value = `${currentYear}-${currentMonth}`
       showMonthSelector.value = true
     }
 
@@ -336,20 +311,11 @@ export default {
       showMonthSelector.value = false
     }
 
-    const performMonthSwitch = () => {
-      if (!monthSelection.value) {
+    const performMonthSwitch = ({ selectedMonth } = {}) => {
+      if (!selectedMonth) {
         alert('请选择月份')
         return
       }
-
-      // 验证月份格式
-      const selectedDate = new Date(monthSelection.value)
-      if (isNaN(selectedDate.getTime())) {
-        alert('无效的月份')
-        return
-      }
-
-      const selectedMonth = monthSelection.value.replace('-', '')
 
       if (room_id) {
         router.push(`/live-sessions?room_id=${room_id}&union=${union.value}&month=${selectedMonth}`)
@@ -855,16 +821,8 @@ export default {
 
     // 多月份统计相关
     const showMultiMonthModal = ref(false)
-    const startMonth = ref('')
-    const endMonth = ref('')
 
     const openMultiMonthModal = () => {
-      // 设置默认值为当前年月
-      const now = new Date()
-      const currentYear = now.getFullYear()
-      const currentMonth = String(now.getMonth() + 1).padStart(2, '0')
-      startMonth.value = `${currentYear}-${currentMonth}`
-      endMonth.value = `${currentYear}-${currentMonth}`
       showMultiMonthModal.value = true
     }
 
@@ -872,18 +830,9 @@ export default {
       showMultiMonthModal.value = false
     }
 
-    const performMultiMonthQuery = async () => {
-      if (!startMonth.value || !endMonth.value) {
+    const performMultiMonthQuery = async ({ startMonth: sMonth, endMonth: eMonth } = {}) => {
+      if (!sMonth || !eMonth) {
         alert('请选择起始和结束月份')
-        return
-      }
-
-      // 验证月份格式
-      const start = new Date(startMonth.value)
-      const end = new Date(endMonth.value)
-
-      if (start > end) {
-        alert('起始月份不能晚于结束月份')
         return
       }
 
@@ -891,32 +840,13 @@ export default {
         loading.value = true
         error.value = null
 
-        // 将月份格式转换为 YYYYMM 格式
-        const startMonthFormatted = startMonth.value.replace('-', '')
-        const endMonthFormatted = endMonth.value.replace('-', '')
-
-        // 获取起始和结束月份之间的所有月份
-        const months = []
-        const startDate = new Date(startMonth.value)
-        const endDate = new Date(endMonth.value)
-
-        // 设置为月初，避免日期问题
-        startDate.setDate(1)
-        endDate.setDate(1)
-
-        const current = new Date(startDate)
-        while (current <= endDate) {
-          const year = current.getFullYear()
-          const month = String(current.getMonth() + 1).padStart(2, '0')
-          months.push(`${year}${month}`)
-          current.setMonth(current.getMonth() + 1)
-        }
+        const months = getMonthRange(sMonth, eMonth)
 
         // 获取所有月份的数据并合并
         let combinedSessions = []
-        for (const month of months) {
+        for (const m of months) {
           try {
-            const response = await anchorAPI.getLiveSessions(room_id, union.value, month)
+            const response = await anchorAPI.getLiveSessions(room_id, union.value, m)
             const sessionsForMonth = response.sessions || []
 
             // 累加每个会话的数据
@@ -939,7 +869,7 @@ export default {
               combinedSessions.push(session)
             })
           } catch (err) {
-            console.error(`获取${month}月份数据失败:`, err)
+            console.error(`获取${m}月份数据失败:`, err)
             // 继续处理下一个月份
           }
         }
@@ -948,10 +878,10 @@ export default {
         sessions.value = combinedSessions
 
         // 更新标题
-        const startYear = startMonth.value.substring(0, 4)
-        const startMon = startMonth.value.substring(5, 7)
-        const endYear = endMonth.value.substring(0, 4)
-        const endMon = endMonth.value.substring(5, 7)
+        const startYear = sMonth.substring(0, 4)
+        const startMon = sMonth.substring(4, 6)
+        const endYear = eMonth.substring(0, 4)
+        const endMon = eMonth.substring(4, 6)
         title.value = `${startYear}年${startMon}月-${endYear}年${endMon}月直播数据`
 
         refreshTime.value = new Date().toLocaleString()
@@ -1023,13 +953,10 @@ export default {
       hideChart,
       // 月份选择器相关
       showMonthSelector,
-      monthSelection,
       closeMonthSelector,
       performMonthSwitch,
       // 多月份统计相关
       showMultiMonthModal,
-      startMonth,
-      endMonth,
       openMultiMonthModal,
       closeMultiMonthModal,
       performMultiMonthQuery
