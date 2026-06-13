@@ -2,14 +2,26 @@
 
 ## 版本历史
 
-### v4.1.6 — 2026-06-13 功能指南弹窗
+### v4.1.4 — 2026-06-13 缓存逻辑全面修复
 
-- 新增功能指南弹窗，介绍网站全部19项功能的用途和使用方法
-- 主页每次打开自动弹出功能指南，二级页面不自动弹出
-- 功能指南按钮放在"进入向阳Hihi粉丝站主站"按钮下方，添加闪烁效果
-- 导出截图按钮添加闪烁效果
-- 功能指南中导出截图和Super Chat历史功能着重标记（粉色高亮）
-- 修复"关注花礼harei"按钮居中问题
+- 修复 size_estimate 估算失效（改用实际序列化大小）
+- 修复 is_past_month 时区不一致（统一使用 Local）
+- 修复 clear_live_sessions_cache_for_month 子字符串匹配误删（改用精确键匹配）
+- 新增 clear_attention_cache_for_month、clear_avatar_cache 函数
+- 新增 POST /cache/clear 端点，支持手动清除指定主播月份缓存
+- 修复服务器重启后缓存时间戳重置（使用文件修改时间）
+- 修复磁盘加载后冗余写入（只写内存不重复写磁盘）
+- CacheManager.hit_count/miss_count 改为 AtomicUsize
+- 清理 6 个未使用的死代码函数
+- 新增启动时自动清理 3 个月前的历史缓存
+- 修复 AnchorBattle 缓存命中时 sessionsData 重置为空
+- 修复 AnchorBattle refreshData 不更新 sessions 和缓存
+- 修复 RankComparison refreshData 缺 try/finally
+- 修复 performExport DOM 节点泄漏
+- 修复 CacheStats setInterval 泄漏
+- AnchorBattle/RankComparison 模块级颜色状态移入组件 data
+
+### v4.1.3 — 2026-06-13 功能指南弹窗
 
 ### v4.1.5 — 2026-06-13 饼图头像平铺 + 导出排名修复
 

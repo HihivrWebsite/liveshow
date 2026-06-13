@@ -97,7 +97,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import axios from 'axios'
 
 export default {
@@ -143,10 +143,18 @@ export default {
       return Math.round((stats.value.current_size / stats.value.max_size) * 100)
     }
 
+    let statsInterval = null
+
     onMounted(() => {
       refreshStats()
-      // 每10秒自动刷新一次
-      setInterval(refreshStats, 10000)
+      statsInterval = setInterval(refreshStats, 10000)
+    })
+
+    onUnmounted(() => {
+      if (statsInterval) {
+        clearInterval(statsInterval)
+        statsInterval = null
+      }
     })
 
     return {

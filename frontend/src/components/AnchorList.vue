@@ -758,24 +758,31 @@ export default {
         container.innerHTML = htmlContent
         document.body.appendChild(container)
 
-        await new Promise(r => requestAnimationFrame(r))
+        try {
+          await new Promise(r => requestAnimationFrame(r))
 
-        const canvas = await html2canvas(container.firstElementChild, {
-          useCORS: false,
-          allowTaint: false,
-          scale: 2,
-          backgroundColor: '#FFF8E1',
-          logging: false
-        })
+          const canvas = await html2canvas(container.firstElementChild, {
+            useCORS: false,
+            allowTaint: false,
+            scale: 2,
+            backgroundColor: '#FFF8E1',
+            logging: false
+          })
 
-        document.body.removeChild(container)
+          const link = document.createElement('a')
+          link.download = `斗虫榜数据_${startLabel}-${endLabel}.png`
+          link.href = canvas.toDataURL('image/png')
+          link.click()
 
-        const link = document.createElement('a')
-        link.download = `斗虫榜数据_${startLabel}-${endLabel}.png`
-        link.href = canvas.toDataURL('image/png')
-        link.click()
-
-        closeExportModal()
+          closeExportModal()
+        } catch (err) {
+          console.error('导出截图失败:', err)
+          alert('导出截图失败: ' + err.message)
+        } finally {
+          if (container.parentNode) {
+            document.body.removeChild(container)
+          }
+        }
       } catch (err) {
         console.error('导出截图失败:', err)
         alert('导出截图失败: ' + err.message)

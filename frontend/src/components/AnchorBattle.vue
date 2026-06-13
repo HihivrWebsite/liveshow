@@ -96,6 +96,8 @@
             type="checkbox" 
             :checked="visibleAnchors.includes(anchor.room_id)" 
             @change="toggleAnchorVisibility(anchor.room_id)">
+          <img :src="`/gift/avatar_proxy?room_id=${anchor.room_id}`" 
+            class="legend-avatar" @error="$event.target.style.display='none'">
           <span class="legend-dot" :style="{ backgroundColor: getAnchorColor(anchor.room_id) }"></span>
           {{ anchor.anchor_name }}
         </span>
@@ -174,20 +176,11 @@ import FooterSection from '@/components/FooterSection.vue'
 
 Chart.register(...registerables)
 
-// 主播颜色映射
-const anchorColors = {}
 const colorPalette = [
-  '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', 
+  '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
   '#FF9F40', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
   '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE'
 ]
-
-function getAnchorColor(roomId) {
-  if (!anchorColors[roomId]) {
-    anchorColors[roomId] = colorPalette[Object.keys(anchorColors).length % colorPalette.length]
-  }
-  return anchorColors[roomId]
-}
 
 export default {
   name: 'AnchorBattle',
@@ -219,8 +212,10 @@ export default {
       debugChartData: { labels: [], datasets: [] },
       debugRawData: '[]',
       debugDatasetsInfo: '[]',
-      isRefreshing: false,  // 标记是否正在刷新
-      currentRefreshingAnchor: null  // 当前正在刷新数据的主播
+      isRefreshing: false,
+      currentRefreshingAnchor: null,
+      anchorColors: {},
+      colorIndex: 0
     }
   },
   computed: {
@@ -278,7 +273,13 @@ export default {
     }
   },
   methods: {
-    getAnchorColor,
+    getAnchorColor(roomId) {
+      if (!this.anchorColors[roomId]) {
+        this.anchorColors[roomId] = colorPalette[this.colorIndex % colorPalette.length]
+        this.colorIndex++
+      }
+      return this.anchorColors[roomId]
+    },
     
     closeDateModal() { 
       this.showDateModal = false
@@ -320,8 +321,9 @@ export default {
         // 1. 检查缓存
         if (this.isCacheValid(cacheKey)) {
           console.log('✅ 使用缓存数据')
-          this.sessions = this.dataCache.get(cacheKey).sessions
-          this.sessionsData = this.selectedAnchors.map(() => [])
+          const cached = this.dataCache.get(cacheKey)
+          this.sessions = cached.sessions
+          this.sessionsData = cached.sessionsData || this.selectedAnchors.map(() => [])
           this.onDataReady()
           return
         }
@@ -358,8 +360,9 @@ export default {
         // 7. 更新缓存
         this.dataCache.set(cacheKey, {
           sessions: allSessions,
+          sessionsData: this.sessionsData,
           timestamp: Date.now(),
-          expiry: 2 * 60 * 60 * 1000  // 2 小时
+          expiry: 2 * 60 * 60 * 1000
         })
 
         // 8. 数据准备好
@@ -469,17 +472,15 @@ export default {
     onDataReady() {
       this.visibleAnchors = this.selectedAnchors.map(a => a.room_id)
       
-      // 等待 DOM 更新后再渲染图表
       this.$nextTick(() => {
-        // 再次等待，确保 canvas 元素完全渲染
         setTimeout(() => {
-          this.renderBattleChart()
+          this.renderBattleChart().catch(() => {})
         }, 100)
       })
     },
     
     // 图表渲染
-    renderBattleChart() {
+    async renderBattleChart() {
       // 1. 检查 canvas 元素
       const canvas = this.$refs.battleChart
       if (!canvas) {
@@ -496,6 +497,39 @@ export default {
       // 3. 准备数据
       const metric = this.currentMetric
       const chartData = this.transformChartData(metric)
+
+      const avatarImages = {}
+      for (const anchor of this.selectedAnchors) {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.src = `/gift/avatar_proxy?room_id=${anchor.room_id}`
+        avatarImages[anchor.room_id] = img
+      }
+
+      await Promise.all(
+        Object.values(avatarImages).map(img => new Promise(resolve => {
+          img.onload = resolve
+          img.onerror = resolve
+          setTimeout(resolve, 3000)
+        }))
+      )
+
+      const AVATAR_SIZE = 20
+      const scaledAvatars = {}
+      for (const [roomId, img] of Object.entries(avatarImages)) {
+        if (img.complete && img.naturalWidth > 0) {
+          const canvas = document.createElement('canvas')
+          canvas.width = AVATAR_SIZE
+          canvas.height = AVATAR_SIZE
+          const ctx = canvas.getContext('2d')
+          ctx.beginPath()
+          ctx.arc(AVATAR_SIZE / 2, AVATAR_SIZE / 2, AVATAR_SIZE / 2, 0, Math.PI * 2)
+          ctx.closePath()
+          ctx.clip()
+          ctx.drawImage(img, 0, 0, AVATAR_SIZE, AVATAR_SIZE)
+          scaledAvatars[roomId] = canvas
+        }
+      }
       
       // 保存 Debug 数据
       this.debugChartData = chartData
@@ -528,22 +562,25 @@ export default {
           labels: chartData.labels,
           datasets: this.selectedAnchors
             .filter(anchor => this.visibleAnchors.includes(anchor.room_id))
-            .map((anchor, index) => ({
-              label: anchor.anchor_name,
-              data: chartData.datasets.find(ds => ds.label === anchor.anchor_name)?.data || [],
-              borderColor: this.getAnchorColor(anchor.room_id),
-              backgroundColor: this.getAnchorColor(anchor.room_id) + '20',
-              pointStyle: pointStyles[index % pointStyles.length],
-              pointRadius: 10,
-              pointHoverRadius: 15,
-              pointBackgroundColor: this.getAnchorColor(anchor.room_id),
-              pointBorderColor: '#fff',
-              pointBorderWidth: 3,
-              borderWidth: 3,
-              fill: false,
-              tension: 0.3,
-              spanGaps: true
-            }))
+            .map((anchor, index) => {
+              const avatarImg = scaledAvatars[anchor.room_id]
+              return {
+                label: anchor.anchor_name,
+                data: chartData.datasets.find(ds => ds.label === anchor.anchor_name)?.data || [],
+                borderColor: this.getAnchorColor(anchor.room_id),
+                backgroundColor: this.getAnchorColor(anchor.room_id) + '20',
+                pointStyle: avatarImg || pointStyles[index % pointStyles.length],
+                pointRadius: avatarImg ? 10 : 8,
+                pointHoverRadius: avatarImg ? 14 : 12,
+                pointBackgroundColor: this.getAnchorColor(anchor.room_id),
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                borderWidth: 3,
+                fill: false,
+                tension: 0.3,
+                spanGaps: true
+              }
+            })
         },
         options: {
           responsive: false,
@@ -679,7 +716,7 @@ export default {
     onMetricChange() {
       console.log(`🔄 切换指标到：${this.currentMetric}`)
       this.$nextTick(() => {
-        this.renderBattleChart()
+        this.renderBattleChart().catch(() => {})
       })
     },
     
@@ -692,7 +729,7 @@ export default {
         this.visibleAnchors.push(roomId)
       }
       this.$nextTick(() => {
-        this.renderBattleChart()
+        this.renderBattleChart().catch(() => {})
       })
     },
     
@@ -778,49 +815,55 @@ export default {
     async refreshData() {
       console.log('=== 开始刷新/补全数据 ===')
 
+      const cacheKey = this.getCacheKey()
+      this.dataCache.delete(cacheKey)
+
       this.isRefreshing = true
       let hasPartialFailure = false
       const failedAnchors = []
 
       try {
-        // 记录缺失数据或数据较少的主播索引
         const missingAnchors = []
 
         this.selectedAnchors.forEach((anchor, index) => {
-          // 数据为空或数据量明显偏少（少于 10 条）都认为需要补全
           if (!this.sessionsData[index] || this.sessionsData[index].length < 10) {
             missingAnchors.push({ anchor, index })
           }
         })
 
         if (missingAnchors.length === 0) {
-          // 没有缺失数据，重新获取所有数据
           console.log('没有缺失数据，重新获取所有数据')
           await this.fetchBattleData()
         } else {
-          // 只获取缺失的数据
           console.log(`发现 ${missingAnchors.length} 个主播数据需要补全，开始刷新`)
           for (const { anchor, index } of missingAnchors) {
             this.currentRefreshingAnchor = anchor
             console.log(`正在获取 ${anchor.anchor_name} 的数据...`)
             await this.fetchSingleAnchorData(anchor, index)
-            
-            // 检查是否获取成功
+
             if (!this.sessionsData[index] || this.sessionsData[index].length === 0) {
               failedAnchors.push(anchor.anchor_name)
               hasPartialFailure = true
             }
-            
-            // 延长延迟时间到 1500ms
+
             await new Promise(resolve => setTimeout(resolve, 1500))
           }
           this.currentRefreshingAnchor = null
+
+          this.sessions = this.sessionsData.flat().sort((a, b) =>
+            (a.start_time || '').localeCompare(b.start_time || '')
+          )
+
+          this.dataCache.set(cacheKey, {
+            sessions: this.sessions,
+            sessionsData: this.sessionsData,
+            timestamp: Date.now(),
+            expiry: 2 * 60 * 60 * 1000
+          })
         }
 
-        // 更新图表
-        this.renderBattleChart()
-        
-        // 显示结果提示
+        await this.renderBattleChart()
+
         if (hasPartialFailure) {
           alert(`数据刷新完成，但以下主播数据仍然缺失：${failedAnchors.join(', ')}\n\n可能是 API 持续超时，请稍后再试或检查网络连接。`)
         } else {
@@ -951,6 +994,7 @@ export default {
 .chart-legend span { margin: 8px 15px; display: inline-flex; align-items: center; cursor: pointer; font-size: 0.95rem }
 .chart-legend input[type="checkbox"] { margin-right: 5px }
 .legend-dot { width: 16px; height: 16px; border-radius: 50%; margin: 0 8px; display: inline-block }
+.legend-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 4px; border: 1px solid #FFC633 }
 .debug-panel { background: #1e1e1e; color: #d4d4d4; border-radius: 15px; padding: 20px; margin: 30px auto; max-width: 1400px; border: 2px solid #4ECDC4 }
 .debug-panel h3 { color: #4ECDC4; margin-top: 0; margin-bottom: 20px }
 .debug-section { margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 15px }

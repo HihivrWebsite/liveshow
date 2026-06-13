@@ -2,7 +2,7 @@ use axum::http::{header, StatusCode};
 use axum::{
     extract::{Query, State},
     response::{Html, IntoResponse},
-    routing::{get, get_service},
+    routing::{get, get_service, post},
     Json, Router,
 };
 use chrono::NaiveDateTime;
@@ -192,7 +192,7 @@ async fn sum_cache_file_sizes_by_prefix(prefix: &str) -> usize {
 
 /// 判断是否为上月数据
 fn is_past_month(month: &str) -> bool {
-    let current_month = chrono::Utc::now().format("%Y%m").to_string();
+    let current_month = chrono::Local::now().format("%Y%m").to_string();
     month < current_month.as_str()
 }
 
@@ -297,14 +297,22 @@ async fn get_attention_cache_data(
             cache_key, size
         );
 
-        // 将磁盘缓存重新加入内存
+        let file_timestamp = {
+            let dir = if is_past { "cache_data/previous_months" } else { "cache_data/current_month" };
+            let file_path = format!("{}/{}.json", dir, cache_key);
+            tokio::fs::metadata(&file_path).await
+                .ok()
+                .and_then(|m| m.modified().ok())
+                .unwrap_or(current_time)
+        };
+
         {
             let mut cache = ATTENTION_CACHE.write().await;
             cache.insert(
                 cache_key.clone(),
                 AttentionCacheEntry {
                     data: loaded_data.clone(),
-                    timestamp: current_time,
+                    timestamp: file_timestamp,
                     is_past_month: is_past,
                 },
             );
@@ -364,24 +372,6 @@ async fn get_attention_cache_data(
     Ok(data)
 }
 
-/// 从缓存的attention数据中获取指定日期的粉丝数
-fn get_attention_from_cache(cache_data: &serde_json::Value, date: &str) -> Option<i64> {
-    if let Some(obj) = cache_data.as_object() {
-        if let Some(value) = obj.get(date) {
-            if let Some(num) = value.as_i64() {
-                return Some(num);
-            }
-            // 尝试作为字符串解析
-            if let Some(str_val) = value.as_str() {
-                if let Ok(num) = str_val.parse::<i64>() {
-                    return Some(num);
-                }
-            }
-        }
-    }
-    None
-}
-
 // 全局缓存，使用LRU策略，限制为5GB (5 * 1024 * 1024 * 1024 bytes)
 const MAX_CACHE_SIZE: usize = 5 * 1024 * 1024 * 1024; // 5GB
 
@@ -394,8 +384,8 @@ lazy_static::lazy_static! {
 struct CacheManager {
     cache: LruCache<String, CacheEntry>,
     current_size: usize,
-    hit_count: usize,  // 缓存命中次数
-    miss_count: usize, // 缓存未命中次数
+    hit_count: AtomicUsize,
+    miss_count: AtomicUsize,
 }
 
 impl CacheManager {
@@ -406,17 +396,17 @@ impl CacheManager {
         CacheManager {
             cache: LruCache::new(capacity),
             current_size: 0,
-            hit_count: 0,
-            miss_count: 0,
+            hit_count: AtomicUsize::new(0),
+            miss_count: AtomicUsize::new(0),
         }
     }
 
     fn get(&mut self, key: &str) -> Option<&CacheEntry> {
         if let Some(entry) = self.cache.get(key) {
-            self.hit_count += 1;
+            self.hit_count.fetch_add(1, Ordering::Relaxed);
             Some(entry)
         } else {
-            self.miss_count += 1;
+            self.miss_count.fetch_add(1, Ordering::Relaxed);
             None
         }
     }
@@ -469,25 +459,22 @@ impl CacheManager {
     }
 
     fn get_hit_count(&self) -> usize {
-        self.hit_count
+        self.hit_count.load(Ordering::Relaxed)
     }
 
     fn get_miss_count(&self) -> usize {
-        self.miss_count
+        self.miss_count.load(Ordering::Relaxed)
     }
 
     fn get_hit_rate(&self) -> f64 {
-        let total_requests = self.hit_count + self.miss_count;
+        let hits = self.hit_count.load(Ordering::Relaxed);
+        let misses = self.miss_count.load(Ordering::Relaxed);
+        let total_requests = hits + misses;
         if total_requests == 0 {
             0.0
         } else {
-            self.hit_count as f64 / total_requests as f64
+            hits as f64 / total_requests as f64
         }
-    }
-
-    fn reset_stats(&mut self) {
-        self.hit_count = 0;
-        self.miss_count = 0;
     }
 }
 
@@ -517,11 +504,6 @@ async fn get_cache_hit_stats() -> (usize, usize, f64) {
     let misses = cache.get_miss_count();
     let hit_rate = cache.get_hit_rate();
     (hits, misses, hit_rate)
-}
-
-// 重置缓存统计
-async fn reset_cache_stats() {
-    GLOBAL_CACHE.write().await.reset_stats();
 }
 
 // ==================== LiveSessions缓存管理 ====================
@@ -579,11 +561,66 @@ async fn put_live_sessions_cache(room_id: &str, _union: &str, month: &str, data:
 /// 清除指定主播月份的LiveSessions缓存（用户手动刷新时调用）
 async fn clear_live_sessions_cache_for_month(room_id: &str, month: &str) {
     let mut cache = LIVE_SESSIONS_CACHE.write().await;
-    cache.retain(|key, _| !key.contains(room_id) || !key.ends_with(month));
-    println!(
-        "🗑️ 已清除主播 {} 月份 {} 的LiveSessions缓存",
-        room_id, month
-    );
+    let exact_key = format!("livesessions_{}_{}", room_id, month);
+    cache.retain(|key, _| key != &exact_key);
+    println!("🗑️ 已清除主播 {} 月份 {} 的 LiveSessions 缓存", room_id, month);
+}
+
+async fn clear_attention_cache_for_month(room_id: &str, month: &str) {
+    let mut cache = ATTENTION_CACHE.write().await;
+    let suffix = format!("_{}_{}", room_id, month);
+    cache.retain(|key, _| !key.ends_with(&suffix));
+    println!("🗑️ 已清除主播 {} 月份 {} 的 Attention 缓存", room_id, month);
+}
+
+async fn clear_avatar_cache(room_id: &str) {
+    let mut cache = AVATAR_CACHE.write().await;
+    cache.remove(room_id);
+    println!("🗑️ 已清除主播 {} 的头像缓存", room_id);
+}
+
+async fn cleanup_old_cache_entries() {
+    let current_month = chrono::Local::now().format("%Y%m").to_string();
+    let current_year: i32 = current_month[..4].parse().unwrap_or(0);
+    let current_mon: i32 = current_month[4..6].parse().unwrap_or(0);
+
+    let (cutoff_year, cutoff_mon) = if current_mon > 3 {
+        (current_year, current_mon - 3)
+    } else {
+        (current_year - 1, current_mon + 9)
+    };
+    let cutoff = format!("{:04}{:02}", cutoff_year, cutoff_mon);
+
+    {
+        let mut cache = ATTENTION_CACHE.write().await;
+        let before = cache.len();
+        cache.retain(|key, _| {
+            if let Some(month_str) = key.split('_').last() {
+                month_str >= cutoff.as_str()
+            } else {
+                true
+            }
+        });
+        let after = cache.len();
+        if before != after {
+            println!("🧹 Attention 缓存清理: {} -> {} 条目", before, after);
+        }
+    }
+    {
+        let mut cache = LIVE_SESSIONS_CACHE.write().await;
+        let before = cache.len();
+        cache.retain(|key, _| {
+            if let Some(month_str) = key.split('_').last() {
+                month_str >= cutoff.as_str()
+            } else {
+                true
+            }
+        });
+        let after = cache.len();
+        if before != after {
+            println!("🧹 LiveSessions 缓存清理: {} -> {} 条目", before, after);
+        }
+    }
 }
 
 // 计算两个时间字符串之间的持续时间（分钟）
@@ -897,6 +934,8 @@ async fn main() {
     // 创建共享数据存储
     let shared_data: SharedData = Arc::new(RwLock::new(HashMap::new()));
 
+    cleanup_old_cache_entries().await;
+
     // 创建安全的CORS中间件层
     let cors_layer = CorsLayer::new()
         .allow_origin([
@@ -913,7 +952,7 @@ async fn main() {
                 .parse::<axum::http::HeaderValue>()
                 .unwrap(),
         ])
-        .allow_methods([axum::http::Method::GET, axum::http::Method::OPTIONS])
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::OPTIONS])
         .allow_headers([
             axum::http::header::CONTENT_TYPE,
             axum::http::header::AUTHORIZATION,
@@ -936,6 +975,7 @@ async fn main() {
         .route("/gift/avatar", get(get_avatar))
         .route("/gift/avatar_proxy", get(get_avatar_proxy))
         .route("/cache/stats", get(get_cache_stats_endpoint))
+        .route("/cache/clear", post(clear_cache_endpoint))
         .nest_service(
             "/assets",
             get_service(ServeDir::new("../rust_backend/dist/assets")),
@@ -1292,7 +1332,7 @@ async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Vec<Anchor> {
     // 如果是过去月份的数据，将其缓存
     if is_past_month {
         // 估算数据大小（简单估算，实际项目中可能需要更精确的估算）
-        let size_estimate = std::mem::size_of_val(&all_data);
+        let size_estimate = serde_json::to_string(&all_data).unwrap_or_default().len();
 
         let cache_entry = CacheEntry {
             data: all_data.clone(),
@@ -1404,6 +1444,23 @@ async fn get_cache_stats_endpoint() -> Result<Json<CacheStatsResponse>, StatusCo
         attention_entries,
         live_sessions_entries,
     }))
+}
+
+#[derive(Deserialize)]
+struct ClearCacheQuery {
+    room_id: Option<String>,
+    month: Option<String>,
+}
+
+async fn clear_cache_endpoint(Query(query): Query<ClearCacheQuery>) -> Json<serde_json::Value> {
+    if let (Some(room_id), Some(month)) = (&query.room_id, &query.month) {
+        clear_live_sessions_cache_for_month(room_id, month).await;
+        clear_attention_cache_for_month(room_id, month).await;
+        clear_avatar_cache(room_id).await;
+        Json(serde_json::json!({"ok": true, "message": format!("已清除 {} {} 的缓存", room_id, month)}))
+    } else {
+        Json(serde_json::json!({"ok": false, "message": "需要 room_id 和 month 参数"}))
+    }
 }
 
 async fn fetch_anchor_data_by_url(
@@ -1545,8 +1602,24 @@ async fn fetch_live_session_data_with_fans_calc(
                 room_id, month, union, sessions.len()
             );
 
-            // 将磁盘缓存重新加入内存
-            put_live_sessions_cache(room_id, union, month, sessions.clone()).await;
+            let file_timestamp = {
+                let dir = if is_past { "cache_data/previous_months" } else { "cache_data/current_month" };
+                let file_path = format!("{}/{}.json", dir, cache_key);
+                tokio::fs::metadata(&file_path).await
+                    .ok()
+                    .and_then(|m| m.modified().ok())
+                    .unwrap_or(std::time::SystemTime::now())
+            };
+
+            let mut cache = LIVE_SESSIONS_CACHE.write().await;
+            cache.insert(
+                cache_key.clone(),
+                LiveSessionsCacheEntry {
+                    data: sessions.clone(),
+                    timestamp: file_timestamp,
+                    is_past_month: is_past,
+                },
+            );
 
             return sessions;
         }
@@ -1737,85 +1810,6 @@ async fn get_attention_data(
             );
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
-    }
-}
-
-/// 从外部 API 获取粉丝数快照数据
-async fn fetch_attention_from_api(
-    client: &Client,
-    api_url: &str,
-) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
-    let response = timeout(
-        Duration::from_secs(10),
-        client
-            .get(api_url)
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            )
-            .header("Accept", "application/json")
-            .send(),
-    )
-    .await??;
-
-    let json_text = timeout(Duration::from_secs(10), response.text()).await??;
-
-    let data: serde_json::Value = serde_json::from_str(&json_text)?;
-    Ok(data)
-}
-
-/// 从日期时间字符串中提取日期部分 (YYYYMMDD 格式)
-fn parse_date_from_datetime(datetime: &str) -> String {
-    if datetime.is_empty() {
-        return String::new();
-    }
-    // 格式："2026-01-01 19:55:04" -> "20260101"
-    let date_part = datetime.split(' ').next().unwrap_or("");
-    date_part.replace("-", "")
-}
-
-/// 获取前一天的日期 (YYYYMMDD 格式)
-fn get_previous_date(date_str: &str) -> Option<String> {
-    if date_str.len() != 8 {
-        return None;
-    }
-
-    let year = date_str[..4].parse::<i32>().ok()?;
-    let month = date_str[4..6].parse::<u32>().ok()?;
-    let day = date_str[6..8].parse::<u32>().ok()?;
-
-    let current_date = chrono::NaiveDate::from_ymd_opt(year, month, day)?;
-    let prev_date = current_date.pred_opt()?;
-
-    Some(prev_date.format("%Y%m%d").to_string())
-}
-
-/// 获取指定日期的粉丝数
-async fn get_attention_for_date(
-    client: &Client,
-    base_url: &str,
-    room_id: &str,
-    date: &str, // YYYYMMDD
-) -> Option<i64> {
-    let month = &date[..6]; // YYYYMM
-    let api_url = format!(
-        "{}/gift/attention?room_id={}&month={}",
-        base_url, room_id, month
-    );
-
-    match fetch_attention_from_api(client, &api_url).await {
-        Ok(response) => {
-            // 从 attention 数组中查找对应日期
-            if let Some(attention_array) = response.get("attention").and_then(|v| v.as_array()) {
-                for snapshot in attention_array {
-                    if let Some(count) = snapshot.get(date).and_then(|v| v.as_str()) {
-                        return count.parse::<i64>().ok();
-                    }
-                }
-            }
-            None
-        }
-        Err(_) => None,
     }
 }
 
