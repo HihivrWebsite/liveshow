@@ -489,7 +489,7 @@ import RankComparison from '@/components/RankComparison.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
-import { getAvatar, getAvatarByUid, preloadAllAvatars, scaleAvatar } from '@/utils/avatarCache'
+import { getAvatar, getAvatarByUid, preloadAllAvatars, scaleAvatar, getAvatarSync, loadAvatarAndUpdate } from '@/utils/avatarCache'
 
 Chart.register(...registerables)
 
@@ -834,8 +834,14 @@ export default {
         refreshTime.value = response.refresh_time || new Date().toLocaleString()
 
         anchors.value.forEach(anchor => {
-          if (anchor.room_id && !avatarMap.value[anchor.room_id]) {
-            avatarMap.value[anchor.room_id] = `/gift/avatar_proxy?room_id=${anchor.room_id}`
+          if (anchor.room_id) {
+            const syncAvatar = getAvatarSync(anchor.room_id)
+            if (syncAvatar) {
+              avatarMap.value[anchor.room_id] = syncAvatar
+            }
+            loadAvatarAndUpdate(anchor.room_id, (dataUrl) => {
+              avatarMap.value[anchor.room_id] = dataUrl
+            })
           }
         })
 
