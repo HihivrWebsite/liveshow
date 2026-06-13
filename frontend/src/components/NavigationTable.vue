@@ -4,8 +4,10 @@
     
     <!-- 恶意斗虫控制按钮 -->
     <div class="battle-controls" v-if="itemType === 'anchor'">
+      <span class="battle-hint" :class="{ 'battle-hint-alert': battleHintVisible }">
+        {{ battleHintVisible ? '请先勾选至少2个主播！' : '选择多个主播后点击进行数据对比' }}
+      </span>
       <button 
-        v-if="selectedAnchors.length > 0" 
         @click.stop="openBattleModal"
         class="battle-btn">
         🎯 恶意斗虫 ({{ selectedAnchors.length }})
@@ -18,7 +20,7 @@
           <tr>
             <th class="rank-col">排名</th>
             <th class="title-col">{{ titleColumn }}</th>
-            <th class="battle-col">恶意对比</th>
+            <th class="battle-col">多选</th>
             <th class="status-col">开播状态</th>
             <th class="revenue-col">总营收</th>
             <th class="action-col">操作</th>
@@ -39,7 +41,7 @@
                 :id="'battle-' + item.room_id"
                 :checked="selectedAnchors.some(a => a.room_id === item.room_id)"
                 @change="toggleBattleSelect(item)">
-              <label :for="'battle-' + item.room_id">对比</label>
+              <label :for="'battle-' + item.room_id">多选</label>
             </td>
             <td class="status-cell" :class="{ 'live-status': isLive(item) }">{{ getStatus(item) }}</td>
             <td class="revenue-cell">{{ formatCurrency(calculateTotalRevenue(item)) }}</td>
@@ -75,7 +77,8 @@ export default {
   },
   data() {
     return {
-      selectedAnchors: []
+      selectedAnchors: [],
+      battleHintVisible: false
     }
   },
   methods: {
@@ -84,10 +87,6 @@ export default {
       if (index > -1) {
         this.selectedAnchors.splice(index, 1);
       } else {
-        if (this.selectedAnchors.length >= 10) {
-          alert('最多只能选择 10 个主播进行对比');
-          return;
-        }
         // 确保传递 union 字段
         this.selectedAnchors.push({
           room_id: item.room_id,
@@ -97,8 +96,14 @@ export default {
       }
     },
     openBattleModal() {
+      if (this.selectedAnchors.length === 0) {
+        this.battleHintVisible = true;
+        setTimeout(() => { this.battleHintVisible = false; }, 2000);
+        return;
+      }
       if (this.selectedAnchors.length < 2) {
-        alert('请至少选择 2 个主播进行对比');
+        this.battleHintVisible = true;
+        setTimeout(() => { this.battleHintVisible = false; }, 2000);
         return;
       }
       this.$emit('open-battle', this.selectedAnchors);
@@ -221,6 +226,26 @@ export default {
 .battle-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+}
+
+.battle-hint-alert {
+  color: #FF4444 !important;
+  animation: hint-shake 0.5s ease-in-out;
+}
+
+@keyframes hint-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+.battle-hint {
+  color: #FFC633;
+  font-size: 1rem;
+  font-weight: bold;
+  margin-right: 10px;
 }
 
 .table-wrapper {
