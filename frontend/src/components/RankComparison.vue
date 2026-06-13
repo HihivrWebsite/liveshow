@@ -81,6 +81,7 @@
 import { Chart, registerables } from 'chart.js'
 import { anchorAPI } from '@/api'
 import { getMonthRange } from '@/utils/monthUtils'
+import { getAvatar, scaleAvatar } from '@/utils/avatarCache'
 import HeaderSection from '@/components/HeaderSection.vue'
 import FooterSection from '@/components/FooterSection.vue'
 
@@ -335,37 +336,10 @@ export default {
         this.battleChart.destroy()
       }
 
-      const avatarImages = {}
-      for (const anchor of this.selectedAnchors) {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.src = `/gift/avatar_proxy?room_id=${anchor.room_id}`
-        avatarImages[anchor.room_id] = img
-      }
-
-      await Promise.all(
-        Object.values(avatarImages).map(img => new Promise(resolve => {
-          img.onload = resolve
-          img.onerror = resolve
-          setTimeout(resolve, 3000)
-        }))
-      )
-
-      const AVATAR_SIZE = 20
       const scaledAvatars = {}
-      for (const [roomId, img] of Object.entries(avatarImages)) {
-        if (img.complete && img.naturalWidth > 0) {
-          const canvas = document.createElement('canvas')
-          canvas.width = AVATAR_SIZE
-          canvas.height = AVATAR_SIZE
-          const ctx = canvas.getContext('2d')
-          ctx.beginPath()
-          ctx.arc(AVATAR_SIZE / 2, AVATAR_SIZE / 2, AVATAR_SIZE / 2, 0, Math.PI * 2)
-          ctx.closePath()
-          ctx.clip()
-          ctx.drawImage(img, 0, 0, AVATAR_SIZE, AVATAR_SIZE)
-          scaledAvatars[roomId] = canvas
-        }
+      for (const anchor of this.selectedAnchors) {
+        const img = await getAvatar(anchor.room_id)
+        if (img) scaledAvatars[anchor.room_id] = scaleAvatar(img, 20)
       }
 
       const datasets = this.selectedAnchors

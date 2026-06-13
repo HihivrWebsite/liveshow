@@ -489,6 +489,7 @@ import RankComparison from '@/components/RankComparison.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
+import { getAvatar, getAvatarByUid, preloadAllAvatars, scaleAvatar } from '@/utils/avatarCache'
 
 Chart.register(...registerables)
 
@@ -685,10 +686,18 @@ export default {
           return
         }
 
-        const avatarMap = {}
+        const avatarMapExport = {}
         for (const anchor of exportData) {
-          const avatarUrl = `/gift/avatar_proxy?room_id=${anchor.room_id}`
-          avatarMap[anchor.room_id] = await imageToBase64(avatarUrl)
+          const img = await getAvatar(anchor.room_id)
+          if (img) {
+            const c = document.createElement('canvas')
+            c.width = img.naturalWidth
+            c.height = img.naturalHeight
+            c.getContext('2d').drawImage(img, 0, 0)
+            avatarMapExport[anchor.room_id] = c.toDataURL('image/png')
+          } else {
+            avatarMapExport[anchor.room_id] = ''
+          }
         }
 
         const fields = getExportFields(exportData[0])
@@ -701,7 +710,7 @@ export default {
 
         let tableRows = ''
         exportData.forEach(anchor => {
-          const avatarBase64 = avatarMap[anchor.room_id] || ''
+          const avatarBase64 = avatarMapExport[anchor.room_id] || ''
           const avatarImg = avatarBase64
             ? `<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;display:inline-block;flex-shrink:0;"><img src="${avatarBase64}" style="width:40px;height:40px;object-fit:cover;display:block;" /></div>`
             : ''
@@ -829,6 +838,8 @@ export default {
             avatarMap.value[anchor.room_id] = `/gift/avatar_proxy?room_id=${anchor.room_id}`
           }
         })
+
+        preloadAllAvatars(anchors.value)
       } catch (err) {
         console.error('获取主播数据失败:', err)
         error.value = '获取数据失败，请稍后重试'
@@ -908,19 +919,6 @@ export default {
 
       const ctx = chartCanvas.value.getContext('2d')
 
-      const avatarImages = {}
-      for (const roomId of roomIds) {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.src = `/gift/avatar_proxy?room_id=${roomId}`
-        avatarImages[roomId] = img
-      }
-      await Promise.all(Object.values(avatarImages).map(img => new Promise(r => {
-        img.onload = r
-        img.onerror = r
-        setTimeout(r, 3000)
-      })))
-
       const AVATAR_SIZE = 30
       const backgroundColors = []
       const fallbackColors = [
@@ -931,14 +929,10 @@ export default {
 
       for (let i = 0; i < roomIds.length; i++) {
         const roomId = roomIds[i]
-        const img = avatarImages[roomId]
-        if (img && img.complete && img.naturalWidth > 0) {
-          const patternCanvas = document.createElement('canvas')
-          patternCanvas.width = AVATAR_SIZE
-          patternCanvas.height = AVATAR_SIZE
-          const patternCtx = patternCanvas.getContext('2d')
-          patternCtx.drawImage(img, 0, 0, AVATAR_SIZE, AVATAR_SIZE)
-          backgroundColors.push(ctx.createPattern(patternCanvas, 'repeat'))
+        const img = await getAvatar(roomId)
+        const scaled = scaleAvatar(img, AVATAR_SIZE)
+        if (scaled) {
+          backgroundColors.push(ctx.createPattern(scaled, 'repeat'))
         } else {
           backgroundColors.push(fallbackColors[i % fallbackColors.length])
         }
@@ -1015,26 +1009,23 @@ export default {
       const chartCtx = chartCanvas.value.getContext('2d')
 
       const AVATAR_SIZE = 30
-      const createPattern = async (uid, fallbackColor) => {
-        try {
-          const img = new Image()
-          img.crossOrigin = 'anonymous'
-          img.src = `/gift/avatar_proxy?uid=${uid}`
-          await new Promise(r => { img.onload = r; img.onerror = r; setTimeout(r, 3000) })
-          if (img.complete && img.naturalWidth > 0) {
-            const patternCanvas = document.createElement('canvas')
-            patternCanvas.width = AVATAR_SIZE
-            patternCanvas.height = AVATAR_SIZE
-            const patternCtx = patternCanvas.getContext('2d')
-            patternCtx.drawImage(img, 0, 0, AVATAR_SIZE, AVATAR_SIZE)
-            return chartCtx.createPattern(patternCanvas, 'repeat')
-          }
-          return fallbackColor
-        } catch (e) { return fallbackColor }
+
+      const createPatternFromImg = (img, fallbackColor) => {
+        if (img && img.complete && img.naturalWidth > 0) {
+          const patternCanvas = document.createElement('canvas')
+          patternCanvas.width = AVATAR_SIZE
+          patternCanvas.height = AVATAR_SIZE
+          const patternCtx = patternCanvas.getContext('2d')
+          patternCtx.drawImage(img, 0, 0, AVATAR_SIZE, AVATAR_SIZE)
+          return chartCtx.createPattern(patternCanvas, 'repeat')
+        }
+        return fallbackColor
       }
 
-      const vrPattern = await createPattern('413748120', '#FF6384')
-      const pspPattern = await createPattern('454673997', '#36A2EB')
+      const vrImg = await getAvatarByUid('413748120')
+      const pspImg = await getAvatarByUid('454673997')
+      const vrPattern = createPatternFromImg(vrImg, '#FF6384')
+      const pspPattern = createPatternFromImg(pspImg, '#36A2EB')
 
       currentChart = new Chart(chartCtx, {
         type: 'pie',

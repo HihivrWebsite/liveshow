@@ -84,6 +84,7 @@
 <script>
 import { formatCurrency } from '@/utils/dataProcessor'
 import { anchorAPI } from '@/api'
+import { getAvatar } from '@/utils/avatarCache'
 
 export default {
   name: 'NavigationTable',
@@ -114,7 +115,15 @@ export default {
     if (this.itemType === 'anchor') {
       this.items.forEach(item => {
         if (item.room_id && !this.avatars[item.room_id]) {
-          this.avatars[item.room_id] = `/gift/avatar_proxy?room_id=${item.room_id}`
+          getAvatar(item.room_id).then(img => {
+            if (img) {
+              const c = document.createElement('canvas')
+              c.width = img.naturalWidth
+              c.height = img.naturalHeight
+              c.getContext('2d').drawImage(img, 0, 0)
+              this.avatars[item.room_id] = c.toDataURL()
+            }
+          })
         }
       })
     }

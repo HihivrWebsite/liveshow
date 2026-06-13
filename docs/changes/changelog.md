@@ -2,6 +2,17 @@
 
 ## 版本历史
 
+### v4.1.5 — 2026-06-13 头像 localStorage 本地缓存
+
+- 新增 `avatarCache.js` 工具模块，实现头像 localStorage 缓存（版本化、自动刷新）
+- `getAvatar(roomId)` / `getAvatarByUid(uid)` 支持缓存优先 + 后台静默刷新
+- `preloadAllAvatars(anchors)` 批量预加载主播头像
+- `scaleAvatar(img, size)` 圆形裁剪缩放头像
+- AnchorList 营收饼图、VR/PSP 对比图、导出截图改用缓存头像
+- AnchorBattle / RankComparison 图表头像预加载改用缓存
+- NavigationTable 导航表格头像改用缓存 base64 加载
+- LiveSessions 主播头像改用缓存加载
+
 ### v4.1.4 — 2026-06-13 缓存逻辑全面修复
 
 - 修复 size_estimate 估算失效（改用实际序列化大小）
