@@ -1,3 +1,5 @@
+import DEFAULT_AVATARS from './defaultAvatars'
+
 const CACHE_PREFIX = 'avatar_'
 const CACHE_VERSION = 'v1'
 
@@ -56,11 +58,19 @@ async function refreshAvatar(key, url) {
 
 export async function getAvatar(roomId) {
   const key = String(roomId)
+
   const cached = getFromStorage(key)
   if (cached) {
     refreshAvatar(key, `/gift/avatar_proxy?room_id=${roomId}`)
     return base64ToImage(cached)
   }
+
+  const defaultData = DEFAULT_AVATARS[key]
+  if (defaultData) {
+    refreshAvatar(key, `/gift/avatar_proxy?room_id=${roomId}`)
+    return base64ToImage(defaultData)
+  }
+
   for (let i = 0; i < 3; i++) {
     const base64 = await fetchAvatar(`/gift/avatar_proxy?room_id=${roomId}`)
     if (base64) {
@@ -74,11 +84,19 @@ export async function getAvatar(roomId) {
 
 export async function getAvatarByUid(uid) {
   const key = `uid_${uid}`
+
   const cached = getFromStorage(key)
   if (cached) {
     refreshAvatar(key, `/gift/avatar_proxy?uid=${uid}`)
     return base64ToImage(cached)
   }
+
+  const defaultData = DEFAULT_AVATARS[key]
+  if (defaultData) {
+    refreshAvatar(key, `/gift/avatar_proxy?uid=${uid}`)
+    return base64ToImage(defaultData)
+  }
+
   for (let i = 0; i < 3; i++) {
     const base64 = await fetchAvatar(`/gift/avatar_proxy?uid=${uid}`)
     if (base64) {
@@ -88,6 +106,33 @@ export async function getAvatarByUid(uid) {
     if (i < 2) await new Promise(r => setTimeout(r, 1000))
   }
   return null
+}
+
+export function getAvatarSync(roomId) {
+  const key = String(roomId)
+
+  const cached = getFromStorage(key)
+  if (cached) return cached
+
+  const defaultData = DEFAULT_AVATARS[key]
+  if (defaultData) return defaultData
+
+  return ''
+}
+
+export async function loadAvatarAndUpdate(roomId, callback) {
+  const key = String(roomId)
+
+  const syncValue = getAvatarSync(roomId)
+  if (syncValue) callback(syncValue)
+
+  const img = await getAvatar(roomId)
+  if (img) {
+    const c = document.createElement('canvas')
+    c.width = img.naturalWidth; c.height = img.naturalHeight
+    c.getContext('2d').drawImage(img, 0, 0)
+    callback(c.toDataURL('image/jpeg', 0.8))
+  }
 }
 
 export async function preloadAllAvatars(anchors) {

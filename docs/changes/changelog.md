@@ -2,6 +2,13 @@
 
 ## 版本历史
 
+### v4.1.7 — 2026-06-14 默认头像集成 + 导航表格头像同步修复
+
+- avatarCache.js 集成 defaultAvatars.js 内置默认头像，getAvatar/getAvatarByUid 优先返回默认头像（瞬间显示），然后后台刷新
+- 新增 getAvatarSync 同步获取头像 base64（用于 img src 绑定）
+- 新增 loadAvatarAndUpdate 异步加载并更新回调
+- NavigationTable 改用 getAvatarSync + loadAvatarAndUpdate，消除导航表格与卡片头像加载不同步问题
+
 ### v4.1.6 — 2026-06-13 头像缓存持久化+重试机制
 
 - AvatarCacheEntry 新增 image_bytes 字段，缓存图片字节避免重复请求 Bilibili CDN
