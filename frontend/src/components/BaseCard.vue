@@ -3,8 +3,7 @@
     <div class="card-header" v-if="showHeader">
       <div class="header-main">
         <div v-if="rank !== undefined" class="card-rank">#{{ rank }}</div>
-        <img v-if="avatarUrl" :src="avatarUrl" class="card-avatar" @error="$event.target.style.display='none'" />
-        <div v-if="title" class="card-title">{{ title }}</div>
+        <div v-if="title" class="card-title"><img v-if="avatarUrl" :src="avatarUrl" class="card-avatar" @error="$event.target.style.display='none'" />{{ title }}</div>
       </div>
       <div v-if="subtitle" class="card-subtitle">{{ subtitle }}</div>
       <div class="card-subtitle-secondary"><strong><em>https</em></strong>斜杠<strong><em>dc</em></strong>点<strong><em>hihivr</em></strong>点<strong><em>top</em></strong></div>
@@ -223,21 +222,24 @@ export default {
 }
 
 .header-main {
-  display: flex; /* 使用flex布局 */
-  align-items: center; /* 垂直居中 */
-  justify-content: space-between; /* 两端对齐 */
-  width: 100%; /* 占满容器宽度 */
-  margin-bottom: 8px; /* 与副标题保持间距 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 8px;
+  position: relative;
 }
 
 .card-rank {
   font-weight: bold;
-  color: white; /* 白色文字 */
-  font-size: 1.4em; /* 适中的字号 */
-  min-width: 50px; /* 确保编号区域有足够的宽度 */
-  text-align: center; /* 居中对齐 */
-  padding: 5px 10px; /* 内边距 */
-  border-radius: 20px; /* 圆角 */
+  color: white;
+  font-size: 1.4em;
+  min-width: 50px;
+  text-align: center;
+  padding: 5px 10px;
+  border-radius: 20px;
+  position: absolute;
+  left: 0;
 }
 
 .card-avatar {
@@ -247,17 +249,18 @@ export default {
   object-fit: cover;
   border: 2px solid rgba(255, 255, 255, 0.6);
   flex-shrink: 0;
+  margin-bottom: 4px;
 }
 
 .card-title {
   font-weight: bold;
-  color: white; /* 白色文字 */
-  flex-grow: 1;
-  text-align: center;
-  font-size: 1.2em; /* 适中的字号 */
-  margin: 0 15px; /* 左右留空 */
-  padding: 5px 10px; /* 内边距 */
-  border-radius: 10px; /* 圆角 */
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 1.2em;
+  padding: 5px 10px;
+  border-radius: 10px;
 }
 
 .collapse-toggle {
@@ -296,13 +299,14 @@ export default {
 }
 
 .card-subtitle-secondary {
-  color: white; /* 白色文字 */
+  color: white;
   font-weight: 500;
-  font-size: 1.0em; /* 适中的字号 */
-  text-align: center; /* 居中对齐 */
-  width: 100%; /* 占满容器宽度 */
-  padding: 8px; /* 内边距 */
-  border-radius: 10px; /* 圆角 */
+  font-size: 1.0em;
+  text-align: center;
+  width: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 10px;
 }
 
 /* 卡片主体样式 - 添加过渡效果 */

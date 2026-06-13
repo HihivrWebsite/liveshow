@@ -2,6 +2,45 @@
 
 ## 版本历史
 
+### v4.1.1 — 2026-06-13 导出截图功能 + UI 修复
+
+- 导出截图功能：支持多选主播后导出数据截图，包含网站顶栏、致谢、数据表格
+- Logo 图片打包到本地静态资源，绕过 CORS 限制
+- 图片预加载转 base64，确保 html2canvas 正确渲染
+- 后端新增根路径静态文件服务
+- 直播中 badge 尺寸调优，与跳转按钮视觉一致
+- 卡片头像、名字、URL 完美居中对齐
+- 导航表格多选列添加全选/全不选复选框
+
+### 打包 Logo 到本地 + 修复头像压扁 — 2026-06-13
+
+- 下载两张 Logo 图片到 `frontend/public/` 目录，导出截图改用本地路径加载，消除 CORS 和外部图床依赖
+- 导出截图头像 HTML 改用 `div + overflow:hidden` 包裹，确保头像在表格中不被压扁
+
+### 导出截图 CORS 修复 — 2026-06-13
+
+- 图片预加载转 base64：Logo 和头像通过 canvas 转为 data URL，绕过 s2.loli.net 的 CORS 限制
+- html2canvas 设置 `useCORS: false`，不再需要跨域请求
+- 容器定位从 `left:-9999px` 改为 `opacity:0; z-index:-1`，避免渲染异常
+- 移除表格 `table-layout:fixed`，列宽自适应内容
+- 容器宽度从 1000px 调整为 1200px
+- 添加 `requestAnimationFrame` 等待 DOM 渲染后再截取
+
+### 详情页放大 + 主页截图导出 — 2026-06-13
+
+- LiveSessions 详情页查询用户头像从 64px 放大至 80px，用户名文字从 1rem 放大至 1.5rem
+- AnchorList 新增截图导出功能：支持选择主播 → 选择月份范围 → 导出 PNG 数据截图
+- NavigationTable 新增 `selection-change` 事件，支持多选状态同步
+- 导出图片包含顶栏、致谢区、说明区、时间范围和主播数据表格
+
+### 导出截图功能修复 — 2026-06-13
+
+- 导出图片顶部改为与网站 HeaderSection 一致的布局（Logo 图片 + 标题 + 致谢文字）
+- 导出容器宽度从 900px 增加至 1400px，修复头像压扁和数据截断问题
+- 表格设置 `table-layout: fixed` 确保列宽均匀分配
+- 导出按钮从 AnchorList 移至 NavigationTable，与恶意斗虫按钮并列显示
+- NavigationTable 表头"多选"添加全选/全不选复选框
+
 ### UI 细节修复 — 2026-06-13
 
 - 修复导航表格"直播中"按钮垂直偏上问题

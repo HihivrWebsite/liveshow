@@ -12,6 +12,11 @@
         class="battle-btn">
         🎯 恶意斗虫 ({{ selectedAnchors.length }})
       </button>
+      <button 
+        @click.stop="$emit('open-export')"
+        class="export-btn-nav">
+        📸 导出截图 ({{ selectedAnchors.length }})
+      </button>
     </div>
     
     <div class="table-wrapper">
@@ -20,7 +25,13 @@
           <tr>
             <th class="rank-col">排名</th>
             <th class="title-col">{{ titleColumn }}</th>
-            <th class="battle-col">多选</th>
+            <th class="battle-col">
+              <input 
+                type="checkbox" 
+                :checked="isAllSelected"
+                @change="toggleSelectAll">
+              多选
+            </th>
             <th class="status-col">开播状态</th>
             <th class="revenue-col">总营收</th>
             <th class="action-col">操作</th>
@@ -46,7 +57,10 @@
                 @change="toggleBattleSelect(item)">
               <label :for="'battle-' + item.room_id">多选</label>
             </td>
-            <td class="status-cell" :class="{ 'live-status': isLive(item) }">{{ getStatus(item) }}</td>
+            <td class="status-cell">
+              <span v-if="isLive(item)" class="live-status-badge">直播中</span>
+              <span v-else>未开播</span>
+            </td>
             <td class="revenue-cell">{{ formatCurrency(calculateTotalRevenue(item)) }}</td>
             <td class="action-cell">
               <button
@@ -86,6 +100,11 @@ export default {
       avatars: {}
     }
   },
+  computed: {
+    isAllSelected() {
+      return this.items.length > 0 && this.selectedAnchors.length === this.items.length;
+    }
+  },
   created() {
     if (this.itemType === 'anchor') {
       this.items.forEach(item => {
@@ -101,13 +120,25 @@ export default {
       if (index > -1) {
         this.selectedAnchors.splice(index, 1);
       } else {
-        // 确保传递 union 字段
         this.selectedAnchors.push({
           room_id: item.room_id,
           anchor_name: item.anchor_name,
           union: item.union || 'VirtuaReal'
         });
       }
+      this.$emit('selection-change', [...this.selectedAnchors]);
+    },
+    toggleSelectAll() {
+      if (this.isAllSelected) {
+        this.selectedAnchors = [];
+      } else {
+        this.selectedAnchors = this.items.map(item => ({
+          room_id: item.room_id,
+          anchor_name: item.anchor_name,
+          union: item.union || 'VirtuaReal'
+        }));
+      }
+      this.$emit('selection-change', [...this.selectedAnchors]);
     },
     openBattleModal() {
       if (this.selectedAnchors.length === 0) {
@@ -242,6 +273,24 @@ export default {
   box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
 }
 
+.export-btn-nav {
+  background: linear-gradient(45deg, #FF6B6B, #FF8E53);
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+  transition: all 0.3s ease;
+}
+
+.export-btn-nav:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+}
+
 .battle-hint-alert {
   color: #FF4444 !important;
   animation: hint-shake 0.5s ease-in-out;
@@ -349,18 +398,18 @@ export default {
   vertical-align: middle;
 }
 
-.status-cell.live-status {
+.live-status-badge {
+  display: inline-block;
   background-color: #f9729a;
   color: white;
   font-weight: bold;
   border-radius: 30px;
-  padding: 5px 10px;
-  text-align: center;
-  vertical-align: middle;
-  min-width: 90px;
-  box-sizing: border-box;
+  padding: 5px 12px;
   font-size: 0.9rem;
-  line-height: 1;
+}
+
+.nav-row:hover .live-status-badge {
+  background-color: #e05a8a;
 }
 
 .revenue-col, .revenue-cell {

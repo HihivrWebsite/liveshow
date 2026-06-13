@@ -337,6 +337,29 @@
       -->
     </div>
 
+    <!-- 导出截图模态框 -->
+    <div v-if="showExportModal" class="modal-overlay" @click="closeExportModal">
+      <div class="modal-content" @click.stop>
+        <h3>📸 导出数据截图</h3>
+        <div class="modal-form">
+          <div class="form-group">
+            <label>起始月份:</label>
+            <input type="month" v-model="exportStartMonth" min="2025-08" class="month-input">
+          </div>
+          <div class="form-group">
+            <label>结束月份:</label>
+            <input type="month" v-model="exportEndMonth" min="2025-08" class="month-input">
+          </div>
+          <div class="button-group">
+            <button @click="performExport" class="confirm-btn" :disabled="exportLoading">
+              {{ exportLoading ? '导出中...' : '确定导出' }}
+            </button>
+            <button @click="closeExportModal" class="cancel-btn">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="chart-info" v-if="chartVisible">
       <h3 style="color: #f9729a; margin-top: 0;">📊 图表交互说明</h3>
       <p><strong>图表功能：</strong></p>
@@ -369,7 +392,10 @@
         item-type="anchor" 
         v-if="anchors.length > 0"
         @open-battle="openBattleModal"
+        @selection-change="onSelectionChange"
+        @open-export="openExportModal"
       />
+
 
       <!-- 恶意斗虫组件 -->
       <AnchorBattle 
@@ -425,6 +451,7 @@
 import { ref, onMounted, watch, nextTick, computed, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Chart, registerables } from 'chart.js'
+import html2canvas from 'html2canvas'
 import { anchorAPI } from '@/api'
 import BaseCard from '@/components/BaseCard.vue'
 import NavigationTable from '@/components/NavigationTable.vue'
@@ -471,6 +498,225 @@ export default {
     const closeBattleModal = () => {
       showBattle.value = false
       battleAnchors.value = []
+    }
+
+    // 导出截图相关
+    const selectedAnchorsForExport = ref([])
+    const selectedAnchorsCount = ref(0)
+    const showExportModal = ref(false)
+    const exportStartMonth = ref('')
+    const exportEndMonth = ref('')
+    const exportLoading = ref(false)
+
+    const onSelectionChange = (selected) => {
+      selectedAnchorsForExport.value = selected
+      selectedAnchorsCount.value = selected.length
+    }
+
+    const openExportModal = () => {
+      if (selectedAnchorsForExport.value.length === 0) {
+        alert('请先在导航表格中勾选至少一个主播')
+        return
+      }
+      showExportModal.value = true
+    }
+
+    const closeExportModal = () => {
+      showExportModal.value = false
+    }
+
+    const getExportFields = (anchor) => {
+      return [
+        { label: '关注数', value: formatNumber(anchor.attention) },
+        { label: '有效天', value: anchor.effective_days },
+        { label: '开播时长', value: anchor.live_duration },
+        { label: '总督', value: anchor.guard_3 || 0 },
+        { label: '提督', value: anchor.guard_2 || 0 },
+        { label: '舰长', value: anchor.guard_1 || 0 },
+        { label: '粉丝团', value: formatNumber(anchor.fans_count || 0) },
+        { label: '礼物收入', value: formatCurrency(anchor.gift) },
+        { label: '舰长收入', value: formatCurrency(anchor.guard) },
+        { label: 'SC收入', value: formatCurrency(anchor.super_chat) },
+        { label: '总营收', value: formatCurrency(calculateTotalRevenue(anchor)) },
+        { label: '即时同接', value: anchor.current_concurrency !== null ? formatNumber(anchor.current_concurrency) : '未开播' }
+      ]
+    }
+
+    const imageToBase64 = (url) => new Promise((resolve) => {
+      const img = new Image()
+      if (url.startsWith('http')) {
+        img.crossOrigin = 'anonymous'
+      }
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        resolve(canvas.toDataURL('image/png'))
+      }
+      img.onerror = () => resolve('')
+      img.src = url
+    })
+
+    const performExport = async () => {
+      if (!exportStartMonth.value || !exportEndMonth.value) {
+        alert('请选择起始和结束月份')
+        return
+      }
+
+      exportLoading.value = true
+
+      try {
+        const logo1 = await imageToBase64('/logo1.png')
+        const logo2 = await imageToBase64('/logo2.png')
+
+        const months = getMonthRange(exportStartMonth.value, exportEndMonth.value)
+        let combinedAnchors = {}
+
+        for (const month of months) {
+          try {
+            const response = await anchorAPI.getAnchorsByMonth(month, currentFilter.value)
+            const anchorsForMonth = response.anchors || response.data || []
+            anchorsForMonth.forEach(anchor => {
+              const key = anchor.room_id || anchor.anchor_name
+              if (!combinedAnchors[key]) {
+                combinedAnchors[key] = { ...anchor }
+                combinedAnchors[key].attention = parseFloat(anchor.attention) || 0
+                combinedAnchors[key].effective_days = parseInt(anchor.effective_days) || 0
+                combinedAnchors[key].guard_1 = parseInt(anchor.guard_1) || 0
+                combinedAnchors[key].guard_2 = parseInt(anchor.guard_2) || 0
+                combinedAnchors[key].guard_3 = parseInt(anchor.guard_3) || 0
+                combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0
+                combinedAnchors[key].gift = parseFloat(anchor.gift) || 0
+                combinedAnchors[key].guard = parseFloat(anchor.guard) || 0
+                combinedAnchors[key].super_chat = parseFloat(anchor.super_chat) || 0
+              } else {
+                combinedAnchors[key].attention = parseFloat(anchor.attention) || 0
+                combinedAnchors[key].effective_days += parseInt(anchor.effective_days) || 0
+                combinedAnchors[key].guard_1 += parseInt(anchor.guard_1) || 0
+                combinedAnchors[key].guard_2 += parseInt(anchor.guard_2) || 0
+                combinedAnchors[key].guard_3 += parseInt(anchor.guard_3) || 0
+                combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0
+                combinedAnchors[key].gift += parseFloat(anchor.gift) || 0
+                combinedAnchors[key].guard += parseFloat(anchor.guard) || 0
+                combinedAnchors[key].super_chat += parseFloat(anchor.super_chat) || 0
+              }
+            })
+          } catch (err) {
+            console.error(`获取${month}月份数据失败:`, err)
+          }
+        }
+
+        const selectedRoomIds = new Set(selectedAnchorsForExport.value.map(a => a.room_id))
+        const exportData = Object.values(combinedAnchors).filter(a => selectedRoomIds.has(a.room_id))
+        exportData.sort((a, b) => {
+          const revA = parseFloat(a.gift || 0) + parseFloat(a.guard || 0) + parseFloat(a.super_chat || 0)
+          const revB = parseFloat(b.gift || 0) + parseFloat(b.guard || 0) + parseFloat(b.super_chat || 0)
+          return revB - revA
+        })
+
+        if (exportData.length === 0) {
+          alert('选中的主播在指定月份范围内没有数据')
+          exportLoading.value = false
+          return
+        }
+
+        const avatarMap = {}
+        for (const anchor of exportData) {
+          const avatarUrl = `/gift/avatar_proxy?room_id=${anchor.room_id}`
+          avatarMap[anchor.room_id] = await imageToBase64(avatarUrl)
+        }
+
+        const fields = getExportFields(exportData[0])
+        const sm = exportStartMonth.value
+        const em = exportEndMonth.value
+        const startLabel = `${sm.substring(0, 4)}年${sm.substring(5, 7)}月`
+        const endLabel = `${em.substring(0, 4)}年${em.substring(5, 7)}月`
+
+        const headerCells = fields.map(f => `<th style="padding:10px 12px;text-align:right;white-space:nowrap;font-size:0.85rem;">${f.label}</th>`).join('')
+
+        let tableRows = ''
+        exportData.forEach(anchor => {
+          const avatarBase64 = avatarMap[anchor.room_id] || ''
+          const avatarImg = avatarBase64
+            ? `<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;display:inline-block;flex-shrink:0;"><img src="${avatarBase64}" style="width:40px;height:40px;object-fit:cover;display:block;" /></div>`
+            : ''
+          const fieldsHtml = getExportFields(anchor).map(f => `<td style="padding:8px 12px;border-bottom:1px solid #FFC633;text-align:right;white-space:nowrap;font-size:0.85rem;">${f.value}</td>`).join('')
+          tableRows += `<tr>
+            <td style="padding:8px 12px;border-bottom:1px solid #FFC633;text-align:center;">${avatarImg}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #FFC633;font-weight:bold;white-space:nowrap;">${anchor.anchor_name}</td>
+            ${fieldsHtml}
+          </tr>`
+        })
+
+        const siteUrl = 'https:斜杠hihivr点top'
+        const htmlContent = `
+          <div style="font-family:'Microsoft YaHei',sans-serif;background:#FFF8E1;padding:20px;width:1200px;">
+            <header style="background:#FFF8E1;padding:20px 0;">
+              <div style="margin:0 auto;padding:0 20px;">
+                <div style="display:flex;align-items:center;justify-content:center;gap:15px;margin-bottom:15px;">
+                  ${logo1 ? `<img src="${logo1}" style="height:100px;" />` : ''}
+                  ${logo2 ? `<img src="${logo2}" style="height:100px;" />` : ''}
+                  <h1 style="color:#FF6600;font-size:2rem;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.5);margin:0;">维阿PSP斗虫榜_${siteUrl}</h1>
+                </div>
+                <div style="text-align:center;">
+                  <p style="color:#f9729a;font-size:1.2rem;margin-bottom:10px;line-height:1.4;font-weight:bold;text-align:center;">特别感谢某热心小礼猫-千秋紫莹提供的斗虫数据API，感谢其对本项目提供了巨大的帮助</p>
+                </div>
+              </div>
+            </header>
+            <div style="background:#FFF5C2;border:1px solid #FFC633;border-radius:10px;padding:10px 15px;margin-bottom:12px;color:#333;font-size:0.9rem;">
+              <div style="font-weight:bold;margin-bottom:4px;">使用导出功能制作</div>
+              <div>使用方法：在主页勾选主播 → 点击导出截图 → 选择时间范围 → 确定导出</div>
+            </div>
+            <div style="color:#f9729a;font-weight:bold;font-size:1.1rem;margin-bottom:10px;">${startLabel}-${endLabel}数据</div>
+            <table style="width:100%;border-collapse:collapse;background:#FFF8E1;border-radius:15px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+              <thead>
+                <tr style="background:linear-gradient(45deg,#FFC633,#FFA500);color:#333;">
+                  <th style="padding:10px 12px;text-align:center;width:50px;">头像</th>
+                  <th style="padding:10px 12px;text-align:left;white-space:nowrap;">主播名</th>
+                  ${headerCells}
+                </tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
+        `
+
+        const container = document.createElement('div')
+        container.style.position = 'fixed'
+        container.style.left = '0'
+        container.style.top = '0'
+        container.style.opacity = '0'
+        container.style.pointerEvents = 'none'
+        container.style.zIndex = '-1'
+        container.innerHTML = htmlContent
+        document.body.appendChild(container)
+
+        await new Promise(r => requestAnimationFrame(r))
+
+        const canvas = await html2canvas(container.firstElementChild, {
+          useCORS: false,
+          allowTaint: false,
+          scale: 2,
+          backgroundColor: '#FFF8E1',
+          logging: false
+        })
+
+        document.body.removeChild(container)
+
+        const link = document.createElement('a')
+        link.download = `斗虫榜数据_${startLabel}-${endLabel}.png`
+        link.href = canvas.toDataURL('image/png')
+        link.click()
+
+        closeExportModal()
+      } catch (err) {
+        console.error('导出截图失败:', err)
+        alert('导出截图失败: ' + err.message)
+      } finally {
+        exportLoading.value = false
+      }
     }
     // 创建并提供全局卡片状态
     const globalCardState = provideGlobalCardState()
@@ -2500,6 +2746,16 @@ export default {
       battleAnchors,
       openBattleModal,
       closeBattleModal,
+      // 导出截图相关
+      selectedAnchorsCount,
+      showExportModal,
+      exportStartMonth,
+      exportEndMonth,
+      exportLoading,
+      onSelectionChange,
+      openExportModal,
+      closeExportModal,
+      performExport,
       globalCardState
     }
   }
@@ -2560,6 +2816,7 @@ export default {
   flex-wrap: wrap;
   margin: 30px 0 10px 0; /* 增加上下间距，让按钮离下面更远，但离表格有一定距离 */
 }
+
 
 .action-controls {
   display: flex;

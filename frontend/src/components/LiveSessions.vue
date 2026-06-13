@@ -1090,7 +1090,7 @@ export default {
 
 .queried-user {
   color: #FFC633;
-  font-size: 1rem;
+  font-size: 1.5rem;
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -1099,8 +1099,8 @@ export default {
 }
 
 .queried-user-avatar {
-  width: 64px;
-  height: 64px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   object-fit: cover;
   border: 2px solid #FFC633;

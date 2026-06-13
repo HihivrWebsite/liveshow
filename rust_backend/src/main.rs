@@ -939,6 +939,10 @@ async fn main() {
             "/assets",
             get_service(ServeDir::new("../rust_backend/dist/assets")),
         )
+        .nest_service(
+            "/",
+            get_service(ServeDir::new("../rust_backend/dist")),
+        )
         .route("/favicon.ico", get(favicon))
         .fallback(index_handler)
         // 添加中间件
