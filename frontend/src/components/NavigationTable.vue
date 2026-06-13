@@ -17,6 +17,11 @@
         class="export-btn-nav">
         📸 导出截图 ({{ selectedAnchors.length }})
       </button>
+      <button 
+        @click.stop="openRankComparison"
+        class="rank-btn">
+        📊 排名对比 ({{ selectedAnchors.length }})
+      </button>
     </div>
     
     <div class="table-wrapper">
@@ -152,6 +157,14 @@ export default {
         return;
       }
       this.$emit('open-battle', this.selectedAnchors);
+    },
+    openRankComparison() {
+      if (this.selectedAnchors.length < 2) {
+        this.battleHintVisible = true;
+        setTimeout(() => { this.battleHintVisible = false; }, 2000);
+        return;
+      }
+      this.$emit('open-rank', this.selectedAnchors);
     }
   },
   setup(props) {
@@ -284,11 +297,35 @@ export default {
   cursor: pointer;
   box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
   transition: all 0.3s ease;
+  animation: export-glow 2s ease-in-out infinite;
+}
+
+@keyframes export-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 107, 107, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(255, 107, 107, 0.8), 0 0 40px rgba(255, 107, 107, 0.4); }
 }
 
 .export-btn-nav:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+}
+
+.rank-btn {
+  background: linear-gradient(45deg, #4BC0C0, #36A2EB);
+  color: white;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(75, 192, 192, 0.4);
+  transition: all 0.3s ease;
+}
+
+.rank-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(75, 192, 192, 0.6);
 }
 
 .battle-hint-alert {
