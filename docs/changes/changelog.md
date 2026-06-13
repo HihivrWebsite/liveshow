@@ -2,7 +2,15 @@
 
 ## 版本历史
 
-### v4.1.5 — 2026-06-13 头像 localStorage 本地缓存
+### v4.1.6 — 2026-06-13 头像缓存持久化+重试机制
+
+- AvatarCacheEntry 新增 image_bytes 字段，缓存图片字节避免重复请求 Bilibili CDN
+- 新增 save_avatar_to_file / load_avatar_from_file，头像持久化到 cache_data/avatars/ 目录
+- 服务器重启后自动从磁盘加载头像缓存
+- 前端头像加载添加重试机制（最多3次，间隔1秒）
+- 前端 getAvatar/getAvatarByUid 添加重试机制（最多 3 次，间隔 1 秒）
+
+### v4.1.4 — 2026-06-13 头像 localStorage 本地缓存
 
 - 新增 `avatarCache.js` 工具模块，实现头像 localStorage 缓存（版本化、自动刷新）
 - `getAvatar(roomId)` / `getAvatarByUid(uid)` 支持缓存优先 + 后台静默刷新
@@ -13,7 +21,7 @@
 - NavigationTable 导航表格头像改用缓存 base64 加载
 - LiveSessions 主播头像改用缓存加载
 
-### v4.1.4 — 2026-06-13 缓存逻辑全面修复
+### v4.1.3 — 2026-06-13 缓存逻辑全面修复
 
 - 修复 size_estimate 估算失效（改用实际序列化大小）
 - 修复 is_past_month 时区不一致（统一使用 Local）

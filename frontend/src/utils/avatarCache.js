@@ -61,10 +61,13 @@ export async function getAvatar(roomId) {
     refreshAvatar(key, `/gift/avatar_proxy?room_id=${roomId}`)
     return base64ToImage(cached)
   }
-  const base64 = await fetchAvatar(`/gift/avatar_proxy?room_id=${roomId}`)
-  if (base64) {
-    saveToStorage(key, base64)
-    return base64ToImage(base64)
+  for (let i = 0; i < 3; i++) {
+    const base64 = await fetchAvatar(`/gift/avatar_proxy?room_id=${roomId}`)
+    if (base64) {
+      saveToStorage(key, base64)
+      return base64ToImage(base64)
+    }
+    if (i < 2) await new Promise(r => setTimeout(r, 1000))
   }
   return null
 }
@@ -76,10 +79,13 @@ export async function getAvatarByUid(uid) {
     refreshAvatar(key, `/gift/avatar_proxy?uid=${uid}`)
     return base64ToImage(cached)
   }
-  const base64 = await fetchAvatar(`/gift/avatar_proxy?uid=${uid}`)
-  if (base64) {
-    saveToStorage(key, base64)
-    return base64ToImage(base64)
+  for (let i = 0; i < 3; i++) {
+    const base64 = await fetchAvatar(`/gift/avatar_proxy?uid=${uid}`)
+    if (base64) {
+      saveToStorage(key, base64)
+      return base64ToImage(base64)
+    }
+    if (i < 2) await new Promise(r => setTimeout(r, 1000))
   }
   return null
 }

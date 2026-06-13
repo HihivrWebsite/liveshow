@@ -53,6 +53,7 @@ struct LiveSessionsCacheEntry {
 #[derive(Clone)]
 struct AvatarCacheEntry {
     face_url: String,
+    image_bytes: Option<Vec<u8>>,
     fetched_at: std::time::SystemTime,
 }
 
@@ -105,6 +106,26 @@ async fn save_cache_to_file(
 
     println!("💾 [缓存持久化] 已保存JSON文件 - {}", file_path);
     Ok(())
+}
+
+async fn save_avatar_to_file(key: &str, image_bytes: &[u8]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    tokio::fs::create_dir_all("cache_data/avatars").await?;
+    let file_path = format!("cache_data/avatars/{}.jpg", key);
+    let mut file = tokio::fs::File::create(&file_path).await?;
+    file.write_all(image_bytes).await?;
+    file.flush().await?;
+    Ok(())
+}
+
+async fn load_avatar_from_file(key: &str) -> Option<Vec<u8>> {
+    let file_path = format!("cache_data/avatars/{}.jpg", key);
+    match tokio::fs::read(&file_path).await {
+        Ok(data) => {
+            println!("📂 [头像缓存加载] 从磁盘加载 - {}", file_path);
+            Some(data)
+        }
+        Err(_) => None,
+    }
 }
 
 /// 从JSON文件加载缓存
@@ -1948,6 +1969,7 @@ async fn get_avatar(
         let mut cache = AVATAR_CACHE.write().await;
         cache.insert(room_id_str.clone(), AvatarCacheEntry {
             face_url: face.clone(),
+            image_bytes: None,
             fetched_at: std::time::SystemTime::now(),
         });
     }
@@ -2012,6 +2034,7 @@ async fn get_avatar_proxy(
                     let mut cache = AVATAR_CACHE.write().await;
                     cache.insert(cache_key.clone(), AvatarCacheEntry {
                         face_url: face.clone(),
+                        image_bytes: None,
                         fetched_at: std::time::SystemTime::now(),
                     });
                 }
@@ -2069,6 +2092,7 @@ async fn get_avatar_proxy(
                     let mut cache = AVATAR_CACHE.write().await;
                     cache.insert(room_id.clone(), AvatarCacheEntry {
                         face_url: face.clone(),
+                        image_bytes: None,
                         fetched_at: std::time::SystemTime::now(),
                     });
                 }
@@ -2079,6 +2103,40 @@ async fn get_avatar_proxy(
     } else {
         return Err(StatusCode::BAD_REQUEST);
     };
+
+    let cached_image = {
+        let cache = AVATAR_CACHE.read().await;
+        cache.get(&_cache_key)
+            .filter(|entry| is_avatar_cache_valid(entry.fetched_at))
+            .and_then(|entry| entry.image_bytes.clone())
+    };
+
+    if let Some(bytes) = cached_image {
+        return Ok((
+            [
+                (header::CONTENT_TYPE, "image/jpeg".to_string()),
+                (header::CACHE_CONTROL, "max-age=86400".to_string()),
+            ],
+            bytes,
+        ));
+    }
+
+    let disk_image = load_avatar_from_file(&_cache_key).await;
+    if let Some(bytes) = disk_image {
+        let mut cache = AVATAR_CACHE.write().await;
+        cache.insert(_cache_key.clone(), AvatarCacheEntry {
+            face_url: face_url.clone(),
+            image_bytes: Some(bytes.clone()),
+            fetched_at: std::time::SystemTime::now(),
+        });
+        return Ok((
+            [
+                (header::CONTENT_TYPE, "image/jpeg".to_string()),
+                (header::CACHE_CONTROL, "max-age=86400".to_string()),
+            ],
+            bytes,
+        ));
+    }
 
     let response = match timeout(
         Duration::from_secs(10),
@@ -2100,6 +2158,17 @@ async fn get_avatar_proxy(
         Ok(Ok(bytes)) => bytes.to_vec(),
         _ => return Err(StatusCode::BAD_GATEWAY),
     };
+
+    {
+        let mut cache = AVATAR_CACHE.write().await;
+        if let Some(entry) = cache.get_mut(&_cache_key) {
+            entry.image_bytes = Some(image_bytes.clone());
+        }
+    }
+
+    if let Err(e) = save_avatar_to_file(&_cache_key, &image_bytes).await {
+        eprintln!("⚠️ [头像磁盘缓存失败] {}", e);
+    }
 
     Ok((
         [
