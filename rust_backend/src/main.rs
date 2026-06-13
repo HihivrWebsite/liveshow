@@ -23,6 +23,8 @@ use tower_http::{
     compression::CompressionLayer, cors::CorsLayer, services::ServeDir, trace::TraceLayer,
 };
 use tracing_subscriber;
+use image::ImageFormat;
+use base64::Engine;
 
 // ==================== 缓存相关定义 ====================
 
@@ -236,6 +238,114 @@ fn is_avatar_cache_valid(fetched_at: std::time::SystemTime) -> bool {
         Ok(duration) => duration.as_secs() < 48 * 3600,
         Err(_) => false,
     }
+}
+
+fn compress_avatar(image_bytes: &[u8]) -> Option<Vec<u8>> {
+    let img = image::load_from_memory(image_bytes).ok()?;
+    let resized = img.resize(40, 40, image::imageops::FilterType::Lanczos3);
+    let mut buf = Vec::new();
+    resized.write_to(&mut std::io::Cursor::new(&mut buf), ImageFormat::Jpeg).ok()?;
+    Some(buf)
+}
+
+async fn save_compressed_avatar(room_id: &str, bytes: &[u8]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    tokio::fs::create_dir_all("cache_data/avatars_compressed").await?;
+    let path = format!("cache_data/avatars_compressed/{}.jpg", room_id);
+    tokio::fs::write(&path, bytes).await?;
+    Ok(())
+}
+
+async fn download_image(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+    let resp = HTTP_CLIENT.get(url)
+        .header("Referer", "https://www.bilibili.com")
+        .header("User-Agent", "Mozilla/5.0")
+        .send().await?;
+    Ok(resp.bytes().await?.to_vec())
+}
+
+async fn get_face_url_from_bilibili(room_id: &str) -> Option<String> {
+    {
+        let cache = AVATAR_CACHE.read().await;
+        if let Some(entry) = cache.get(room_id) {
+            if is_avatar_cache_valid(entry.fetched_at) {
+                return Some(entry.face_url.clone());
+            }
+        }
+    }
+
+    let api_url = format!("https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid={}", room_id);
+    let resp = HTTP_CLIENT.get(&api_url)
+        .header("User-Agent", "Mozilla/5.0")
+        .send().await.ok()?;
+    let json: serde_json::Value = resp.json().await.ok()?;
+    let face = json.get("data")?.get("info")?.get("face")?.as_str()?;
+    Some(face.to_string())
+}
+
+async fn fetch_all_anchors_for_avatars() -> Result<Vec<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
+    let mut anchors = Vec::new();
+
+    if let Ok(vr_anchors) = fetch_anchor_data_by_url("https://vr.qianqiuzy.cn/gift").await {
+        for anchor in vr_anchors {
+            let room_id = anchor.room_id.to_string();
+            let face_url = get_face_url_from_bilibili(&room_id).await;
+            if let Some(url) = face_url {
+                anchors.push((room_id, url));
+            }
+        }
+    }
+
+    if let Ok(psp_anchors) = fetch_anchor_data_by_url("https://psp.qianqiuzy.cn/gift").await {
+        for anchor in psp_anchors {
+            let room_id = anchor.room_id.to_string();
+            let face_url = get_face_url_from_bilibili(&room_id).await;
+            if let Some(url) = face_url {
+                anchors.push((room_id, url));
+            }
+        }
+    }
+
+    Ok(anchors)
+}
+
+async fn batch_download_avatars() {
+    println!("🔄 [头像批量更新] 开始...");
+
+    let anchors = match fetch_all_anchors_for_avatars().await {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("❌ [头像批量更新] 获取主播列表失败: {}", e);
+            return;
+        }
+    };
+
+    let mut success = 0;
+    let mut fail = 0;
+
+    for (room_id, face_url) in anchors {
+        match download_image(&face_url).await {
+            Ok(bytes) => {
+                match compress_avatar(&bytes) {
+                    Some(compressed) => {
+                        let _ = save_compressed_avatar(&room_id, &compressed).await;
+                        let mut cache = AVATAR_CACHE.write().await;
+                        cache.insert(room_id.clone(), AvatarCacheEntry {
+                            face_url: face_url.clone(),
+                            image_bytes: Some(compressed),
+                            fetched_at: std::time::SystemTime::now(),
+                        });
+                        success += 1;
+                    }
+                    None => fail += 1,
+                }
+            }
+            Err(_) => fail += 1,
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+
+    println!("✅ [头像批量更新] 完成: 成功 {}, 失败 {}", success, fail);
 }
 
 /// 批量获取单月份所有日期的attention数据
@@ -995,6 +1105,7 @@ async fn main() {
         .route("/gift/attention", get(get_attention_data))
         .route("/gift/avatar", get(get_avatar))
         .route("/gift/avatar_proxy", get(get_avatar_proxy))
+        .route("/gift/avatars/batch", get(get_avatars_batch))
         .route("/cache/stats", get(get_cache_stats_endpoint))
         .route("/cache/clear", post(clear_cache_endpoint))
         .nest_service(
@@ -1015,7 +1126,15 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:2992").await.unwrap();
     println!("Server running on http://0.0.0.0:2992");
 
-    // 启动服务器
+    tokio::spawn(async {
+        batch_download_avatars().await;
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(48 * 3600));
+        loop {
+            interval.tick().await;
+            batch_download_avatars().await;
+        }
+    });
+
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -2177,6 +2296,23 @@ async fn get_avatar_proxy(
         ],
         image_bytes,
     ))
+}
+
+async fn get_avatars_batch() -> Json<serde_json::Value> {
+    let cache = AVATAR_CACHE.read().await;
+    let mut avatars = serde_json::Map::new();
+
+    for (key, entry) in cache.iter() {
+        if let Some(ref bytes) = entry.image_bytes {
+            let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+            avatars.insert(key.clone(), serde_json::Value::String(format!("data:image/jpeg;base64,{}", b64)));
+        }
+    }
+
+    Json(serde_json::json!({
+        "avatars": avatars,
+        "count": avatars.len()
+    }))
 }
 
 async fn serve_logo1() -> impl IntoResponse {

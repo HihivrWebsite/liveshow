@@ -2,6 +2,17 @@
 
 ## 版本历史
 
+### v4.1.8 — 2026-06-14 后端定时批量下载压缩头像 + 前端简化
+
+- 新增 `compress_avatar` 函数，使用 image crate 将头像压缩为 40x40 JPEG
+- 新增 `batch_download_avatars` 定时任务，每 48 小时批量下载压缩所有主播头像
+- 新增 `/gift/avatars/batch` 端点，返回所有已缓存头像的 base64 map
+- 前端 `avatarCache.js` 移除 `defaultAvatars.js` 依赖，改用批量接口预填充缓存
+- 新增 `fetchAllAvatars` 函数，页面加载时一次性获取所有头像 base64
+- 简化 `getAvatar` / `getAvatarSync` / `getAvatarByUid`，移除重试和默认头像逻辑
+- 删除 `defaultAvatars.js` 文件
+- Cargo.toml 新增 `image = "0.25"` 和 `base64 = "0.22"` 依赖
+
 ### v4.1.7 — 2026-06-14 默认头像集成 + 导航表格头像同步修复
 
 - avatarCache.js 集成 defaultAvatars.js 内置默认头像，getAvatar/getAvatarByUid 优先返回默认头像（瞬间显示），然后后台刷新

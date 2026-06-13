@@ -1,5 +1,3 @@
-import DEFAULT_AVATARS from './defaultAvatars'
-
 const CACHE_PREFIX = 'avatar_'
 const CACHE_VERSION = 'v1'
 
@@ -32,6 +30,36 @@ function base64ToImage(base64) {
   })
 }
 
+export async function fetchAllAvatars() {
+  try {
+    const resp = await fetch('/gift/avatars/batch')
+    const data = await resp.json()
+    if (data.avatars) {
+      for (const [roomId, base64] of Object.entries(data.avatars)) {
+        saveToStorage(roomId, base64)
+      }
+    }
+    return data.avatars || {}
+  } catch (e) {
+    console.error('获取批量头像失败:', e)
+    return {}
+  }
+}
+
+export async function getAvatar(roomId) {
+  const key = String(roomId)
+
+  const cached = getFromStorage(key)
+  if (cached) return base64ToImage(cached)
+
+  const base64 = await fetchAvatar(`/gift/avatar_proxy?room_id=${roomId}`)
+  if (base64) {
+    saveToStorage(key, base64)
+    return base64ToImage(base64)
+  }
+  return null
+}
+
 async function fetchAvatar(url) {
   try {
     const img = new Image()
@@ -51,78 +79,25 @@ async function fetchAvatar(url) {
   } catch { return null }
 }
 
-async function refreshAvatar(key, url) {
-  const base64 = await fetchAvatar(url)
-  if (base64) saveToStorage(key, base64)
-}
-
-export async function getAvatar(roomId) {
-  const key = String(roomId)
-
-  const cached = getFromStorage(key)
-  if (cached) {
-    refreshAvatar(key, `/gift/avatar_proxy?room_id=${roomId}`)
-    return base64ToImage(cached)
-  }
-
-  const defaultData = DEFAULT_AVATARS[key]
-  if (defaultData) {
-    refreshAvatar(key, `/gift/avatar_proxy?room_id=${roomId}`)
-    return base64ToImage(defaultData)
-  }
-
-  for (let i = 0; i < 3; i++) {
-    const base64 = await fetchAvatar(`/gift/avatar_proxy?room_id=${roomId}`)
-    if (base64) {
-      saveToStorage(key, base64)
-      return base64ToImage(base64)
-    }
-    if (i < 2) await new Promise(r => setTimeout(r, 1000))
-  }
-  return null
-}
-
 export async function getAvatarByUid(uid) {
   const key = `uid_${uid}`
 
   const cached = getFromStorage(key)
-  if (cached) {
-    refreshAvatar(key, `/gift/avatar_proxy?uid=${uid}`)
-    return base64ToImage(cached)
-  }
+  if (cached) return base64ToImage(cached)
 
-  const defaultData = DEFAULT_AVATARS[key]
-  if (defaultData) {
-    refreshAvatar(key, `/gift/avatar_proxy?uid=${uid}`)
-    return base64ToImage(defaultData)
-  }
-
-  for (let i = 0; i < 3; i++) {
-    const base64 = await fetchAvatar(`/gift/avatar_proxy?uid=${uid}`)
-    if (base64) {
-      saveToStorage(key, base64)
-      return base64ToImage(base64)
-    }
-    if (i < 2) await new Promise(r => setTimeout(r, 1000))
+  const base64 = await fetchAvatar(`/gift/avatar_proxy?uid=${uid}`)
+  if (base64) {
+    saveToStorage(key, base64)
+    return base64ToImage(base64)
   }
   return null
 }
 
 export function getAvatarSync(roomId) {
-  const key = String(roomId)
-
-  const cached = getFromStorage(key)
-  if (cached) return cached
-
-  const defaultData = DEFAULT_AVATARS[key]
-  if (defaultData) return defaultData
-
-  return ''
+  return getFromStorage(String(roomId)) || ''
 }
 
 export async function loadAvatarAndUpdate(roomId, callback) {
-  const key = String(roomId)
-
   const syncValue = getAvatarSync(roomId)
   if (syncValue) callback(syncValue)
 
