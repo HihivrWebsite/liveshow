@@ -1,0 +1,27 @@
+[
+  {
+    "avg_concurrency": 264.8692307692308,
+    "current_concurrency": null,
+    "danmaku_count": 809,
+    "duration_minutes": 42,
+    "end_attention": 2312926,
+    "end_fans_count": 460,
+    "end_guard_1": 64,
+    "end_guard_2": 1,
+    "end_guard_3": 0,
+    "end_time": "2026-05-01 23:42:23",
+    "gift": 55.6,
+    "guard": 1572.0,
+    "max_concurrency": 350,
+    "new_fans_count": -26,
+    "start_attention": 2312952,
+    "start_fans_count": 130,
+    "start_guard_1": 61,
+    "start_guard_2": 1,
+    "start_guard_3": 0,
+    "start_time": "2026-05-01 22:59:37",
+    "super_chat": 136.0,
+    "title": "晚上好牙~",
+    "total_revenue": 1763.6
+  }
+]
