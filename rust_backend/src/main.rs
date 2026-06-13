@@ -1,4 +1,4 @@
-use axum::http::StatusCode;
+use axum::http::{header, StatusCode};
 use axum::{
     extract::{Query, State},
     response::Html,
@@ -50,6 +50,12 @@ struct LiveSessionsCacheEntry {
     is_past_month: bool,
 }
 
+#[derive(Clone)]
+struct AvatarCacheEntry {
+    face_url: String,
+    fetched_at: std::time::SystemTime,
+}
+
 // 全局Attention缓存管理器
 lazy_static::lazy_static! {
     static ref ATTENTION_CACHE: Arc<RwLock<HashMap<String, AttentionCacheEntry>>> =
@@ -59,6 +65,12 @@ lazy_static::lazy_static! {
 // 全局LiveSessions缓存管理器
 lazy_static::lazy_static! {
     static ref LIVE_SESSIONS_CACHE: Arc<RwLock<HashMap<String, LiveSessionsCacheEntry>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+}
+
+// 全局主播头像缓存（48小时刷新）
+lazy_static::lazy_static! {
+    static ref AVATAR_CACHE: Arc<RwLock<HashMap<String, AvatarCacheEntry>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
@@ -196,6 +208,13 @@ fn is_cache_valid(cached_timestamp: std::time::SystemTime) -> bool {
     };
 
     now.naive_local() < next_refresh
+}
+
+fn is_avatar_cache_valid(fetched_at: std::time::SystemTime) -> bool {
+    match std::time::SystemTime::now().duration_since(fetched_at) {
+        Ok(duration) => duration.as_secs() < 48 * 3600,
+        Err(_) => false,
+    }
 }
 
 /// 批量获取单月份所有日期的attention数据
@@ -841,6 +860,17 @@ struct AttentionQuery {
     union: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct AvatarQuery {
+    room_id: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct AvatarResponse {
+    room_id: u64,
+    face: String,
+}
+
 type SharedData = Arc<RwLock<HashMap<String, Vec<Anchor>>>>;
 
 // 全局HTTP客户端，复用连接
@@ -902,6 +932,8 @@ async fn main() {
         )
         .route("/gift/sc", get(get_sc_history))
         .route("/gift/attention", get(get_attention_data))
+        .route("/gift/avatar", get(get_avatar))
+        .route("/gift/avatar_proxy", get(get_avatar_proxy))
         .route("/cache/stats", get(get_cache_stats_endpoint))
         .nest_service(
             "/assets",
@@ -1854,6 +1886,182 @@ async fn get_live_sessions_with_fans(
         title: format!("{}年{}月直播数据", &month[..4], &month[4..]),
         refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     }))
+}
+
+async fn get_avatar(
+    Query(query): Query<AvatarQuery>,
+) -> Result<Json<AvatarResponse>, StatusCode> {
+    let room_id_str = match query.room_id {
+        Some(id) => id,
+        None => return Err(StatusCode::BAD_REQUEST),
+    };
+
+    if !room_id_str.chars().all(|c| c.is_ascii_digit()) || room_id_str.parse::<u64>().unwrap_or(0) == 0 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    {
+        let cache = AVATAR_CACHE.read().await;
+        if let Some(entry) = cache.get(&room_id_str) {
+            if is_avatar_cache_valid(entry.fetched_at) {
+                return Ok(Json(AvatarResponse {
+                    room_id: room_id_str.parse::<u64>().unwrap_or(0),
+                    face: entry.face_url.clone(),
+                }));
+            }
+        }
+    }
+
+    let api_url = format!(
+        "https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid={}",
+        room_id_str
+    );
+
+    let response = match timeout(
+        Duration::from_secs(10),
+        HTTP_CLIENT
+            .get(&api_url)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .header("Accept", "application/json")
+            .send(),
+    ).await {
+        Ok(Ok(resp)) => resp,
+        _ => return Err(StatusCode::BAD_GATEWAY),
+    };
+
+    let json_text = match timeout(Duration::from_secs(10), response.text()).await {
+        Ok(Ok(text)) => text,
+        _ => return Err(StatusCode::BAD_GATEWAY),
+    };
+
+    let raw_data: serde_json::Value = match serde_json::from_str(&json_text) {
+        Ok(data) => data,
+        Err(_) => return Err(StatusCode::BAD_GATEWAY),
+    };
+
+    let face = raw_data
+        .get("data")
+        .and_then(|d| d.get("info"))
+        .and_then(|i| i.get("face"))
+        .and_then(|f| f.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    if !face.is_empty() {
+        let mut cache = AVATAR_CACHE.write().await;
+        cache.insert(room_id_str.clone(), AvatarCacheEntry {
+            face_url: face.clone(),
+            fetched_at: std::time::SystemTime::now(),
+        });
+    }
+
+    Ok(Json(AvatarResponse {
+        room_id: room_id_str.parse::<u64>().unwrap_or(0),
+        face,
+    }))
+}
+
+async fn get_avatar_proxy(
+    Query(query): Query<AvatarQuery>,
+) -> Result<([(header::HeaderName, String); 2], Vec<u8>), StatusCode> {
+    let room_id_str = match query.room_id {
+        Some(id) => id,
+        None => return Err(StatusCode::BAD_REQUEST),
+    };
+
+    if !room_id_str.chars().all(|c| c.is_ascii_digit()) || room_id_str.parse::<u64>().unwrap_or(0) == 0 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let face_url = {
+        let cache = AVATAR_CACHE.read().await;
+        cache.get(&room_id_str)
+            .filter(|entry| is_avatar_cache_valid(entry.fetched_at))
+            .map(|entry| entry.face_url.clone())
+    };
+
+    let face_url = match face_url {
+        Some(url) => url,
+        None => {
+            let api_url = format!(
+                "https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid={}",
+                room_id_str
+            );
+
+            let response = match timeout(
+                Duration::from_secs(10),
+                HTTP_CLIENT
+                    .get(&api_url)
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .header("Accept", "application/json")
+                    .send(),
+            ).await {
+                Ok(Ok(resp)) => resp,
+                _ => return Err(StatusCode::BAD_GATEWAY),
+            };
+
+            let json_text = match timeout(Duration::from_secs(10), response.text()).await {
+                Ok(Ok(text)) => text,
+                _ => return Err(StatusCode::BAD_GATEWAY),
+            };
+
+            let raw_data: serde_json::Value = match serde_json::from_str(&json_text) {
+                Ok(data) => data,
+                Err(_) => return Err(StatusCode::BAD_GATEWAY),
+            };
+
+            let face = raw_data
+                .get("data")
+                .and_then(|d| d.get("info"))
+                .and_then(|i| i.get("face"))
+                .and_then(|f| f.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            if face.is_empty() {
+                return Err(StatusCode::NOT_FOUND);
+            }
+
+            {
+                let mut cache = AVATAR_CACHE.write().await;
+                cache.insert(room_id_str.clone(), AvatarCacheEntry {
+                    face_url: face.clone(),
+                    fetched_at: std::time::SystemTime::now(),
+                });
+            }
+
+            face
+        }
+    };
+
+    let response = match timeout(
+        Duration::from_secs(10),
+        HTTP_CLIENT
+            .get(&face_url)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .header("Referer", "https://www.bilibili.com")
+            .send(),
+    ).await {
+        Ok(Ok(resp)) => resp,
+        _ => return Err(StatusCode::BAD_GATEWAY),
+    };
+
+    if !response.status().is_success() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    let image_bytes = match timeout(Duration::from_secs(10), response.bytes()).await {
+        Ok(Ok(bytes)) => bytes.to_vec(),
+        _ => return Err(StatusCode::BAD_GATEWAY),
+    };
+
+    Ok((
+        [
+            (header::CONTENT_TYPE, "image/jpeg".to_string()),
+            (header::CACHE_CONTROL, "max-age=86400".to_string()),
+        ],
+        image_bytes,
+    ))
 }
 
 async fn index_handler() -> Html<String> {

@@ -387,6 +387,7 @@
           :title="anchor.anchor_name + ' [' + anchor.union + ']'"
           :subtitle="''"
           :is-live="anchor.status === 1"
+          :avatar-url="avatarMap[anchor.room_id] || ''"
           :fields="[
             { label: '关注数', value: formatNumber(anchor.attention), type: 'number' },
             { label: '有效天', value: anchor.effective_days },
@@ -452,6 +453,7 @@ export default {
     const currentFilter = ref('all')
     const loading = ref(true)
     const error = ref(null)
+    const avatarMap = ref({})
     let currentChart = null
     const chartCanvas = ref(null)
 
@@ -503,6 +505,12 @@ export default {
         }
         anchors.value = response.anchors || response.data || []
         refreshTime.value = response.refresh_time || new Date().toLocaleString()
+
+        anchors.value.forEach(anchor => {
+          if (anchor.room_id && !avatarMap.value[anchor.room_id]) {
+            avatarMap.value[anchor.room_id] = `/gift/avatar_proxy?room_id=${anchor.room_id}`
+          }
+        })
       } catch (err) {
         console.error('获取主播数据失败:', err)
         error.value = '获取数据失败，请稍后重试'
@@ -2427,6 +2435,7 @@ export default {
       loading,
       error,
       chartCanvas,
+      avatarMap,
       viewLiveSessions,
       switchFilter,
       openMonthSelector,

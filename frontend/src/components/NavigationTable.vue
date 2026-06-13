@@ -34,7 +34,10 @@
             class="nav-row"
           >
             <td class="rank-cell">{{ index + 1 }}</td>
-            <td class="title-cell">{{ getItemTitle(item) }}</td>
+            <td class="title-cell">
+              <img v-if="item.room_id && avatars[item.room_id]" :src="avatars[item.room_id]" class="nav-avatar" @error="$event.target.style.display='none'" />
+              {{ getItemTitle(item) }}
+            </td>
             <td class="battle-cell" @click.stop>
               <input 
                 type="checkbox" 
@@ -61,6 +64,7 @@
 
 <script>
 import { formatCurrency } from '@/utils/dataProcessor'
+import { anchorAPI } from '@/api'
 
 export default {
   name: 'NavigationTable',
@@ -78,7 +82,17 @@ export default {
   data() {
     return {
       selectedAnchors: [],
-      battleHintVisible: false
+      battleHintVisible: false,
+      avatars: {}
+    }
+  },
+  created() {
+    if (this.itemType === 'anchor') {
+      this.items.forEach(item => {
+        if (item.room_id && !this.avatars[item.room_id]) {
+          this.avatars[item.room_id] = `/gift/avatar_proxy?room_id=${item.room_id}`
+        }
+      })
     }
   },
   methods: {
@@ -297,6 +311,16 @@ export default {
 
 .title-col, .title-cell {
   min-width: 250px;
+}
+
+.nav-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 6px;
+  border: 1px solid #FFC633;
 }
 
 .battle-col, .battle-cell {

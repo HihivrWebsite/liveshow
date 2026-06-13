@@ -101,5 +101,15 @@ export const anchorAPI = {
     params.append('union', union)  // 添加union参数以支持缓存键生成
 
     return apiClient.get(`/gift/attention?${params.toString()}`)
+  },
+
+  getAvatar: (roomId) => {
+    const params = new URLSearchParams()
+    params.append('room_id', roomId)
+    return apiClient.get(`/gift/avatar?${params.toString()}`)
+  },
+
+  getAvatarProxyUrl: (roomId) => {
+    return `/gift/avatar_proxy?room_id=${roomId}`
   }
 }

@@ -253,7 +253,68 @@ GET /gift/attention
 
 ---
 
-## 5. 获取历史 SC 数据
+## 5. 获取主播头像
+
+### 请求
+
+```
+GET /gift/avatar
+```
+
+### 参数
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| room_id | string | 是 | 直播间ID |
+
+### 响应
+
+```json
+{
+  "room_id": 1713546334,
+  "face": "https://i1.hdslb.com/bfs/face/xxx.jpg"
+}
+```
+
+### 说明
+
+- 头像 URL 缓存 48 小时自动刷新
+- 数据来源：Bilibili API `get_anchor_in_room`
+- 缓存未命中时调用外部 API，命中时直接返回缓存
+
+---
+
+## 5.1 主播头像代理
+
+### 请求
+
+```
+GET /gift/avatar_proxy
+```
+
+### 参数
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| room_id | string | 是 | 直播间ID |
+
+### 响应
+
+- Content-Type: image/jpeg
+- Cache-Control: max-age=86400（浏览器缓存24小时）
+- 响应体：头像图片二进制数据
+
+### 说明
+
+- 代理 Bilibili CDN 头像请求，解决防盗链问题
+- 后端请求时设置 `Referer: https://www.bilibili.com/`
+- 头像 URL 缓存 48 小时自动刷新（主播可能更换头像）
+- 浏览器缓存 24 小时，比后端 48h 短以确保及时更新
+- 请求失败返回 HTTP 404
+
+---
+
+## 6. 获取历史 SC 数据
 
 ### 请求
 
@@ -288,7 +349,7 @@ GET /gift/sc
 
 ---
 
-## 6. 缓存统计
+## 7. 缓存统计
 
 ### 请求
 

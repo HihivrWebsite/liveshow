@@ -51,6 +51,7 @@
       <h1 class="page-title">{{ title }}</h1>
       <p class="refresh-time">刷新时间：{{ refreshTime }}</p>
       <div class="queried-user">
+        <img v-if="anchorAvatar" :src="anchorAvatar" class="queried-user-avatar" @error="$event.target.style.display='none'" />
         查询用户：{{ queriedUser }} ({{ union }})
       </div>
     </div>
@@ -270,6 +271,7 @@ export default {
     const loading = ref(true)
     const error = ref(null)
     const fansLoading = ref(false)
+    const anchorAvatar = ref('')
     let sessionChart = null
     const chartCanvas = ref(null)
 
@@ -779,8 +781,12 @@ export default {
 
         if (response.queried_user) {
           queriedUser.value = response.queried_user
-        } else if (response.queried_user) {  // 修正拼写错误
+        } else if (response.queried_user) {
           queriedUser.value = response.queried_user
+        }
+
+        if (room_id) {
+          anchorAvatar.value = `/gift/avatar_proxy?room_id=${room_id}`
         }
         console.log('设置查询用户:', queriedUser.value) // 添加调试日志
 
@@ -957,6 +963,7 @@ export default {
       error,
       chartVisible,
       chartCanvas,
+      anchorAvatar,
       goToMainSite,
       followCreator,
       viewSuperChatDetails,
@@ -1085,6 +1092,18 @@ export default {
   color: #FFC633;
   font-size: 1rem;
   font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.queried-user-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #FFC633;
 }
 
 .chart-info {

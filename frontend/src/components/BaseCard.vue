@@ -3,6 +3,7 @@
     <div class="card-header" v-if="showHeader">
       <div class="header-main">
         <div v-if="rank !== undefined" class="card-rank">#{{ rank }}</div>
+        <img v-if="avatarUrl" :src="avatarUrl" class="card-avatar" @error="$event.target.style.display='none'" />
         <div v-if="title" class="card-title">{{ title }}</div>
       </div>
       <div v-if="subtitle" class="card-subtitle">{{ subtitle }}</div>
@@ -95,6 +96,10 @@ export default {
     isLive: {
       type: Boolean,
       default: false
+    },
+    avatarUrl: {
+      type: String,
+      default: ''
     }
   },
   emits: ['action-click'],
@@ -233,6 +238,15 @@ export default {
   text-align: center; /* 居中对齐 */
   padding: 5px 10px; /* 内边距 */
   border-radius: 20px; /* 圆角 */
+}
+
+.card-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
 }
 
 .card-title {
