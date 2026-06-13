@@ -2,6 +2,12 @@
 
 ## 版本历史
 
+### UI 细节修复 — 2026-06-13
+
+- 修复导航表格"直播中"按钮垂直偏上问题
+- 页底技术栈 Qwen Code 改为 MimoCode
+- SC 低于 10 元改为银色背景 + 深色字体
+
 ### 修复粉丝数计算逻辑 — 2026-06-13
 
 - 修复 `new_fans_count` 计算逻辑，改为直接从外部 API 的 `start_attention`/`end_attention` 计算

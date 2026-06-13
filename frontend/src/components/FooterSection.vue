@@ -6,7 +6,7 @@
           © {{ new Date().getFullYear() }} 为成为向阳人而骄傲
         </p>
         <p class="tech-stack">
-          技术栈: Rust + Axum + Vue 3 + Vite + Qwen Code
+          技术栈: Rust + Axum + Vue 3 + Vite + MimoCode
         </p>
       </div>
       <div class="footer-links">

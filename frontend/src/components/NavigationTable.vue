@@ -297,6 +297,7 @@ export default {
 .status-col, .status-cell {
   text-align: center;
   width: 100px;
+  vertical-align: middle;
 }
 
 .status-cell.live-status {
@@ -305,13 +306,12 @@ export default {
   font-weight: bold;
   border-radius: 30px;
   padding: 5px 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  text-align: center;
+  vertical-align: middle;
   min-width: 90px;
-  height: 28px;
   box-sizing: border-box;
   font-size: 0.9rem;
+  line-height: 1;
 }
 
 .revenue-col, .revenue-cell {

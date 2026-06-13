@@ -234,18 +234,20 @@ export default {
     // 根据价格获取SC颜色
     const getSCColor = (price) => {
       const p = parseFloat(price) || 0
-      if (p < 100) return '#3A5FCD'  // 100以下蓝色
+      if (p < 10) return '#C0C0C0'   // 10以下银色
+      if (p < 100) return '#3A5FCD'  // 10到100蓝色
       if (p >= 100 && p < 1000) return '#FFD700'  // 100到1000金色
       if (p >= 1000) return '#FF0000'  // 1000及以上红色
-      return '#3A5FCD' // 默认颜色（蓝色）
+      return '#3A5FCD'
     }
 
     // 根据价格获取SC类名
     const getSCClass = (price) => {
       const p = parseFloat(price) || 0
-      if (p < 100) return 'sc-blue'  // 100以下蓝色
-      if (p >= 100 && p < 1000) return 'sc-gold'  // 100到1000金色
-      if (p >= 1000) return 'sc-red'  // 1000及以上红色
+      if (p < 10) return 'sc-silver'  // 10以下银色
+      if (p < 100) return 'sc-blue'   // 10到100蓝色
+      if (p >= 100 && p < 1000) return 'sc-gold'
+      if (p >= 1000) return 'sc-red'
       return 'sc-default'
     }
 
@@ -538,6 +540,8 @@ export default {
 }
 
 /* 不同价格区间的样式 */
+.sc-silver { background-color: #C0C0C0; color: #333333; }
+.sc-silver .sc-price { color: #333333; }
 .sc-blue { background-color: #3A5FCD; }
 .sc-gold { background-color: #FFD700; color: white; }
 .sc-red { background-color: #FF0000; color: white; }
