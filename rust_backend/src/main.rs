@@ -1,7 +1,7 @@
 use axum::http::{header, StatusCode};
 use axum::{
     extract::{Query, State},
-    response::Html,
+    response::{Html, IntoResponse},
     routing::{get, get_service},
     Json, Router,
 };
@@ -863,6 +863,7 @@ struct AttentionQuery {
 #[derive(Debug, Deserialize)]
 struct AvatarQuery {
     room_id: Option<String>,
+    uid: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -939,10 +940,8 @@ async fn main() {
             "/assets",
             get_service(ServeDir::new("../rust_backend/dist/assets")),
         )
-        .nest_service(
-            "/",
-            get_service(ServeDir::new("../rust_backend/dist")),
-        )
+        .route("/logo1.png", get(serve_logo1))
+        .route("/logo2.png", get(serve_logo2))
         .route("/favicon.ico", get(favicon))
         .fallback(index_handler)
         // 添加中间件
@@ -1968,74 +1967,123 @@ async fn get_avatar(
 async fn get_avatar_proxy(
     Query(query): Query<AvatarQuery>,
 ) -> Result<([(header::HeaderName, String); 2], Vec<u8>), StatusCode> {
-    let room_id_str = match query.room_id {
-        Some(id) => id,
-        None => return Err(StatusCode::BAD_REQUEST),
-    };
-
-    if !room_id_str.chars().all(|c| c.is_ascii_digit()) || room_id_str.parse::<u64>().unwrap_or(0) == 0 {
-        return Err(StatusCode::BAD_REQUEST);
-    }
-
-    let face_url = {
-        let cache = AVATAR_CACHE.read().await;
-        cache.get(&room_id_str)
-            .filter(|entry| is_avatar_cache_valid(entry.fetched_at))
-            .map(|entry| entry.face_url.clone())
-    };
-
-    let face_url = match face_url {
-        Some(url) => url,
-        None => {
-            let api_url = format!(
-                "https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid={}",
-                room_id_str
-            );
-
-            let response = match timeout(
-                Duration::from_secs(10),
-                HTTP_CLIENT
-                    .get(&api_url)
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .header("Accept", "application/json")
-                    .send(),
-            ).await {
-                Ok(Ok(resp)) => resp,
-                _ => return Err(StatusCode::BAD_GATEWAY),
-            };
-
-            let json_text = match timeout(Duration::from_secs(10), response.text()).await {
-                Ok(Ok(text)) => text,
-                _ => return Err(StatusCode::BAD_GATEWAY),
-            };
-
-            let raw_data: serde_json::Value = match serde_json::from_str(&json_text) {
-                Ok(data) => data,
-                Err(_) => return Err(StatusCode::BAD_GATEWAY),
-            };
-
-            let face = raw_data
-                .get("data")
-                .and_then(|d| d.get("info"))
-                .and_then(|i| i.get("face"))
-                .and_then(|f| f.as_str())
-                .unwrap_or("")
-                .to_string();
-
-            if face.is_empty() {
-                return Err(StatusCode::NOT_FOUND);
-            }
-
-            {
-                let mut cache = AVATAR_CACHE.write().await;
-                cache.insert(room_id_str.clone(), AvatarCacheEntry {
-                    face_url: face.clone(),
-                    fetched_at: std::time::SystemTime::now(),
-                });
-            }
-
-            face
+    let (_cache_key, face_url) = if let Some(uid) = &query.uid {
+        if !uid.chars().all(|c| c.is_ascii_digit()) || uid.parse::<u64>().unwrap_or(0) == 0 {
+            return Err(StatusCode::BAD_REQUEST);
         }
+        let cache_key = format!("uid_{}", uid);
+        let cached = {
+            let cache = AVATAR_CACHE.read().await;
+            cache.get(&cache_key)
+                .filter(|entry| is_avatar_cache_valid(entry.fetched_at))
+                .map(|entry| entry.face_url.clone())
+        };
+        let face_url = match cached {
+            Some(url) => url,
+            None => {
+                let api_url = format!(
+                    "https://api.bilibili.com/x/web-interface/card?mid={}",
+                    uid
+                );
+                let response = match timeout(
+                    Duration::from_secs(10),
+                    HTTP_CLIENT
+                        .get(&api_url)
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .header("Accept", "application/json")
+                        .send(),
+                ).await {
+                    Ok(Ok(resp)) => resp,
+                    _ => return Err(StatusCode::BAD_GATEWAY),
+                };
+                let json_text = match timeout(Duration::from_secs(10), response.text()).await {
+                    Ok(Ok(text)) => text,
+                    _ => return Err(StatusCode::BAD_GATEWAY),
+                };
+                let raw_data: serde_json::Value = match serde_json::from_str(&json_text) {
+                    Ok(data) => data,
+                    Err(_) => return Err(StatusCode::BAD_GATEWAY),
+                };
+                let face = raw_data
+                    .get("data")
+                    .and_then(|d| d.get("card"))
+                    .and_then(|c| c.get("face"))
+                    .and_then(|f| f.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if face.is_empty() {
+                    return Err(StatusCode::NOT_FOUND);
+                }
+                {
+                    let mut cache = AVATAR_CACHE.write().await;
+                    cache.insert(cache_key.clone(), AvatarCacheEntry {
+                        face_url: face.clone(),
+                        fetched_at: std::time::SystemTime::now(),
+                    });
+                }
+                face
+            }
+        };
+        (cache_key, face_url)
+    } else if let Some(room_id) = &query.room_id {
+        if !room_id.chars().all(|c| c.is_ascii_digit()) || room_id.parse::<u64>().unwrap_or(0) == 0 {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        let cached = {
+            let cache = AVATAR_CACHE.read().await;
+            cache.get(room_id)
+                .filter(|entry| is_avatar_cache_valid(entry.fetched_at))
+                .map(|entry| entry.face_url.clone())
+        };
+        let face_url = match cached {
+            Some(url) => url,
+            None => {
+                let api_url = format!(
+                    "https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid={}",
+                    room_id
+                );
+                let response = match timeout(
+                    Duration::from_secs(10),
+                    HTTP_CLIENT
+                        .get(&api_url)
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .header("Accept", "application/json")
+                        .send(),
+                ).await {
+                    Ok(Ok(resp)) => resp,
+                    _ => return Err(StatusCode::BAD_GATEWAY),
+                };
+                let json_text = match timeout(Duration::from_secs(10), response.text()).await {
+                    Ok(Ok(text)) => text,
+                    _ => return Err(StatusCode::BAD_GATEWAY),
+                };
+                let raw_data: serde_json::Value = match serde_json::from_str(&json_text) {
+                    Ok(data) => data,
+                    Err(_) => return Err(StatusCode::BAD_GATEWAY),
+                };
+                let face = raw_data
+                    .get("data")
+                    .and_then(|d| d.get("info"))
+                    .and_then(|i| i.get("face"))
+                    .and_then(|f| f.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if face.is_empty() {
+                    return Err(StatusCode::NOT_FOUND);
+                }
+                {
+                    let mut cache = AVATAR_CACHE.write().await;
+                    cache.insert(room_id.clone(), AvatarCacheEntry {
+                        face_url: face.clone(),
+                        fetched_at: std::time::SystemTime::now(),
+                    });
+                }
+                face
+            }
+        };
+        (room_id.clone(), face_url)
+    } else {
+        return Err(StatusCode::BAD_REQUEST);
     };
 
     let response = match timeout(
@@ -2066,6 +2114,28 @@ async fn get_avatar_proxy(
         ],
         image_bytes,
     ))
+}
+
+async fn serve_logo1() -> impl IntoResponse {
+    match std::fs::read("../rust_backend/dist/logo1.png") {
+        Ok(data) => (
+            [(header::CONTENT_TYPE, "image/png".to_string())],
+            data,
+        )
+            .into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn serve_logo2() -> impl IntoResponse {
+    match std::fs::read("../rust_backend/dist/logo2.png") {
+        Ok(data) => (
+            [(header::CONTENT_TYPE, "image/png".to_string())],
+            data,
+        )
+            .into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 async fn index_handler() -> Html<String> {

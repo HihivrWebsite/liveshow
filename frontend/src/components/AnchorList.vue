@@ -375,6 +375,27 @@
       <canvas id="chartCanvas" ref="chartCanvas"></canvas>
     </div>
 
+    <div class="chart-legend" v-if="chartVisible && chartType === 'revenue'">
+      <span v-for="(label, i) in chartLabels" :key="i">
+        <img :src="`/gift/avatar_proxy?room_id=${chartRoomIds[i]}`" class="legend-avatar" @error="$event.target.style.display='none'">
+        <span class="legend-dot" :style="{ backgroundColor: chartColors[i % chartColors.length] }"></span>
+        {{ label }} {{ chartData.length > 0 ? Math.round(chartData[i] / chartData.reduce((a, b) => a + b, 0) * 100) + '%' : '' }}
+      </span>
+    </div>
+
+    <div class="chart-legend" v-if="chartVisible && chartType === 'vrpsp'">
+      <span>
+        <img :src="'/gift/avatar_proxy?uid=413748120'" class="legend-avatar" @error="$event.target.style.display='none'">
+        <span class="legend-dot" style="background-color: #FF6384"></span>
+        VirtuaReal {{ vrpspTotal.vr + vrpspTotal.psp > 0 ? Math.round(vrpspTotal.vr / (vrpspTotal.vr + vrpspTotal.psp) * 100) + '%' : '' }}
+      </span>
+      <span>
+        <img :src="'/gift/avatar_proxy?uid=454673997'" class="legend-avatar" @error="$event.target.style.display='none'">
+        <span class="legend-dot" style="background-color: #36A2EB"></span>
+        PSPlive {{ vrpspTotal.vr + vrpspTotal.psp > 0 ? Math.round(vrpspTotal.psp / (vrpspTotal.vr + vrpspTotal.psp) * 100) + '%' : '' }}
+      </span>
+    </div>
+
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
       <p>加载中...</p>
@@ -394,6 +415,7 @@
         @open-battle="openBattleModal"
         @selection-change="onSelectionChange"
         @open-export="openExportModal"
+        @open-rank="openRankModal"
       />
 
 
@@ -402,6 +424,13 @@
         v-if="showBattle"
         :initial-anchors="battleAnchors"
         @close="closeBattleModal"
+      />
+
+      <!-- 排名对比组件 -->
+      <RankComparison
+        v-if="showRank"
+        :initial-anchors="rankAnchors"
+        @close="closeRankModal"
       />
 
       <div class="grid-container">
@@ -456,6 +485,7 @@ import { anchorAPI } from '@/api'
 import BaseCard from '@/components/BaseCard.vue'
 import NavigationTable from '@/components/NavigationTable.vue'
 import AnchorBattle from '@/components/AnchorBattle.vue'
+import RankComparison from '@/components/RankComparison.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
@@ -468,12 +498,23 @@ export default {
     BaseCard,
     NavigationTable,
     AnchorBattle,
+    RankComparison,
     MonthSelector
   },
   setup() {
     const router = useRouter()
     const route = useRoute()
     const chartVisible = ref(false)
+    const chartType = ref('')
+    const chartLabels = ref([])
+    const chartRoomIds = ref([])
+    const chartData = ref([])
+    const vrpspTotal = ref({ vr: 0, psp: 0 })
+    const chartColors = [
+      '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+      '#FF9F40', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+      '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE'
+    ]
     const anchors = ref([])
     const title = ref('维阿PSP斗虫榜')
     const refreshTime = ref(new Date().toLocaleString())
@@ -498,6 +539,20 @@ export default {
     const closeBattleModal = () => {
       showBattle.value = false
       battleAnchors.value = []
+    }
+
+    // 排名对比相关
+    const showRank = ref(false)
+    const rankAnchors = ref([])
+
+    const openRankModal = (selectedAnchors) => {
+      rankAnchors.value = selectedAnchors
+      showRank.value = true
+    }
+
+    const closeRankModal = () => {
+      showRank.value = false
+      rankAnchors.value = []
     }
 
     // 导出截图相关
@@ -609,12 +664,20 @@ export default {
         }
 
         const selectedRoomIds = new Set(selectedAnchorsForExport.value.map(a => a.room_id))
-        const exportData = Object.values(combinedAnchors).filter(a => selectedRoomIds.has(a.room_id))
-        exportData.sort((a, b) => {
+
+        // 先对全部主播排名（总排名）
+        const allAnchorsSorted = Object.values(combinedAnchors).sort((a, b) => {
           const revA = parseFloat(a.gift || 0) + parseFloat(a.guard || 0) + parseFloat(a.super_chat || 0)
           const revB = parseFloat(b.gift || 0) + parseFloat(b.guard || 0) + parseFloat(b.super_chat || 0)
           return revB - revA
         })
+        const overallRanks = {}
+        allAnchorsSorted.forEach((anchor, index) => {
+          overallRanks[anchor.room_id] = index + 1
+        })
+
+        // 筛选选中的主播
+        const exportData = allAnchorsSorted.filter(a => selectedRoomIds.has(a.room_id))
 
         if (exportData.length === 0) {
           alert('选中的主播在指定月份范围内没有数据')
@@ -644,6 +707,7 @@ export default {
             : ''
           const fieldsHtml = getExportFields(anchor).map(f => `<td style="padding:8px 12px;border-bottom:1px solid #FFC633;text-align:right;white-space:nowrap;font-size:0.85rem;">${f.value}</td>`).join('')
           tableRows += `<tr>
+            <td style="padding:8px 12px;border-bottom:1px solid #FFC633;text-align:center;font-weight:bold;color:#FF6600;">${overallRanks[anchor.room_id]}</td>
             <td style="padding:8px 12px;border-bottom:1px solid #FFC633;text-align:center;">${avatarImg}</td>
             <td style="padding:8px 12px;border-bottom:1px solid #FFC633;font-weight:bold;white-space:nowrap;">${anchor.anchor_name}</td>
             ${fieldsHtml}
@@ -673,6 +737,7 @@ export default {
             <table style="width:100%;border-collapse:collapse;background:#FFF8E1;border-radius:15px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
               <thead>
                 <tr style="background:linear-gradient(45deg,#FFC633,#FFA500);color:#333;">
+                  <th style="padding:10px 12px;text-align:center;width:50px;">排名</th>
                   <th style="padding:10px 12px;text-align:center;width:50px;">头像</th>
                   <th style="padding:10px 12px;text-align:left;white-space:nowrap;">主播名</th>
                   ${headerCells}
@@ -808,14 +873,17 @@ export default {
     }
 
     const showRevenueChart = async () => {
+      chartType.value = 'revenue'
       const data = []
       const labels = []
+      const roomIds = []
 
       anchors.value.forEach(anchor => {
         const revenue = parseFloat(anchor.total_revenue || anchor.gift + anchor.guard + anchor.super_chat || 0)
         if (!isNaN(revenue) && revenue > 0) {
           data.push(revenue)
           labels.push(anchor.anchor_name)
+          roomIds.push(anchor.room_id)
         }
       })
 
@@ -825,14 +893,50 @@ export default {
       }
 
       chartVisible.value = true
-
+      chartLabels.value = labels
+      chartRoomIds.value = roomIds
+      chartData.value = data
       await nextTick()
-
-      if (currentChart) {
-        currentChart.destroy()
-      }
+      if (currentChart) currentChart.destroy()
 
       const ctx = chartCanvas.value.getContext('2d')
+
+      const avatarImages = {}
+      for (const roomId of roomIds) {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.src = `/gift/avatar_proxy?room_id=${roomId}`
+        avatarImages[roomId] = img
+      }
+      await Promise.all(Object.values(avatarImages).map(img => new Promise(r => {
+        img.onload = r
+        img.onerror = r
+        setTimeout(r, 3000)
+      })))
+
+      const AVATAR_SIZE = 30
+      const backgroundColors = []
+      const fallbackColors = [
+        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+        '#FF9F40', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+        '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE'
+      ]
+
+      for (let i = 0; i < roomIds.length; i++) {
+        const roomId = roomIds[i]
+        const img = avatarImages[roomId]
+        if (img && img.complete && img.naturalWidth > 0) {
+          const patternCanvas = document.createElement('canvas')
+          patternCanvas.width = AVATAR_SIZE
+          patternCanvas.height = AVATAR_SIZE
+          const patternCtx = patternCanvas.getContext('2d')
+          patternCtx.drawImage(img, 0, 0, AVATAR_SIZE, AVATAR_SIZE)
+          backgroundColors.push(ctx.createPattern(patternCanvas, 'repeat'))
+        } else {
+          backgroundColors.push(fallbackColors[i % fallbackColors.length])
+        }
+      }
+
       currentChart = new Chart(ctx, {
         type: 'pie',
         data: {
@@ -840,11 +944,7 @@ export default {
           datasets: [{
             label: '总营收占比',
             data: data,
-            backgroundColor: [
-              '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-              '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384',
-              '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
-            ],
+            backgroundColor: backgroundColors,
             borderWidth: 2,
             borderColor: '#fff'
           }]
@@ -856,19 +956,10 @@ export default {
             title: {
               display: true,
               text: '主播营收占比',
-              font: {
-                size: 16
-              }
+              font: { size: 16 }
             },
             legend: {
-              position: 'right',
-              labels: {
-                padding: 8,  // 减少间距
-                usePointStyle: true,
-                pointStyle: 'circle',
-                borderRadius: 6,  // 增大图例图标
-                fontSize: 12
-              }
+              display: false
             },
             tooltip: {
               callbacks: {
@@ -886,6 +977,7 @@ export default {
     }
 
     const showVRPSPComparison = async () => {
+      chartType.value = 'vrpsp'
       if (currentFilter.value !== 'all') {
         alert('VR PSP对比图仅在"维阿PSP斗虫榜"模式下可用')
         return
@@ -896,7 +988,6 @@ export default {
 
       anchors.value.forEach(anchor => {
         const revenue = parseFloat(anchor.total_revenue || anchor.gift + anchor.guard + anchor.super_chat || 0) || 0
-
         if (anchor.union === 'VirtuaReal') {
           vrTotal += revenue
         } else if (anchor.union === 'PSPlive') {
@@ -909,23 +1000,43 @@ export default {
         return
       }
 
+      vrpspTotal.value = { vr: vrTotal, psp: pspTotal }
       chartVisible.value = true
-
       await nextTick()
+      if (currentChart) currentChart.destroy()
 
-      if (currentChart) {
-        currentChart.destroy()
+      const chartCtx = chartCanvas.value.getContext('2d')
+
+      const AVATAR_SIZE = 30
+      const createPattern = async (uid, fallbackColor) => {
+        try {
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+          img.src = `/gift/avatar_proxy?uid=${uid}`
+          await new Promise(r => { img.onload = r; img.onerror = r; setTimeout(r, 3000) })
+          if (img.complete && img.naturalWidth > 0) {
+            const patternCanvas = document.createElement('canvas')
+            patternCanvas.width = AVATAR_SIZE
+            patternCanvas.height = AVATAR_SIZE
+            const patternCtx = patternCanvas.getContext('2d')
+            patternCtx.drawImage(img, 0, 0, AVATAR_SIZE, AVATAR_SIZE)
+            return chartCtx.createPattern(patternCanvas, 'repeat')
+          }
+          return fallbackColor
+        } catch (e) { return fallbackColor }
       }
 
-      const ctx = chartCanvas.value.getContext('2d')
-      currentChart = new Chart(ctx, {
+      const vrPattern = await createPattern('413748120', '#FF6384')
+      const pspPattern = await createPattern('454673997', '#36A2EB')
+
+      currentChart = new Chart(chartCtx, {
         type: 'pie',
         data: {
           labels: ['VirtuaReal', 'PSPlive'],
           datasets: [{
             label: '工会总营收对比',
             data: [vrTotal, pspTotal],
-            backgroundColor: ['#FF6384', '#36A2EB'],
+            backgroundColor: [vrPattern, pspPattern],
             borderWidth: 2,
             borderColor: '#fff'
           }]
@@ -937,19 +1048,10 @@ export default {
             title: {
               display: true,
               text: 'VR vs PSP 总营收对比',
-              font: {
-                size: 16
-              }
+              font: { size: 16 }
             },
             legend: {
-              position: 'right',
-              labels: {
-                padding: 8,  // 减少间距
-                usePointStyle: true,
-                pointStyle: 'circle',
-                borderRadius: 6,  // 增大图例图标
-                fontSize: 12
-              }
+              display: false
             },
             tooltip: {
               callbacks: {
@@ -2674,6 +2776,10 @@ export default {
 
     return {
       chartVisible,
+      chartType,
+      chartLabels,
+      chartRoomIds,
+      chartColors,
       anchors,
       title,
       refreshTime,
@@ -2681,6 +2787,8 @@ export default {
       loading,
       error,
       chartCanvas,
+      chartData,
+      vrpspTotal,
       avatarMap,
       viewLiveSessions,
       switchFilter,
@@ -2746,6 +2854,11 @@ export default {
       battleAnchors,
       openBattleModal,
       closeBattleModal,
+      // 排名对比相关
+      showRank,
+      rankAnchors,
+      openRankModal,
+      closeRankModal,
       // 导出截图相关
       selectedAnchorsCount,
       showExportModal,
@@ -4077,5 +4190,41 @@ export default {
   .field-value:active {
     transform: scale(0.99); /* 点击时轻微缩小 */
   }
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin: 10px 0;
+  padding: 10px;
+}
+
+.chart-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: #333;
+}
+
+.legend-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 4px;
+  border: 1px solid #FFC633;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 4px;
 }
 </style>
