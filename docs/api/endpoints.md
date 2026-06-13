@@ -149,7 +149,10 @@ GET /gift/live_sessions
       "title": "直播标题",
       "avg_concurrency": 1500,
       "current_concurrency": 1600,
-      "max_concurrency": 2000
+      "max_concurrency": 2000,
+      "new_fans_count": 150,
+      "start_attention": 87138,
+      "end_attention": 87288
     }
   ],
   "room_id": "1713546334",
@@ -159,6 +162,56 @@ GET /gift/live_sessions
   "refresh_time": "2026-01-15 12:00:00"
 }
 ```
+
+### 字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| start_time | string | 开播时间 |
+| end_time | string/null | 下播时间（直播进行中为 null） |
+| duration_minutes | int | 直播时长（分钟） |
+| start_guard_1 | int | 开播时舰长数量 |
+| end_guard_1 | int/null | 下播时舰长数量 |
+| start_guard_2 | int | 开播时提督数量 |
+| end_guard_2 | int/null | 下播时提督数量 |
+| start_guard_3 | int | 开播时总督数量 |
+| end_guard_3 | int/null | 下播时总督数量 |
+| start_fans_count | int | 开播时粉丝团人数 |
+| end_fans_count | int/null | 下播时粉丝团人数 |
+| danmaku_count | int | 弹幕数 |
+| gift | float | 礼物收入 |
+| guard | float | 舰长收入 |
+| super_chat | float | SC收入 |
+| total_revenue | float | 总营收 |
+| title | string | 直播标题 |
+| avg_concurrency | float/null | 平均同接 |
+| current_concurrency | int/null | 即时同接 |
+| max_concurrency | int/null | 最高同接 |
+| new_fans_count | int | 新增粉丝数（-1 表示未计算，0 表示无变化） |
+| start_attention | int/null | 开播时粉丝数（来自外部 API） |
+| end_attention | int/null | 下播时粉丝数（来自外部 API） |
+
+---
+
+## 3.1 获取直播会话（含粉丝计算）
+
+### 请求
+
+```
+GET /gift/live_sessions_with_fans
+```
+
+### 参数
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| room_id | string | 是 | 直播间ID |
+| union | string | 是 | 工会名称：`VirtuaReal` 或 `PSPlive` |
+| month | string | 否 | 月份，格式 YYYYMM，默认当前月份 |
+
+### 响应
+
+与 `/gift/live_sessions` 相同，`new_fans_count` 字段已直接从外部 API 的 `start_attention` 和 `end_attention` 计算得出。
 
 ---
 

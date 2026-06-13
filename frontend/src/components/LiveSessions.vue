@@ -20,6 +20,9 @@
         <button @click="openMultiMonthModal" class="action-btn secondary">
           多月份共同统计
         </button>
+        <button @click="fetchFansData" class="action-btn primary" :disabled="fansLoading">
+          {{ fansLoading ? '计算中...' : '计算新增粉丝数' }}
+        </button>
         <!--
         <button @click="openClusterAnalysisModal" class="action-btn secondary">
           进行聚类分析
@@ -170,9 +173,9 @@
             },
             {
               label: '新增粉丝数',
-              value: session.new_fans_count !== undefined && session.new_fans_count !== -1 
-                ? formatNumber(session.new_fans_count) 
-                : '-1',
+              value: session.new_fans_count === undefined || session.new_fans_count === -1 
+                ? '-' 
+                : formatNumber(session.new_fans_count),
               type: 'number'
             },
             {
@@ -266,6 +269,7 @@ export default {
     const union = ref('VirtuaReal')
     const loading = ref(true)
     const error = ref(null)
+    const fansLoading = ref(false)
     let sessionChart = null
     const chartCanvas = ref(null)
 
@@ -794,6 +798,22 @@ export default {
       }
     }
 
+    const fetchFansData = async () => {
+      if (!room_id) return
+      fansLoading.value = true
+      try {
+        const monthValue = route.query.month || month
+        const response = await anchorAPI.getLiveSessionsWithFans(room_id, union.value, monthValue)
+        if (response.sessions && response.sessions.length > 0) {
+          sessions.value = response.sessions
+        }
+      } catch (err) {
+        console.error('获取粉丝数据失败:', err)
+      } finally {
+        fansLoading.value = false
+      }
+    }
+
     // 获取SC历史数据
     const fetchSCHistory = async (roomId) => {
       try {
@@ -959,7 +979,10 @@ export default {
       showMultiMonthModal,
       openMultiMonthModal,
       closeMultiMonthModal,
-      performMultiMonthQuery
+      performMultiMonthQuery,
+      // 粉丝数计算相关
+      fansLoading,
+      fetchFansData
     }
   }
 }

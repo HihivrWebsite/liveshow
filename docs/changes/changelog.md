@@ -2,6 +2,28 @@
 
 ## 版本历史
 
+### 修复粉丝数计算逻辑 — 2026-06-13
+
+- 修复 `new_fans_count` 计算逻辑，改为直接从外部 API 的 `start_attention`/`end_attention` 计算
+- 移除 `calculate_session_fans_change` 函数及其端点 `/gift/session_fans_change`
+- 简化 `fetch_live_session_data_with_fans_calc` 函数
+- 更新文档，补充 `start_attention` 和 `end_attention` 字段说明
+
+### 新增粉丝数直接从外部 API 获取 — 2026-06-13
+
+- `LiveSession` 结构体新增 `start_attention` 和 `end_attention` 字段
+- `new_fans_count` 改为直接从外部 API 的 `start_attention`/`end_attention` 计算，不再调用 `/gift/attention` 每日快照
+- 移除 `calculate_session_fans_change` 函数及其端点 `/gift/session_fans_change`
+- 简化 `fetch_live_session_data_with_fans_calc` 函数，移除 `calculate_fans_change` 参数
+
+### 新增粉丝数功能 + 缓存清理 — 2026-06-13
+
+- 删除后端 4 个未使用的 Attention 缓存辅助函数（`is_attention_cache_valid`、`get_attention_cache`、`put_attention_cache`、`clear_attention_cache_for_month`）
+- 前端 API 层新增 `getLiveSessionsWithFans` 和 `getSessionFansChange` 方法
+- LiveSessions 页面新增"计算新增粉丝数"按钮，按需调用 `/gift/live_sessions_with_fans`
+- 修复新增粉丝数未计算时显示为 `-1` 的问题，改为显示 `-`
+- 更新 API 文档，补充 `/gift/live_sessions_with_fans` 端点（`/gift/session_fans_change` 已移除）
+
 ### 月份选择器统一 + Bug 修复 — 2026-06-13
 
 - 创建 `MonthSelector.vue` 统一月份选择器组件，替代各页面内联模态框

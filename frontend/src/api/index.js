@@ -84,6 +84,15 @@ export const anchorAPI = {
     return apiClient.get('/cache/stats')
   },
 
+  // 获取包含粉丝计算的直播会话（完整模式）
+  getLiveSessionsWithFans: (roomId, union, month) => {
+    const params = new URLSearchParams()
+    params.append('room_id', roomId)
+    params.append('union', union)
+    if (month) params.append('month', month)
+    return apiClient.get(`/gift/live_sessions_with_fans?${params.toString()}`)
+  },
+
   // 获取粉丝数快照 - 支持缓存机制
   getAttention: (roomId, month, union = 'VirtuaReal') => {
     const params = new URLSearchParams()

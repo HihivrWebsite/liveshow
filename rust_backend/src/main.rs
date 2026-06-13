@@ -505,64 +505,6 @@ async fn reset_cache_stats() {
     GLOBAL_CACHE.write().await.reset_stats();
 }
 
-// ==================== Attention缓存管理 ====================
-
-/// 判断当月缓存是否仍然有效（距上次更新<1小时）
-fn is_attention_cache_valid(cached_timestamp: std::time::SystemTime) -> bool {
-    match std::time::SystemTime::now().duration_since(cached_timestamp) {
-        Ok(duration) => duration.as_secs() < 3600, // 1小时 = 3600秒
-        Err(_) => false,
-    }
-}
-
-/// 获取Attention缓存数据
-async fn get_attention_cache(
-    room_id: &str,
-    month: &str,
-    _union: &str,
-) -> Option<serde_json::Value> {
-    let cache_key = format!("attention_{}_{}", room_id, month);
-    let cache = ATTENTION_CACHE.read().await;
-
-    if let Some(entry) = cache.get(&cache_key) {
-        // 检查缓存有效性
-        if entry.is_past_month || is_attention_cache_valid(entry.timestamp) {
-            println!("✅ Attention缓存命中: {}", cache_key);
-            return Some(entry.data.clone());
-        }
-        println!("⏰ Attention缓存过期，需要重新获取");
-    }
-    None
-}
-
-/// 存储Attention缓存数据
-async fn put_attention_cache(room_id: &str, month: &str, data: serde_json::Value) {
-    let cache_key = format!("attention_{}_{}", room_id, month);
-    let is_past = is_past_month(month);
-
-    let mut cache = ATTENTION_CACHE.write().await;
-    cache.insert(
-        cache_key.clone(),
-        AttentionCacheEntry {
-            data,
-            timestamp: std::time::SystemTime::now(),
-            is_past_month: is_past,
-        },
-    );
-
-    println!(
-        "💾 Attention缓存已保存: {} (过去月份: {})",
-        cache_key, is_past
-    );
-}
-
-/// 清除指定月份的Attention缓存（用户手动刷新时调用）
-async fn clear_attention_cache_for_month(month: &str) {
-    let mut cache = ATTENTION_CACHE.write().await;
-    cache.retain(|key, _| !key.ends_with(month));
-    println!("🗑️ 已清除月份 {} 的Attention缓存", month);
-}
-
 // ==================== LiveSessions缓存管理 ====================
 
 /// 获取LiveSessions缓存数据
@@ -811,6 +753,8 @@ pub struct LiveSession {
     pub current_concurrency: Option<i64>,
     pub max_concurrency: Option<i64>,
     pub new_fans_count: i64,
+    pub start_attention: Option<i64>,
+    pub end_attention: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -897,14 +841,6 @@ struct AttentionQuery {
     union: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct SessionFansChangeQuery {
-    room_id: Option<String>,
-    union: Option<String>,
-    start_time: String,
-    end_time: Option<String>,
-}
-
 type SharedData = Arc<RwLock<HashMap<String, Vec<Anchor>>>>;
 
 // 全局HTTP客户端，复用连接
@@ -963,10 +899,6 @@ async fn main() {
         .route(
             "/gift/live_sessions_with_fans",
             get(get_live_sessions_with_fans),
-        )
-        .route(
-            "/gift/session_fans_change",
-            get(calculate_session_fans_change_endpoint),
         )
         .route("/gift/sc", get(get_sc_history))
         .route("/gift/attention", get(get_attention_data))
@@ -1543,7 +1475,7 @@ async fn fetch_live_session_data(
     union: &str,
     month: &str,
 ) -> Vec<LiveSession> {
-    fetch_live_session_data_with_fans_calc(client, room_id, union, month, false).await
+    fetch_live_session_data_with_fans_calc(client, room_id, union, month).await
 }
 
 async fn fetch_live_session_data_with_fans_calc(
@@ -1551,7 +1483,6 @@ async fn fetch_live_session_data_with_fans_calc(
     room_id: &str,
     union: &str,
     month: &str,
-    calculate_fans_change: bool,
 ) -> Vec<LiveSession> {
     let cache_key = format!("livesessions_{}_{}", room_id, month);
     let is_past = is_past_month(month);
@@ -1566,25 +1497,7 @@ async fn fetch_live_session_data_with_fans_calc(
             cached_sessions.len()
         );
 
-        let mut sessions = cached_sessions;
-
-        // 只有在需要时才计算新增粉丝数（懒加载）
-        if calculate_fans_change {
-            println!("🔄 [粉丝计算] 开始计算所有会话的新增粉丝数...");
-            for session in &mut sessions {
-                session.new_fans_count = calculate_session_fans_change(
-                    client,
-                    &session.start_time,
-                    &session.end_time,
-                    room_id,
-                    union,
-                )
-                .await;
-            }
-            println!("✅ [粉丝计算] 完成所有会话的粉丝数计算");
-        } else {
-            println!("⏭️ [跳过计算] 懒加载模式，跳过粉丝数计算");
-        }
+        let sessions = cached_sessions;
 
         return sessions;
     }
@@ -1599,26 +1512,6 @@ async fn fetch_live_session_data_with_fans_calc(
 
             // 将磁盘缓存重新加入内存
             put_live_sessions_cache(room_id, union, month, sessions.clone()).await;
-
-            let mut sessions = sessions;
-
-            // 只有在需要时才计算新增粉丝数（懒加载）
-            if calculate_fans_change {
-                println!("🔄 [粉丝计算] 开始计算所有会话的新增粉丝数...");
-                for session in &mut sessions {
-                    session.new_fans_count = calculate_session_fans_change(
-                        client,
-                        &session.start_time,
-                        &session.end_time,
-                        room_id,
-                        union,
-                    )
-                    .await;
-                }
-                println!("✅ [粉丝计算] 完成所有会话的粉丝数计算");
-            } else {
-                println!("⏭️ [跳过计算] 懒加载模式，跳过粉丝数计算");
-            }
 
             return sessions;
         }
@@ -1642,7 +1535,7 @@ async fn fetch_live_session_data_with_fans_calc(
     );
     println!("🌐 [API调用] Fetching live sessions from: {}", api_url);
 
-    let mut sessions = match fetch_live_session_from_api(client, &api_url).await {
+    let sessions = match fetch_live_session_from_api(client, &api_url).await {
         Ok(sessions) => {
             println!("✅ [API调用成功] 获取到 {} 个直播会话", sessions.len());
             sessions
@@ -1656,24 +1549,6 @@ async fn fetch_live_session_data_with_fans_calc(
     // 保存到缓存
     if !sessions.is_empty() {
         put_live_sessions_cache(room_id, union, month, sessions.clone()).await;
-    }
-
-    // 只有在需要时才计算新增粉丝数（懒加载）
-    if calculate_fans_change {
-        println!("🔄 [粉丝计算] 开始计算所有会话的新增粉丝数...");
-        for session in &mut sessions {
-            session.new_fans_count = calculate_session_fans_change(
-                client,
-                &session.start_time,
-                &session.end_time,
-                room_id,
-                union,
-            )
-            .await;
-        }
-        println!("✅ [粉丝计算] 完成所有会话的粉丝数计算");
-    } else {
-        println!("⏭️ [跳过计算] 懒加载模式，跳过粉丝数计算");
     }
 
     sessions
@@ -1748,6 +1623,8 @@ async fn fetch_live_session_from_api(
         let avg_concurrency = safe_parse_optional_f64(item.get("avg_concurrency"));
         let current_concurrency = safe_parse_optional_i64(item.get("current_concurrency"));
         let max_concurrency = safe_parse_optional_i64(item.get("max_concurrency"));
+        let start_attention = item.get("start_attention").and_then(|v| v.as_i64());
+        let end_attention = item.get("end_attention").and_then(|v| v.as_i64());
 
         let live_session = LiveSession {
             start_time,
@@ -1770,7 +1647,12 @@ async fn fetch_live_session_from_api(
             avg_concurrency,
             current_concurrency,
             max_concurrency,
-            new_fans_count: -1, // 暂时设为 -1，后续通过 attention API 计算
+            new_fans_count: match (start_attention, end_attention) {
+                (Some(start), Some(end)) => end - start,
+                _ => -1,
+            },
+            start_attention,
+            end_attention,
         };
 
         sessions.push(live_session);
@@ -1902,128 +1784,6 @@ async fn get_attention_for_date(
     }
 }
 
-/// 计算单次直播的粉丝数变化
-async fn calculate_session_fans_change(
-    client: &Client,
-    start_time: &str,
-    end_time: &str,
-    room_id: &str,
-    union: &str,
-) -> i64 {
-    // 1. 解析开始和结束时间
-    let start_date = parse_date_from_datetime(start_time);
-
-    if start_date.is_empty() {
-        return -1;
-    }
-
-    // 2. 计算结束日期（如果未下播则使用当前时间）
-    let end_date = if end_time.is_empty() {
-        chrono::Utc::now().format("%Y%m%d").to_string()
-    } else {
-        parse_date_from_datetime(end_time)
-    };
-
-    // 3. 计算前一天
-    let start_date_prev = match get_previous_date(&start_date) {
-        Some(d) => d,
-        None => return -1,
-    };
-
-    let end_date_prev = match get_previous_date(&end_date) {
-        Some(d) => d,
-        None => return -1,
-    };
-
-    // 4. 获取月份（开始和结束应该在同一月份）
-    let month = &start_date[..6]; // YYYYMM
-
-    println!(
-        "📊 [粉丝变化计算] 开始 - room_id={}, 直播期间: {} 到 {}",
-        room_id, start_date, end_date
-    );
-
-    // 5. 从缓存获取attention数据
-    let attention_data = match get_attention_cache_data(client, room_id, month, union).await {
-        Ok(data) => {
-            println!(
-                "✅ [粉丝变化计算] 成功获取attention数据 - room_id={}, month={}",
-                room_id, month
-            );
-            data
-        }
-        Err(e) => {
-            eprintln!(
-                "❌ [粉丝变化计算] 获取attention数据失败 - room_id={}, error={}",
-                room_id, e
-            );
-            return -1;
-        }
-    };
-
-    // 6. 从缓存数据中提取粉丝数
-    let start_attention = match get_attention_from_cache(&attention_data, &start_date_prev) {
-        Some(count) => {
-            println!("   📈 开始日期粉丝数 - {} = {}", start_date_prev, count);
-            count
-        }
-        None => {
-            eprintln!(
-                "❌ [粉丝变化计算] 缓存中未找到日期 {} 的粉丝数",
-                start_date_prev
-            );
-            return -1;
-        }
-    };
-
-    let end_attention = match get_attention_from_cache(&attention_data, &end_date_prev) {
-        Some(count) => {
-            println!("   📈 结束日期粉丝数 - {} = {}", end_date_prev, count);
-            count
-        }
-        None => {
-            eprintln!(
-                "❌ [粉丝变化计算] 缓存中未找到日期 {} 的粉丝数",
-                end_date_prev
-            );
-            return -1;
-        }
-    };
-
-    // 7. 计算变化
-    let fans_change = end_attention - start_attention;
-    println!(
-        "✅ [粉丝变化计算] 完成 - room_id={}, 粉丝变化: {} - {} = {}",
-        room_id, end_attention, start_attention, fans_change
-    );
-    fans_change
-}
-
-/// 计算单个会话的粉丝变化（懒加载用）
-async fn calculate_session_fans_change_endpoint(
-    Query(query): Query<SessionFansChangeQuery>,
-) -> Result<Json<serde_json::Value>, StatusCode> {
-    let room_id = query.room_id.unwrap_or_default();
-    let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
-    let end_time = query.end_time.as_deref().unwrap_or("");
-
-    if room_id.is_empty() {
-        return Err(StatusCode::BAD_REQUEST);
-    }
-
-    let fans_change =
-        calculate_session_fans_change(&HTTP_CLIENT, &query.start_time, end_time, &room_id, &union)
-            .await;
-
-    Ok(Json(serde_json::json!({
-        "fans_change": fans_change,
-        "room_id": room_id,
-        "union": union,
-        "start_time": query.start_time,
-        "end_time": query.end_time
-    })))
-}
-
 /// 获取包含粉丝计算的直播会话（完整模式）
 async fn get_live_sessions_with_fans(
     Query(query): Query<LiveSessionQuery>,
@@ -2084,7 +1844,7 @@ async fn get_live_sessions_with_fans(
 
     // 使用完整计算模式
     let sessions =
-        fetch_live_session_data_with_fans_calc(&HTTP_CLIENT, &room_id, &union, &month, true).await;
+        fetch_live_session_data_with_fans_calc(&HTTP_CLIENT, &room_id, &union, &month).await;
 
     Ok(Json(LiveSessionResponse {
         sessions,

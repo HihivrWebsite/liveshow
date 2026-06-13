@@ -114,8 +114,7 @@ fn should_refresh_now() -> bool {
 ### 相关 API 端点
 
 - `/gift/live_sessions` — 默认懒加载模式，不计算 `new_fans_count`
-- `/gift/live_sessions_with_fans` — 完整计算模式，计算所有会话的 `new_fans_count`
-- `/gift/session_fans_change` — 单个会话按需计算
+- `/gift/live_sessions_with_fans` — 完整计算模式，计算所有会话的 `new_fans_count`（`new_fans_count = end_attention - start_attention`）
 
 ## 缓存失效场景
 

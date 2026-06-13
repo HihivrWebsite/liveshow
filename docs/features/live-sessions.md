@@ -31,11 +31,12 @@
 
 显示该主播的 Super Chat 历史记录。
 
-### 新增粉丝数（懒加载）
+### 新增粉丝数
 
-- 初始加载时不计算 `new_fans_count`
-- 用户展开会话详情时按需计算
-- 通过 `/gift/session_fans_change` 端点获取
+- 数据来源：外部 API 的 `/gift/live_sessions` 直接返回 `start_attention`（开播时粉丝数）和 `end_attention`（下播时粉丝数）
+- 计算方式：`new_fans_count = end_attention - start_attention`
+- 默认懒加载模式不计算，点击"计算新增粉丝数"按钮触发
+- `new_fans_count` 值为 `-1` 表示未计算，`0` 表示无变化
 
 ### 跳转功能
 
