@@ -2,6 +2,13 @@
 
 ## 版本历史
 
+### v4.2.2 — 2026-06-14 嵌入默认头像 + 禁用后台刷新
+
+- Python 脚本从 `cache_data/avatars_compressed/` 读取 85 个 40x40 JPEG 头像，转为 base64 data URL，生成 `defaultAvatars.js`（154 KB）
+- `avatarCache.js` 完全重写：删除 `fetchAllAvatars`，改为从 `defaultAvatars.js` 导入静态头像数据，`getAvatar`/`getAvatarByUid` 不再等待网络请求
+- `main.js` 删除 `fetchAllAvatars` 导入和调用，消除启动时的后台 HTTP 请求
+- `AnchorList.vue` 移除 `fetchAllAvatars` 导入和调用
+
 ### v4.2.1 — 2026-06-14 简化头像系统 — 删除客户端缓存
 
 - `avatarCache.js` 完全重写，删除所有 localStorage/内存缓存逻辑（CACHE_PREFIX、CACHE_VERSION、getFromStorage、saveToStorage、memoryCache、base64ToImage、loadAvatarAndUpdate、preloadAllAvatars）

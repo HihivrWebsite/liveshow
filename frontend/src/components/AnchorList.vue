@@ -489,7 +489,7 @@ import RankComparison from '@/components/RankComparison.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
-import { fetchAllAvatars, getAvatar, getAvatarByUid, scaleAvatar, getAvatarSync } from '@/utils/avatarCache'
+import { getAvatar, getAvatarByUid, scaleAvatar, getAvatarSync } from '@/utils/avatarCache'
 
 Chart.register(...registerables)
 
@@ -825,8 +825,6 @@ export default {
       try {
         loading.value = true
         error.value = null
-
-        fetchAllAvatars()
 
         let response;
         const currentMonth = route.query.month || null;

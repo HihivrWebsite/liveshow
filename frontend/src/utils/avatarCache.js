@@ -1,21 +1,22 @@
-let avatarStore = {}
-let avatarPromise = null
+import DEFAULT_AVATARS from './defaultAvatars'
 
-export function fetchAllAvatars() {
-  if (avatarPromise) return avatarPromise
-  avatarPromise = fetch('/gift/avatars/batch')
-    .then(resp => resp.json())
-    .then(data => { avatarStore = data.avatars || {} })
-    .catch(() => {})
-  return avatarPromise
-}
+let avatarStore = { ...DEFAULT_AVATARS }
+
+// 服务器获取功能已禁用，仅使用嵌入的默认头像
+// export function fetchAllAvatars() {
+//   fetch('/gift/avatars/batch')
+//     .then(resp => resp.json())
+//     .then(data => {
+//       if (data.avatars) Object.assign(avatarStore, data.avatars)
+//     })
+//     .catch(() => {})
+// }
 
 export function getAvatarSync(roomId) {
   return avatarStore[String(roomId)] || ''
 }
 
 export async function getAvatar(roomId) {
-  await fetchAllAvatars()
   const base64 = avatarStore[String(roomId)]
   if (!base64) return null
   return new Promise(resolve => {
@@ -27,7 +28,6 @@ export async function getAvatar(roomId) {
 }
 
 export async function getAvatarByUid(uid) {
-  await fetchAllAvatars()
   const base64 = avatarStore[`uid_${uid}`]
   if (!base64) return null
   return new Promise(resolve => {
