@@ -46,8 +46,8 @@
         <span v-for="anchor in selectedAnchors" :key="anchor.room_id">
           <input type="checkbox" :checked="visibleAnchors.includes(anchor.room_id)"
             @change="toggleAnchorVisibility(anchor.room_id)">
-          <img :src="`/gift/avatar_proxy?room_id=${anchor.room_id}`" 
-            class="legend-avatar" @error="$event.target.style.display='none'">
+          <img :src="avatarDataUrls[anchor.room_id] || ''" 
+            class="legend-avatar">
           <span class="legend-dot" :style="{ backgroundColor: getAnchorColor(anchor.room_id) }"></span>
           {{ anchor.anchor_name }}
         </span>
@@ -117,6 +117,7 @@ export default {
       currentRefreshingAnchor: '',
       anchorColors: {},
       colorIndex: 0,
+      avatarDataUrls: {},
       metricNameMap: {
         duration: '直播时长',
         gift: '礼物收入',
@@ -337,10 +338,18 @@ export default {
       }
 
       const scaledAvatars = {}
+      const avatarDataUrls = {}
       for (const anchor of this.selectedAnchors) {
         const img = await getAvatar(anchor.room_id)
-        if (img) scaledAvatars[anchor.room_id] = scaleAvatar(img, 20)
+        if (img) {
+          scaledAvatars[anchor.room_id] = scaleAvatar(img, 20)
+          const c = document.createElement('canvas')
+          c.width = img.naturalWidth; c.height = img.naturalHeight
+          c.getContext('2d').drawImage(img, 0, 0)
+          avatarDataUrls[anchor.room_id] = c.toDataURL('image/jpeg', 0.8)
+        }
       }
+      this.avatarDataUrls = avatarDataUrls
 
       const datasets = this.selectedAnchors
         .filter(a => this.visibleAnchors.includes(a.room_id))

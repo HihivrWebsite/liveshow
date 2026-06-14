@@ -48,48 +48,15 @@ export async function fetchAllAvatars() {
 
 export async function getAvatar(roomId) {
   const key = String(roomId)
-
   const cached = getFromStorage(key)
   if (cached) return base64ToImage(cached)
-
-  const base64 = await fetchAvatar(`/gift/avatar_proxy?room_id=${roomId}`)
-  if (base64) {
-    saveToStorage(key, base64)
-    return base64ToImage(base64)
-  }
   return null
-}
-
-async function fetchAvatar(url) {
-  try {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.src = url
-    await new Promise((resolve) => {
-      img.onload = resolve
-      img.onerror = resolve
-      setTimeout(resolve, 5000)
-    })
-    if (!img.complete || img.naturalWidth === 0) return null
-    const c = document.createElement('canvas')
-    c.width = img.naturalWidth
-    c.height = img.naturalHeight
-    c.getContext('2d').drawImage(img, 0, 0)
-    return c.toDataURL('image/jpeg', 0.8)
-  } catch { return null }
 }
 
 export async function getAvatarByUid(uid) {
   const key = `uid_${uid}`
-
   const cached = getFromStorage(key)
   if (cached) return base64ToImage(cached)
-
-  const base64 = await fetchAvatar(`/gift/avatar_proxy?uid=${uid}`)
-  if (base64) {
-    saveToStorage(key, base64)
-    return base64ToImage(base64)
-  }
   return null
 }
 
@@ -98,21 +65,9 @@ export function getAvatarSync(roomId) {
 }
 
 export async function loadAvatarAndUpdate(roomId, callback) {
-  const syncValue = getAvatarSync(roomId)
-  if (syncValue) callback(syncValue)
-
-  const img = await getAvatar(roomId)
-  if (img) {
-    const c = document.createElement('canvas')
-    c.width = img.naturalWidth; c.height = img.naturalHeight
-    c.getContext('2d').drawImage(img, 0, 0)
-    callback(c.toDataURL('image/jpeg', 0.8))
-  }
-}
-
-export async function preloadAllAvatars(anchors) {
-  const promises = anchors.map(anchor => getAvatar(anchor.room_id))
-  return Promise.all(promises)
+  const key = String(roomId)
+  const cached = getFromStorage(key)
+  if (cached) callback(cached)
 }
 
 export function scaleAvatar(img, size) {

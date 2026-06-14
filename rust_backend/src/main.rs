@@ -311,13 +311,32 @@ async fn fetch_all_anchors_for_avatars() -> Result<Vec<(String, String)>, Box<dy
 async fn batch_download_avatars() {
     println!("🔄 [头像批量更新] 开始...");
 
-    let anchors = match fetch_all_anchors_for_avatars().await {
+    let mut anchors = match fetch_all_anchors_for_avatars().await {
         Ok(a) => a,
         Err(e) => {
             eprintln!("❌ [头像批量更新] 获取主播列表失败: {}", e);
             return;
         }
     };
+
+    // 添加工会官方账号 UID
+    let guild_uids = vec![
+        ("uid_413748120".to_string(), "VirtuaReal".to_string()),
+        ("uid_454673997".to_string(), "PSPlive".to_string()),
+    ];
+    for (key, name) in &guild_uids {
+        let api_url = format!("https://api.bilibili.com/x/web-interface/card?mid={}", key.replace("uid_", ""));
+        if let Ok(resp) = HTTP_CLIENT.get(&api_url)
+            .header("User-Agent", "Mozilla/5.0")
+            .send().await {
+            if let Ok(json) = resp.json::<serde_json::Value>().await {
+                if let Some(face) = json.get("data").and_then(|d| d.get("card")).and_then(|c| c.get("face")).and_then(|f| f.as_str()) {
+                    anchors.push((key.clone(), face.to_string()));
+                    println!("✅ [工会头像] {} -> {}", name, face);
+                }
+            }
+        }
+    }
 
     let mut success = 0;
     let mut fail = 0;

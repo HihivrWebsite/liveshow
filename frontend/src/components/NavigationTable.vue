@@ -1,6 +1,7 @@
 <template>
   <div class="navigation-table-container">
     <h3 class="table-title">📋 快速导航</h3>
+    <p class="export-hint-big">📸 点击导出截图一键截图</p>
     
     <!-- 恶意斗虫控制按钮 -->
     <div class="battle-controls" v-if="itemType === 'anchor'">
@@ -35,7 +36,7 @@
                 type="checkbox" 
                 :checked="isAllSelected"
                 @change="toggleSelectAll">
-              多选
+              全选
             </th>
             <th class="status-col">开播状态</th>
             <th class="revenue-col">总营收</th>
@@ -268,6 +269,15 @@ export default {
   text-align: center;
   margin: 0 0 15px 0;
   font-size: 1.2em;
+}
+
+.export-hint-big {
+  color: #FF6600;
+  font-size: 1.3rem;
+  font-weight: bold;
+  text-align: center;
+  margin: 5px 0 10px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .battle-controls {

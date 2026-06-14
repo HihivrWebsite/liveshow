@@ -2,6 +2,24 @@
 
 ## 版本历史
 
+### v4.2.0 — 2026-06-14 清理死代码 + 提示文字 + 表头改名 + 指南重排
+
+- `api/index.js` 删除未使用的 `getAvatar` 和 `getAvatarProxyUrl` 函数（旧 `/gift/avatar` 和 `/gift/avatar_proxy` 端点）
+- `NavigationTable.vue` 标题下方添加橙色提示文字"📸 点击导出截图一键截图"
+- `NavigationTable.vue` 表头"多选"改为"全选"
+- `HeaderSection.vue` 功能指南重排：导出截图、排名对比、恶意斗虫、Super Chat历史移至最前，新增"核心功能"分类，共七个分类
+
+### v4.1.9 — 2026-06-14 移除未压缩头像回退 + 图例改用压缩头像
+
+- `avatarCache.js` 移除 `getAvatar`/`getAvatarByUid` 对 `/gift/avatar_proxy` 的回退，仅从 localStorage 读取
+- 删除 `fetchAvatar` 和 `preloadAllAvatars` 函数
+- `loadAvatarAndUpdate` 简化为同步读取 localStorage
+- AnchorList 营收饼图图例改用 `getAvatarSync` 获取压缩头像
+- AnchorList VR/PSP 图例改用 `getAvatarByUid` 预加载后绑定响应式变量
+- AnchorList VR/PSP 饼图扇区头像改用 `scaleAvatar` 圆形裁剪
+- RankComparison 图例改用 `getAvatar` 预加载后绑定 `avatarDataUrls`
+- AnchorBattle 图例改用 `getAvatar` 预加载后绑定 `avatarDataUrls`
+
 ### v4.1.8 — 2026-06-14 后端定时批量下载压缩头像 + 前端简化
 
 - 新增 `compress_avatar` 函数，使用 image crate 将头像压缩为 40x40 JPEG

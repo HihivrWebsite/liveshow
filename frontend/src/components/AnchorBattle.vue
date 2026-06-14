@@ -96,8 +96,8 @@
             type="checkbox" 
             :checked="visibleAnchors.includes(anchor.room_id)" 
             @change="toggleAnchorVisibility(anchor.room_id)">
-          <img :src="`/gift/avatar_proxy?room_id=${anchor.room_id}`" 
-            class="legend-avatar" @error="$event.target.style.display='none'">
+          <img :src="avatarDataUrls[anchor.room_id] || ''" 
+            class="legend-avatar">
           <span class="legend-dot" :style="{ backgroundColor: getAnchorColor(anchor.room_id) }"></span>
           {{ anchor.anchor_name }}
         </span>
@@ -216,7 +216,8 @@ export default {
       isRefreshing: false,
       currentRefreshingAnchor: null,
       anchorColors: {},
-      colorIndex: 0
+      colorIndex: 0,
+      avatarDataUrls: {}
     }
   },
   computed: {
@@ -500,10 +501,18 @@ export default {
       const chartData = this.transformChartData(metric)
 
       const scaledAvatars = {}
+      const avatarDataUrls = {}
       for (const anchor of this.selectedAnchors) {
         const img = await getAvatar(anchor.room_id)
-        if (img) scaledAvatars[anchor.room_id] = scaleAvatar(img, 20)
+        if (img) {
+          scaledAvatars[anchor.room_id] = scaleAvatar(img, 20)
+          const c = document.createElement('canvas')
+          c.width = img.naturalWidth; c.height = img.naturalHeight
+          c.getContext('2d').drawImage(img, 0, 0)
+          avatarDataUrls[anchor.room_id] = c.toDataURL('image/jpeg', 0.8)
+        }
       }
+      this.avatarDataUrls = avatarDataUrls
       
       // 保存 Debug 数据
       this.debugChartData = chartData

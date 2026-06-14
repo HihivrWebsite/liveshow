@@ -377,7 +377,7 @@
 
     <div class="chart-legend" v-if="chartVisible && chartType === 'revenue'">
       <span v-for="(label, i) in chartLabels" :key="i">
-        <img :src="`/gift/avatar_proxy?room_id=${chartRoomIds[i]}`" class="legend-avatar" @error="$event.target.style.display='none'">
+        <img :src="getAvatarSync(chartRoomIds[i])" class="legend-avatar">
         <span class="legend-dot" :style="{ backgroundColor: chartColors[i % chartColors.length] }"></span>
         {{ label }} {{ chartData.length > 0 ? Math.round(chartData[i] / chartData.reduce((a, b) => a + b, 0) * 100) + '%' : '' }}
       </span>
@@ -385,12 +385,12 @@
 
     <div class="chart-legend" v-if="chartVisible && chartType === 'vrpsp'">
       <span>
-        <img :src="'/gift/avatar_proxy?uid=413748120'" class="legend-avatar" @error="$event.target.style.display='none'">
+        <img :src="vrAvatarUrl" class="legend-avatar">
         <span class="legend-dot" style="background-color: #FF6384"></span>
         VirtuaReal {{ vrpspTotal.vr + vrpspTotal.psp > 0 ? Math.round(vrpspTotal.vr / (vrpspTotal.vr + vrpspTotal.psp) * 100) + '%' : '' }}
       </span>
       <span>
-        <img :src="'/gift/avatar_proxy?uid=454673997'" class="legend-avatar" @error="$event.target.style.display='none'">
+        <img :src="pspAvatarUrl" class="legend-avatar">
         <span class="legend-dot" style="background-color: #36A2EB"></span>
         PSPlive {{ vrpspTotal.vr + vrpspTotal.psp > 0 ? Math.round(vrpspTotal.psp / (vrpspTotal.vr + vrpspTotal.psp) * 100) + '%' : '' }}
       </span>
@@ -489,7 +489,7 @@ import RankComparison from '@/components/RankComparison.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
-import { fetchAllAvatars, getAvatar, getAvatarByUid, preloadAllAvatars, scaleAvatar, getAvatarSync, loadAvatarAndUpdate } from '@/utils/avatarCache'
+import { fetchAllAvatars, getAvatar, getAvatarByUid, scaleAvatar, getAvatarSync, loadAvatarAndUpdate } from '@/utils/avatarCache'
 
 Chart.register(...registerables)
 
@@ -525,6 +525,8 @@ export default {
     const avatarMap = ref({})
     let currentChart = null
     const chartCanvas = ref(null)
+    const vrAvatarUrl = ref('')
+    const pspAvatarUrl = ref('')
 
 
 
@@ -847,8 +849,6 @@ export default {
             })
           }
         })
-
-        preloadAllAvatars(anchors.value)
       } catch (err) {
         console.error('获取主播数据失败:', err)
         error.value = '获取数据失败，请稍后重试'
@@ -1019,20 +1019,27 @@ export default {
 
       const AVATAR_SIZE = 30
 
+      const vrImg = await getAvatarByUid('413748120')
+      if (vrImg) {
+        const c = document.createElement('canvas')
+        c.width = vrImg.naturalWidth; c.height = vrImg.naturalHeight
+        c.getContext('2d').drawImage(vrImg, 0, 0)
+        vrAvatarUrl.value = c.toDataURL('image/jpeg', 0.8)
+      }
+      const pspImg = await getAvatarByUid('454673997')
+      if (pspImg) {
+        const c = document.createElement('canvas')
+        c.width = pspImg.naturalWidth; c.height = pspImg.naturalHeight
+        c.getContext('2d').drawImage(pspImg, 0, 0)
+        pspAvatarUrl.value = c.toDataURL('image/jpeg', 0.8)
+      }
+
       const createPatternFromImg = (img, fallbackColor) => {
-        if (img && img.complete && img.naturalWidth > 0) {
-          const patternCanvas = document.createElement('canvas')
-          patternCanvas.width = AVATAR_SIZE
-          patternCanvas.height = AVATAR_SIZE
-          const patternCtx = patternCanvas.getContext('2d')
-          patternCtx.drawImage(img, 0, 0, AVATAR_SIZE, AVATAR_SIZE)
-          return chartCtx.createPattern(patternCanvas, 'repeat')
-        }
+        const scaled = scaleAvatar(img, AVATAR_SIZE)
+        if (scaled) return chartCtx.createPattern(scaled, 'repeat')
         return fallbackColor
       }
 
-      const vrImg = await getAvatarByUid('413748120')
-      const pspImg = await getAvatarByUid('454673997')
       const vrPattern = createPatternFromImg(vrImg, '#FF6384')
       const pspPattern = createPatternFromImg(pspImg, '#36A2EB')
 
@@ -2796,7 +2803,10 @@ export default {
       chartCanvas,
       chartData,
       vrpspTotal,
+      vrAvatarUrl,
+      pspAvatarUrl,
       avatarMap,
+      getAvatarSync,
       viewLiveSessions,
       switchFilter,
       openMonthSelector,

@@ -103,13 +103,4 @@ export const anchorAPI = {
     return apiClient.get(`/gift/attention?${params.toString()}`)
   },
 
-  getAvatar: (roomId) => {
-    const params = new URLSearchParams()
-    params.append('room_id', roomId)
-    return apiClient.get(`/gift/avatar?${params.toString()}`)
-  },
-
-  getAvatarProxyUrl: (roomId) => {
-    return `/gift/avatar_proxy?room_id=${roomId}`
-  }
 }
