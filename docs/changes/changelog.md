@@ -2,6 +2,14 @@
 
 ## 版本历史
 
+### v4.2.1 — 2026-06-14 简化头像系统 — 删除客户端缓存
+
+- `avatarCache.js` 完全重写，删除所有 localStorage/内存缓存逻辑（CACHE_PREFIX、CACHE_VERSION、getFromStorage、saveToStorage、memoryCache、base64ToImage、loadAvatarAndUpdate、preloadAllAvatars）
+- 改为纯服务器获取：fetchAllAvatars 使用 Promise 单例，结果存入模块级 avatarStore 对象
+- `AnchorList.vue` import 移除 loadAvatarAndUpdate，fetchData 中头像加载简化为直接 getAvatarSync
+- `NavigationTable.vue` import 移除 loadAvatarAndUpdate，created 钩子简化为直接 getAvatarSync
+- `LiveSessions.vue` import 移除 loadAvatarAndUpdate，头像加载简化为直接 getAvatarSync
+
 ### v4.2.0 — 2026-06-14 清理死代码 + 提示文字 + 表头改名 + 指南重排
 
 - `api/index.js` 删除未使用的 `getAvatar` 和 `getAvatarProxyUrl` 函数（旧 `/gift/avatar` 和 `/gift/avatar_proxy` 端点）

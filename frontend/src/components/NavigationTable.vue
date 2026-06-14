@@ -85,7 +85,7 @@
 <script>
 import { formatCurrency } from '@/utils/dataProcessor'
 import { anchorAPI } from '@/api'
-import { getAvatarSync, loadAvatarAndUpdate } from '@/utils/avatarCache'
+import { getAvatarSync } from '@/utils/avatarCache'
 
 export default {
   name: 'NavigationTable',
@@ -116,13 +116,7 @@ export default {
     if (this.itemType === 'anchor') {
       this.items.forEach(item => {
         if (item.room_id) {
-          const syncAvatar = getAvatarSync(item.room_id)
-          if (syncAvatar) {
-            this.avatars[item.room_id] = syncAvatar
-          }
-          loadAvatarAndUpdate(item.room_id, (dataUrl) => {
-            this.avatars[item.room_id] = dataUrl
-          })
+          this.avatars[item.room_id] = getAvatarSync(item.room_id)
         }
       })
     }

@@ -249,7 +249,7 @@ import NavigationTable from '@/components/NavigationTable.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
-import { getAvatar, getAvatarSync, loadAvatarAndUpdate } from '@/utils/avatarCache'
+import { getAvatar, getAvatarSync } from '@/utils/avatarCache'
 
 Chart.register(...registerables)
 
@@ -787,13 +787,7 @@ export default {
         }
 
         if (room_id) {
-          const syncAvatar = getAvatarSync(room_id)
-          if (syncAvatar) {
-            anchorAvatar.value = syncAvatar
-          }
-          loadAvatarAndUpdate(room_id, (dataUrl) => {
-            anchorAvatar.value = dataUrl
-          })
+          anchorAvatar.value = getAvatarSync(room_id)
         }
         console.log('设置查询用户:', queriedUser.value) // 添加调试日志
 

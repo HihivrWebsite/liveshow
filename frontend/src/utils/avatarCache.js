@@ -1,28 +1,24 @@
-const CACHE_PREFIX = 'avatar_'
-const CACHE_VERSION = 'v1'
+let avatarStore = {}
+let avatarPromise = null
 
-function getFromStorage(key) {
-  try {
-    const data = localStorage.getItem(CACHE_PREFIX + key)
-    if (!data) return null
-    const parsed = JSON.parse(data)
-    if (parsed.version !== CACHE_VERSION) return null
-    return parsed.base64
-  } catch { return null }
+export function fetchAllAvatars() {
+  if (avatarPromise) return avatarPromise
+  avatarPromise = fetch('/gift/avatars/batch')
+    .then(resp => resp.json())
+    .then(data => { avatarStore = data.avatars || {} })
+    .catch(() => {})
+  return avatarPromise
 }
 
-function saveToStorage(key, base64) {
-  try {
-    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({
-      version: CACHE_VERSION,
-      base64,
-      updated: Date.now()
-    }))
-  } catch (e) {}
+export function getAvatarSync(roomId) {
+  return avatarStore[String(roomId)] || ''
 }
 
-function base64ToImage(base64) {
-  return new Promise((resolve) => {
+export async function getAvatar(roomId) {
+  await fetchAllAvatars()
+  const base64 = avatarStore[String(roomId)]
+  if (!base64) return null
+  return new Promise(resolve => {
     const img = new Image()
     img.onload = () => resolve(img)
     img.onerror = () => resolve(null)
@@ -30,44 +26,16 @@ function base64ToImage(base64) {
   })
 }
 
-export async function fetchAllAvatars() {
-  try {
-    const resp = await fetch('/gift/avatars/batch')
-    const data = await resp.json()
-    if (data.avatars) {
-      for (const [roomId, base64] of Object.entries(data.avatars)) {
-        saveToStorage(roomId, base64)
-      }
-    }
-    return data.avatars || {}
-  } catch (e) {
-    console.error('获取批量头像失败:', e)
-    return {}
-  }
-}
-
-export async function getAvatar(roomId) {
-  const key = String(roomId)
-  const cached = getFromStorage(key)
-  if (cached) return base64ToImage(cached)
-  return null
-}
-
 export async function getAvatarByUid(uid) {
-  const key = `uid_${uid}`
-  const cached = getFromStorage(key)
-  if (cached) return base64ToImage(cached)
-  return null
-}
-
-export function getAvatarSync(roomId) {
-  return getFromStorage(String(roomId)) || ''
-}
-
-export async function loadAvatarAndUpdate(roomId, callback) {
-  const key = String(roomId)
-  const cached = getFromStorage(key)
-  if (cached) callback(cached)
+  await fetchAllAvatars()
+  const base64 = avatarStore[`uid_${uid}`]
+  if (!base64) return null
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => resolve(null)
+    img.src = base64
+  })
 }
 
 export function scaleAvatar(img, size) {
