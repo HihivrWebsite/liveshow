@@ -148,5 +148,30 @@
     "super_chat": 3260.0,
     "title": "看黑社会2再来一把",
     "total_revenue": 11074.1
+  },
+  {
+    "avg_concurrency": 910.4782608695652,
+    "current_concurrency": 1412,
+    "danmaku_count": 1694,
+    "duration_minutes": 0,
+    "end_attention": null,
+    "end_fans_count": 0,
+    "end_guard_1": 0,
+    "end_guard_2": 0,
+    "end_guard_3": 0,
+    "end_time": "",
+    "gift": 1024.9,
+    "guard": 8330.0,
+    "max_concurrency": 1412,
+    "new_fans_count": -1,
+    "start_attention": 344792,
+    "start_fans_count": 1938,
+    "start_guard_1": 84,
+    "start_guard_2": 6,
+    "start_guard_3": 1,
+    "start_time": "2026-06-14 20:02:15",
+    "super_chat": 3770.0,
+    "title": "生日快乐！",
+    "total_revenue": 13124.9
   }
 ]

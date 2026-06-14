@@ -2,33 +2,36 @@
   <div class="anchor-list">
     <div class="controls-section">
       <div class="filter-controls">
-        <button
+        <GlassButton
           @click="switchFilter('all')"
-          :class="['filter-btn', { active: currentFilter === 'all' }]"
+          :variant="currentFilter === 'all' ? 'secondary' : 'primary'"
+          size="md"
         >
           维阿PSP斗虫榜
-        </button>
-        <button
+        </GlassButton>
+        <GlassButton
           @click="switchFilter('vr')"
-          :class="['filter-btn', { active: currentFilter === 'vr' }]"
+          :variant="currentFilter === 'vr' ? 'secondary' : 'primary'"
+          size="md"
         >
           维阿斗虫榜
-        </button>
-        <button
+        </GlassButton>
+        <GlassButton
           @click="switchFilter('psp')"
-          :class="['filter-btn', { active: currentFilter === 'psp' }]"
+          :variant="currentFilter === 'psp' ? 'secondary' : 'primary'"
+          size="md"
         >
           PSPlive斗虫榜
-        </button>
+        </GlassButton>
       </div>
 
       <div class="action-controls">
-        <button @click="openMonthSelector" class="action-btn secondary">
+        <GlassButton @click="openMonthSelector" variant="secondary">
           切换不同月份
-        </button>
-        <button @click="openMultiMonthModal" class="action-btn secondary">
+        </GlassButton>
+        <GlassButton @click="openMultiMonthModal" variant="secondary">
           多月份共同统计
-        </button>
+        </GlassButton>
       </div>
 
       <MonthSelector
@@ -54,23 +57,23 @@
     </div>
 
     <div class="chart-button-container">
-      <button @click="showRevenueChart" class="action-btn primary" title="营收占比分析">
+      <GlassButton @click="showRevenueChart" variant="primary" title="营收占比分析">
         查看营收占比
-      </button>
-      <button
+      </GlassButton>
+      <GlassButton
         v-if="currentFilter === 'all'"
         @click="showVRPSPComparison"
-        class="action-btn primary"
+        variant="primary"
         title="VR与PSP工会数据对比"
       >
         VR PSP对比图
-      </button>
-      <button @click="hideAllCharts" class="action-btn danger">
+      </GlassButton>
+      <GlassButton @click="hideAllCharts" variant="danger">
         关闭图表
-      </button>
-      <button @click="openRegressionAnalysisModal" class="action-btn primary">
+      </GlassButton>
+      <GlassButton @click="openRegressionAnalysisModal" variant="primary">
         进行回归分析
-      </button>
+      </GlassButton>
       <!--
       <button @click="openClusterAnalysisModal" class="action-btn primary">
         进行聚类分析
@@ -79,9 +82,7 @@
     </div>
 
     <!-- 聚类分析模态框 -->
-    <div v-if="showClusterModal" class="modal-overlay" @click="closeClusterModal">
-      <div class="modal-content" @click.stop style="width: 600px;">
-        <h3>聚类分析</h3>
+    <GlassDialog :visible="showClusterModal" title="聚类分析" width="600px" @close="closeClusterModal">
         <div class="cluster-analysis-form">
           <div class="form-group">
             <label>选择聚类变量 (X):</label>
@@ -131,19 +132,15 @@
               <option value="5">5类</option>
             </select>
           </div>
-
-          <div class="button-group">
-            <button @click="performClusterAnalysis" class="confirm-btn" :disabled="!canPerformClusterAnalysis">确定</button>
-            <button @click="closeClusterModal" class="cancel-btn">取消</button>
-          </div>
         </div>
-      </div>
-    </div>
+        <template #footer>
+          <GlassButton @click="performClusterAnalysis" variant="secondary" :disabled="!canPerformClusterAnalysis">确定</GlassButton>
+          <GlassButton @click="closeClusterModal" variant="default">取消</GlassButton>
+        </template>
+    </GlassDialog>
 
     <!-- 回归分析模态框 -->
-    <div v-if="showRegressionModal" class="modal-overlay" @click="closeRegressionModal">
-      <div class="modal-content" @click.stop style="width: 600px;">
-        <h3>回归分析</h3>
+    <GlassDialog :visible="showRegressionModal" title="回归分析" width="600px" @close="closeRegressionModal">
         <div class="regression-analysis-form">
           <div class="form-group">
             <label>选择因变量 (Y):</label>
@@ -201,23 +198,21 @@
               </label>
             </div>
           </div>
-
-          <div class="button-group">
-            <button @click="performRegressionAnalysis" class="confirm-btn" :disabled="!canPerformAnalysis || regressionLoading">
-              <span v-if="regressionLoading">计算中...</span>
-              <span v-else>确定</span>
-            </button>
-            <button @click="closeRegressionModal" class="cancel-btn">取消</button>
-          </div>
         </div>
-      </div>
-    </div>
+        <template #footer>
+          <GlassButton @click="performRegressionAnalysis" variant="secondary" :disabled="!canPerformAnalysis || regressionLoading">
+            <span v-if="regressionLoading">计算中...</span>
+            <span v-else>确定</span>
+          </GlassButton>
+          <GlassButton @click="closeRegressionModal" variant="default">取消</GlassButton>
+        </template>
+    </GlassDialog>
 
     <!-- 聚类分析结果图表容器 -->
     <div v-if="clusterAnalysisVisible" class="cluster-chart-container">
       <div class="chart-header">
         <h3>聚类分析结果</h3>
-        <button @click="closeClusterAnalysis" class="close-chart-btn">关闭</button>
+        <GlassButton @click="closeClusterAnalysis" variant="secondary" size="sm">关闭</GlassButton>
       </div>
       <div class="analysis-results">
         <div class="statistics-panel">
@@ -261,7 +256,7 @@
     <div v-if="regressionAnalysisVisible" class="regression-chart-container">
       <div class="chart-header">
         <h3>回归分析结果</h3>
-        <button @click="closeRegressionAnalysis" class="close-chart-btn">关闭</button>
+        <GlassButton @click="closeRegressionAnalysis" variant="secondary" size="sm">关闭</GlassButton>
       </div>
       <div class="analysis-results">
         <div class="statistics-panel">
@@ -338,9 +333,7 @@
     </div>
 
     <!-- 导出截图模态框 -->
-    <div v-if="showExportModal" class="modal-overlay" @click="closeExportModal">
-      <div class="modal-content" @click.stop>
-        <h3>📸 导出数据截图</h3>
+    <GlassDialog :visible="showExportModal" title="导出数据截图" width="420px" @close="closeExportModal">
         <div class="modal-form">
           <div class="form-group">
             <label>起始月份:</label>
@@ -350,18 +343,36 @@
             <label>结束月份:</label>
             <input type="month" v-model="exportEndMonth" min="2025-08" class="month-input">
           </div>
-          <div class="button-group">
-            <button @click="performExport" class="confirm-btn" :disabled="exportLoading">
-              {{ exportLoading ? '导出中...' : '确定导出' }}
-            </button>
-            <button @click="closeExportModal" class="cancel-btn">取消</button>
-          </div>
         </div>
+        <template #footer>
+          <GlassButton @click="performExport" variant="secondary" :disabled="exportLoading">
+            {{ exportLoading ? '导出中...' : '确定导出' }}
+          </GlassButton>
+          <GlassButton @click="closeExportModal" variant="default">取消</GlassButton>
+        </template>
+    </GlassDialog>
+
+    <!-- VR PSP 对比图弹窗 -->
+    <GlassDialog :visible="vrpspDialogVisible" title="VR vs PSP 工会数据对比" width="700px" @close="closeVRPSPDialog">
+      <div class="vrpsp-dialog-chart">
+        <div ref="vrpspChartCanvas" style="width:100%;height:400px"></div>
       </div>
-    </div>
+      <div class="chart-legend" v-if="vrpspDialogVisible">
+        <span>
+          <img :src="vrAvatarUrl" class="legend-avatar">
+          <span class="legend-dot" style="background-color: #FF6384"></span>
+          VirtuaReal {{ vrpspTotal.vr + vrpspTotal.psp > 0 ? Math.round(vrpspTotal.vr / (vrpspTotal.vr + vrpspTotal.psp) * 100) + '%' : '' }}
+        </span>
+        <span>
+          <img :src="pspAvatarUrl" class="legend-avatar">
+          <span class="legend-dot" style="background-color: #36A2EB"></span>
+          PSPlive {{ vrpspTotal.vr + vrpspTotal.psp > 0 ? Math.round(vrpspTotal.psp / (vrpspTotal.vr + vrpspTotal.psp) * 100) + '%' : '' }}
+        </span>
+      </div>
+    </GlassDialog>
 
     <div class="chart-info" v-if="chartVisible">
-      <h3 style="color: #f9729a; margin-top: 0;">📊 图表交互说明</h3>
+      <h3 style="color: var(--color-accent); margin-top: 0;"><BarChart3 :size="20" class="heading-icon" /> 图表交互说明</h3>
       <p><strong>图表功能：</strong></p>
       <ul style="text-align: left; display: inline-block;">
         <li>点击图例可以隐藏/显示对应的数据显示</li>
@@ -372,7 +383,7 @@
     </div>
 
     <div :class="['chart-container', { visible: chartVisible }]">
-      <canvas id="chartCanvas" ref="chartCanvas"></canvas>
+      <div id="chartCanvas" ref="chartCanvas" style="width:100%;height:100%"></div>
     </div>
 
     <div class="chart-legend" v-if="chartVisible && chartType === 'revenue'">
@@ -383,19 +394,6 @@
       </span>
     </div>
 
-    <div class="chart-legend" v-if="chartVisible && chartType === 'vrpsp'">
-      <span>
-        <img :src="vrAvatarUrl" class="legend-avatar">
-        <span class="legend-dot" style="background-color: #FF6384"></span>
-        VirtuaReal {{ vrpspTotal.vr + vrpspTotal.psp > 0 ? Math.round(vrpspTotal.vr / (vrpspTotal.vr + vrpspTotal.psp) * 100) + '%' : '' }}
-      </span>
-      <span>
-        <img :src="pspAvatarUrl" class="legend-avatar">
-        <span class="legend-dot" style="background-color: #36A2EB"></span>
-        PSPlive {{ vrpspTotal.vr + vrpspTotal.psp > 0 ? Math.round(vrpspTotal.psp / (vrpspTotal.vr + vrpspTotal.psp) * 100) + '%' : '' }}
-      </span>
-    </div>
-
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
       <p>加载中...</p>
@@ -403,7 +401,7 @@
 
     <div v-else-if="error" class="error-state">
       <p class="error-message">{{ error }}</p>
-      <button @click="fetchData" class="retry-btn">重试</button>
+      <GlassButton @click="fetchData" variant="success">重试</GlassButton>
     </div>
 
     <div v-else class="data-section">
@@ -433,7 +431,7 @@
         @close="closeRankModal"
       />
 
-      <div class="grid-container">
+      <div class="grid-container" ref="gridContainer">
         <BaseCard
           v-for="(anchor, index) in anchors"
           :key="anchor.room_id || index"
@@ -463,12 +461,14 @@
           @action-click="viewLiveSessions(anchor.room_id, anchor.union)"
         >
           <template #actions>
-            <button
+            <GlassButton
               @click="viewLiveSessions(anchor.room_id, anchor.union)"
-              class="view-btn"
+              variant="secondary"
+              size="sm"
+              cta
             >
               查看详细数据
-            </button>
+            </GlassButton>
           </template>
         </BaseCard>
       </div>
@@ -479,7 +479,8 @@
 <script>
 import { ref, onMounted, watch, nextTick, computed, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Chart, registerables } from 'chart.js'
+import * as echarts from 'echarts'
+import '@/utils/echartsTheme.js'
 import html2canvas from 'html2canvas'
 import { anchorAPI } from '@/api'
 import BaseCard from '@/components/BaseCard.vue'
@@ -487,11 +488,14 @@ import NavigationTable from '@/components/NavigationTable.vue'
 import AnchorBattle from '@/components/AnchorBattle.vue'
 import RankComparison from '@/components/RankComparison.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
+import GlassButton from '@/components/ui/GlassButton.vue'
+import GlassDialog from '@/components/ui/GlassDialog.vue'
+import { BarChart3 } from 'lucide-vue-next'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
 import { getAvatar, getAvatarByUid, scaleAvatar, getAvatarSync } from '@/utils/avatarCache'
-
-Chart.register(...registerables)
+import { staggerEnter } from '@/composables/useGSAP'
+import gsap from 'gsap'
 
 export default {
   name: 'AnchorList',
@@ -500,7 +504,10 @@ export default {
     NavigationTable,
     AnchorBattle,
     RankComparison,
-    MonthSelector
+    MonthSelector,
+    GlassButton,
+    GlassDialog,
+    BarChart3
   },
   setup() {
     const router = useRouter()
@@ -527,6 +534,10 @@ export default {
     const chartCanvas = ref(null)
     const vrAvatarUrl = ref('')
     const pspAvatarUrl = ref('')
+    const gridContainer = ref(null)
+    const vrpspDialogVisible = ref(false)
+    const vrpspChartCanvas = ref(null)
+    let vrpspChart = null
 
 
 
@@ -708,7 +719,7 @@ export default {
         const startLabel = `${sm.substring(0, 4)}年${sm.substring(5, 7)}月`
         const endLabel = `${em.substring(0, 4)}年${em.substring(5, 7)}月`
 
-        const headerCells = fields.map(f => `<th style="padding:10px 12px;text-align:right;white-space:nowrap;font-size:0.85rem;">${f.label}</th>`).join('')
+        const headerCells = fields.map(f => `<th style="padding:10px 12px;text-align:right;white-space:nowrap;font-size:0.85rem;color:#5D4B24;">${f.label}</th>`).join('')
 
         let tableRows = ''
         exportData.forEach(anchor => {
@@ -716,38 +727,38 @@ export default {
           const avatarImg = avatarBase64
             ? `<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;display:inline-block;flex-shrink:0;"><img src="${avatarBase64}" style="width:40px;height:40px;object-fit:cover;display:block;" /></div>`
             : ''
-          const fieldsHtml = getExportFields(anchor).map(f => `<td style="padding:8px 12px;border-bottom:1px solid #FFC633;text-align:right;white-space:nowrap;font-size:0.85rem;">${f.value}</td>`).join('')
+          const fieldsHtml = getExportFields(anchor).map(f => `<td style="padding:8px 12px;border-bottom:1px solid #F6B100;text-align:right;white-space:nowrap;font-size:0.85rem;color:#5D4B24;">${f.value}</td>`).join('')
           tableRows += `<tr>
-            <td style="padding:8px 12px;border-bottom:1px solid #FFC633;text-align:center;font-weight:bold;color:#FF6600;">${overallRanks[anchor.room_id]}</td>
-            <td style="padding:8px 12px;border-bottom:1px solid #FFC633;text-align:center;">${avatarImg}</td>
-            <td style="padding:8px 12px;border-bottom:1px solid #FFC633;font-weight:bold;white-space:nowrap;">${anchor.anchor_name}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #F6B100;text-align:center;font-weight:bold;color:#F6B100;">${overallRanks[anchor.room_id]}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #F6B100;text-align:center;">${avatarImg}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #F6B100;font-weight:bold;white-space:nowrap;color:#5D4B24;">${anchor.anchor_name}</td>
             ${fieldsHtml}
           </tr>`
         })
 
         const siteUrl = 'https:斜杠hihivr点top'
         const htmlContent = `
-          <div style="font-family:'Microsoft YaHei',sans-serif;background:#FFF8E1;padding:20px;width:1200px;">
-            <header style="background:#FFF8E1;padding:20px 0;">
+          <div style="font-family:'Segoe UI','Microsoft YaHei',sans-serif;background:#F7F1DF;padding:20px;width:1200px;">
+            <header style="background:#F7F1DF;padding:20px 0;">
               <div style="margin:0 auto;padding:0 20px;">
                 <div style="display:flex;align-items:center;justify-content:center;gap:15px;margin-bottom:15px;">
                   ${logo1 ? `<img src="${logo1}" style="height:100px;" />` : ''}
                   ${logo2 ? `<img src="${logo2}" style="height:100px;" />` : ''}
-                  <h1 style="color:#FF6600;font-size:2rem;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.5);margin:0;">维阿PSP斗虫榜_${siteUrl}</h1>
+                  <h1 style="color:#F6B100;font-size:2rem;font-weight:bold;text-shadow:2px 2px 4px rgba(93,75,36,0.3);margin:0;">维阿PSP斗虫榜_${siteUrl}</h1>
                 </div>
                 <div style="text-align:center;">
-                  <p style="color:#f9729a;font-size:1.2rem;margin-bottom:10px;line-height:1.4;font-weight:bold;text-align:center;">特别感谢某热心小礼猫-千秋紫莹提供的斗虫数据API，感谢其对本项目提供了巨大的帮助</p>
+                  <p style="color:#FF6B9D;font-size:1.2rem;margin-bottom:10px;line-height:1.4;font-weight:bold;text-align:center;">特别感谢某热心小礼猫-千秋紫莹提供的斗虫数据API，感谢其对本项目提供了巨大的帮助</p>
                 </div>
               </div>
             </header>
-            <div style="background:#FFF5C2;border:1px solid #FFC633;border-radius:10px;padding:10px 15px;margin-bottom:12px;color:#333;font-size:0.9rem;">
+            <div style="background:rgba(246,177,0,0.1);border:1px solid #F6B100;border-radius:32px;padding:10px 15px;margin-bottom:12px;color:#5D4B24;font-size:0.9rem;box-shadow:0 2px 8px rgba(93,75,36,0.1);">
               <div style="font-weight:bold;margin-bottom:4px;">使用导出功能制作</div>
               <div>使用方法：在主页勾选主播 → 点击导出截图 → 选择时间范围 → 确定导出</div>
             </div>
-            <div style="color:#f9729a;font-weight:bold;font-size:1.1rem;margin-bottom:10px;">${startLabel}-${endLabel}数据</div>
-            <table style="width:100%;border-collapse:collapse;background:#FFF8E1;border-radius:15px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+            <div style="color:#FF6B9D;font-weight:bold;font-size:1.1rem;margin-bottom:10px;">${startLabel}-${endLabel}数据</div>
+            <table style="width:100%;border-collapse:collapse;background:#F7F1DF;border-radius:32px;overflow:hidden;box-shadow:0 4px 16px rgba(93,75,36,0.15);">
               <thead>
-                <tr style="background:linear-gradient(45deg,#FFC633,#FFA500);color:#333;">
+                <tr style="background:linear-gradient(45deg,#F6B100,#FF6B9D);color:#5D4B24;">
                   <th style="padding:10px 12px;text-align:center;width:50px;">排名</th>
                   <th style="padding:10px 12px;text-align:center;width:50px;">头像</th>
                   <th style="padding:10px 12px;text-align:left;white-space:nowrap;">主播名</th>
@@ -776,7 +787,7 @@ export default {
             useCORS: false,
             allowTaint: false,
             scale: 2,
-            backgroundColor: '#FFF8E1',
+            backgroundColor: '#F7F1DF',
             logging: false
           })
 
@@ -846,6 +857,12 @@ export default {
         error.value = '获取数据失败，请稍后重试'
       } finally {
         loading.value = false
+        nextTick(() => {
+          if (gridContainer.value) {
+            const cards = gridContainer.value.querySelectorAll(':scope > *')
+            if (cards.length) staggerEnter(cards)
+          }
+        })
       }
     }
 
@@ -911,75 +928,74 @@ export default {
         return
       }
 
+      await Promise.all(roomIds.map(id => getAvatar(id)))
+
       chartVisible.value = true
       chartLabels.value = labels
       chartRoomIds.value = roomIds
       chartData.value = data
       await nextTick()
-      if (currentChart) currentChart.destroy()
+      if (currentChart) {
+        currentChart.dispose()
+        currentChart = null
+      }
 
-      const ctx = chartCanvas.value.getContext('2d')
-
-      const AVATAR_SIZE = 30
-      const backgroundColors = []
       const fallbackColors = [
         '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
         '#FF9F40', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
         '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE'
       ]
 
-      for (let i = 0; i < roomIds.length; i++) {
-        const roomId = roomIds[i]
-        const img = await getAvatar(roomId)
+      const AVATAR_SIZE = 60
+      const seriesData = []
+      for (let i = 0; i < labels.length; i++) {
+        const img = await getAvatar(roomIds[i])
         const scaled = scaleAvatar(img, AVATAR_SIZE)
+        let color = fallbackColors[i % fallbackColors.length]
         if (scaled) {
-          backgroundColors.push(ctx.createPattern(scaled, 'repeat'))
-        } else {
-          backgroundColors.push(fallbackColors[i % fallbackColors.length])
+          color = { image: scaled, repeat: 'repeat' }
         }
+        seriesData.push({ name: labels[i], value: data[i], itemStyle: { color } })
       }
 
-      currentChart = new Chart(ctx, {
-        type: 'pie',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: '总营收占比',
-            data: data,
-            backgroundColor: backgroundColors,
-            borderWidth: 2,
-            borderColor: '#fff'
-          }]
+      currentChart = echarts.init(chartCanvas.value, 'liveshow')
+      currentChart.setOption({
+        title: {
+          text: '主播营收占比',
+          left: 'center',
+          textStyle: { fontSize: 16 }
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: {
-              display: true,
-              text: '主播营收占比',
-              font: { size: 16 }
-            },
-            legend: {
-              display: false
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const value = context.parsed
-                  const total = context.dataset.data.reduce((a, b) => a + b, 0)
-                  const percentage = Math.round((value / total) * 100)
-                  return `${context.label}: ${value.toFixed(2)} (${percentage}%)`
-                }
-              }
+        tooltip: {
+          trigger: 'item',
+          formatter: function(params) {
+            const total = data.reduce((sum, d) => sum + d, 0)
+            const percentage = Math.round((params.value / total) * 100)
+            return `${params.name}: ${params.value.toFixed(2)} (${percentage}%)`
+          }
+        },
+        series: [{
+          name: '总营收占比',
+          type: 'pie',
+          radius: '82%',
+          center: ['50%', '55%'],
+          data: seriesData,
+          label: { show: false },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
             }
           }
-        }
+        }]
+      })
+
+      window.addEventListener('resize', () => {
+        if (currentChart) currentChart.resize()
       })
     }
 
     const showVRPSPComparison = async () => {
-      chartType.value = 'vrpsp'
       if (currentFilter.value !== 'all') {
         alert('VR PSP对比图仅在"维阿PSP斗虫榜"模式下可用')
         return
@@ -1002,23 +1018,22 @@ export default {
         return
       }
 
+      hideAllCharts()
+      chartType.value = 'vrpsp'
+
       vrpspTotal.value = { vr: vrTotal, psp: pspTotal }
-      chartVisible.value = true
-      await nextTick()
-      if (currentChart) currentChart.destroy()
 
-      const chartCtx = chartCanvas.value.getContext('2d')
+      const [vrImg, pspImg] = await Promise.all([
+        getAvatarByUid('413748120'),
+        getAvatarByUid('454673997')
+      ])
 
-      const AVATAR_SIZE = 30
-
-      const vrImg = await getAvatarByUid('413748120')
       if (vrImg) {
         const c = document.createElement('canvas')
         c.width = vrImg.naturalWidth; c.height = vrImg.naturalHeight
         c.getContext('2d').drawImage(vrImg, 0, 0)
         vrAvatarUrl.value = c.toDataURL('image/jpeg', 0.8)
       }
-      const pspImg = await getAvatarByUid('454673997')
       if (pspImg) {
         const c = document.createElement('canvas')
         c.width = pspImg.naturalWidth; c.height = pspImg.naturalHeight
@@ -1026,58 +1041,69 @@ export default {
         pspAvatarUrl.value = c.toDataURL('image/jpeg', 0.8)
       }
 
-      const createPatternFromImg = (img, fallbackColor) => {
-        const scaled = scaleAvatar(img, AVATAR_SIZE)
-        if (scaled) return chartCtx.createPattern(scaled, 'repeat')
-        return fallbackColor
+      const AVATAR_SIZE = 60
+      const vrScaled = scaleAvatar(vrImg, AVATAR_SIZE)
+      const pspScaled = scaleAvatar(pspImg, AVATAR_SIZE)
+
+      vrpspDialogVisible.value = true
+      await nextTick()
+      if (vrpspChart) {
+        vrpspChart.dispose()
+        vrpspChart = null
       }
 
-      const vrPattern = createPatternFromImg(vrImg, '#FF6384')
-      const pspPattern = createPatternFromImg(pspImg, '#36A2EB')
-
-      currentChart = new Chart(chartCtx, {
-        type: 'pie',
-        data: {
-          labels: ['VirtuaReal', 'PSPlive'],
-          datasets: [{
-            label: '工会总营收对比',
-            data: [vrTotal, pspTotal],
-            backgroundColor: [vrPattern, pspPattern],
-            borderWidth: 2,
-            borderColor: '#fff'
-          }]
+      vrpspChart = echarts.init(vrpspChartCanvas.value, 'liveshow')
+      vrpspChart.setOption({
+        title: {
+          text: 'VR vs PSP 总营收对比',
+          left: 'center',
+          textStyle: { fontSize: 16 }
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: {
-              display: true,
-              text: 'VR vs PSP 总营收对比',
-              font: { size: 16 }
-            },
-            legend: {
-              display: false
-            },
-            tooltip: {
-              callbacks: {
-                label: function(context) {
-                  const value = context.parsed
-                  const total = context.dataset.data.reduce((a, b) => a + b, 0)
-                  const percentage = Math.round((value / total) * 100)
-                  return `${context.label}: ${value.toFixed(2)} (${percentage}%)`
-                }
-              }
+        tooltip: {
+          trigger: 'item',
+          formatter: function(params) {
+            const total = vrTotal + pspTotal
+            const percentage = Math.round((params.value / total) * 100)
+            return `${params.name}: ${params.value.toFixed(2)} (${percentage}%)`
+          }
+        },
+        series: [{
+          name: '工会总营收对比',
+          type: 'pie',
+          radius: '82%',
+          center: ['50%', '55%'],
+          data: [
+            { name: 'VirtuaReal', value: vrTotal, itemStyle: { color: vrScaled ? { image: vrScaled, repeat: 'repeat' } : '#FF6384' } },
+            { name: 'PSPlive', value: pspTotal, itemStyle: { color: pspScaled ? { image: pspScaled, repeat: 'repeat' } : '#36A2EB' } }
+          ],
+          label: { show: false },
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
             }
           }
-        }
+        }]
       })
+
+      window.addEventListener('resize', () => {
+        if (vrpspChart) vrpspChart.resize()
+      })
+    }
+
+    const closeVRPSPDialog = () => {
+      vrpspDialogVisible.value = false
+      if (vrpspChart) {
+        vrpspChart.dispose()
+        vrpspChart = null
+      }
     }
 
     const hideAllCharts = () => {
       chartVisible.value = false
       if (currentChart) {
-        currentChart.destroy()
+        currentChart.dispose()
         currentChart = null
       }
     }
@@ -1184,7 +1210,7 @@ export default {
     const closeRegressionAnalysis = () => {
       regressionAnalysisVisible.value = false
       if (regressionChartInstance) {
-        regressionChartInstance.destroy()
+        regressionChartInstance.dispose()
         regressionChartInstance = null
       }
     }
@@ -1756,8 +1782,8 @@ export default {
 
         // 计算数据范围
         const maxX = Math.max(residuals.length - 1, 1)
-        const minY = Math.min(...residuals)
-        const maxY = Math.max(...residuals)
+        let minY = Math.min(...residuals)
+        let maxY = Math.max(...residuals)
 
         // 如果所有残差都相同，稍微扩展范围
         if (minY === maxY) {
@@ -1836,93 +1862,87 @@ export default {
     const drawPredictionChart = async (validAnchors, predictedValues) => {
       try {
         if (!predictionChart.value) {
-          console.error('预测vs实测图画布不存在')
+          console.error('预测vs实测图容器不存在')
           return
         }
 
-        // 销毁现有图表实例
         if (predictionChartInstance) {
-          predictionChartInstance.destroy()
+          predictionChartInstance.dispose()
         }
 
         const actualValues = validAnchors.map(anchor => parseFloat(anchor[dependentVariable.value]))
 
-        // 检查数据有效性
         if (!actualValues || actualValues.length === 0 || !predictedValues || predictedValues.length === 0) {
           console.error('数据无效或为空')
           return
         }
 
-        // 准备预测vs实测数据
-        const predictionData = actualValues.map((actual, idx) => ({
-          x: actual,
-          y: predictedValues[idx]
-        }))
-
-        // 准备y=x参考线数据
         const minVal = Math.min(...actualValues, ...predictedValues)
         const maxVal = Math.max(...actualValues, ...predictedValues)
 
-        const referenceLine = [
-          { x: minVal, y: minVal },
-          { x: maxVal, y: maxVal }
-        ]
+        const chart = echarts.init(predictionChart.value, 'liveshow')
+        predictionChartInstance = chart
 
-        const ctx = predictionChart.value.getContext('2d')
-        predictionChartInstance = new Chart(ctx, {
-          type: 'scatter',
-          data: {
-            datasets: [
-              {
-                label: '预测 vs 实测',
-                data: predictionData,
-                backgroundColor: 'rgba(75, 192, 192, 0.6)',
-                borderColor: 'rgba(75, 192, 192, 1)',
-                pointRadius: 5,
-                showLine: false
-              },
-              {
-                label: 'y=x 参考线',
-                data: referenceLine,
-                borderColor: 'rgba(255, 99, 132, 1)',
-                borderWidth: 2,
-                showLine: true,
-                pointRadius: 0,
-                fill: false,
-                borderDash: [5, 5]
-              }
-            ]
+        chart.setOption({
+          title: {
+            text: '预测 vs 实测: 预测值 vs 实测值',
+            left: 'center',
+            textStyle: { fontSize: 16 }
           },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              title: {
-                display: true,
-                text: `预测 vs 实测: 预测值 vs 实测值`,
-                font: {
-                  size: 16
-                }
-              },
-              legend: {
-                position: 'top',
+          tooltip: {
+            trigger: 'item',
+            formatter: function(params) {
+              if (params.seriesIndex === 0) {
+                return `实测: ${params.data[0].toFixed(2)}<br/>预测: ${params.data[1].toFixed(2)}`
               }
-            },
-            scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: `实测${formatVariableName(dependentVariable.value)}`
-                }
-              },
-              y: {
-                title: {
-                  display: true,
-                  text: `预测${formatVariableName(dependentVariable.value)}`
-                }
-              }
+              return ''
             }
-          }
+          },
+          legend: {
+            data: ['预测 vs 实测', 'y=x 参考线'],
+            top: '10%'
+          },
+          grid: {
+            left: '10%',
+            right: '10%',
+            bottom: '15%',
+            top: '20%'
+          },
+          xAxis: {
+            type: 'value',
+            name: `实测${formatVariableName(dependentVariable.value)}`,
+            splitLine: { lineStyle: { type: 'dashed' } }
+          },
+          yAxis: {
+            type: 'value',
+            name: `预测${formatVariableName(dependentVariable.value)}`,
+            splitLine: { lineStyle: { type: 'dashed' } }
+          },
+          series: [
+            {
+              name: '预测 vs 实测',
+              type: 'scatter',
+              data: actualValues.map((actual, idx) => [actual, predictedValues[idx]]),
+              symbolSize: 8,
+              itemStyle: { color: 'rgba(75, 192, 192, 0.6)' }
+            },
+            {
+              name: 'y=x 参考线',
+              type: 'line',
+              data: [[minVal, minVal], [maxVal, maxVal]],
+              lineStyle: {
+                color: 'rgba(255, 99, 132, 1)',
+                width: 2,
+                type: 'dashed'
+              },
+              symbol: 'none',
+              smooth: false
+            }
+          ]
+        })
+
+        window.addEventListener('resize', () => {
+          if (predictionChartInstance) predictionChartInstance.resize()
         })
       } catch (error) {
         console.error('绘制预测vs实测图失败:', error)
@@ -2763,12 +2783,8 @@ export default {
             if (targetElement) {
               targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
-              // 添加临时高亮效果
-              targetElement.style.transition = 'background-color 0.5s ease'
-              targetElement.style.backgroundColor = 'rgba(249, 114, 154, 0.3)'
-              setTimeout(() => {
-                targetElement.style.backgroundColor = ''
-              }, 2000)
+              gsap.set(targetElement, { backgroundColor: 'rgba(249, 114, 154, 0.3)' })
+              gsap.to(targetElement, { backgroundColor: 'transparent', duration: 0.5, delay: 1.5 })
             }
           })
         }
@@ -2797,6 +2813,9 @@ export default {
       vrpspTotal,
       vrAvatarUrl,
       pspAvatarUrl,
+      vrpspDialogVisible,
+      vrpspChartCanvas,
+      closeVRPSPDialog,
       avatarMap,
       getAvatarSync,
       viewLiveSessions,
@@ -2878,19 +2897,22 @@ export default {
       openExportModal,
       closeExportModal,
       performExport,
-      globalCardState
+      globalCardState,
+      fetchData,
+      gridContainer
     }
   }
 }
 </script>
 
 <style scoped>
+.heading-icon { vertical-align: middle; margin-right: 4px }
 .anchor-list {
-  background: #FFF8E1;
-  border-radius: 30px; /* 超椭圆曲线 */
+  background: var(--color-card);
+  border-radius: var(--radius-card);
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid #FFC633;
+  border: 1px solid var(--color-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -2908,79 +2930,66 @@ export default {
 
 .filter-btn {
   padding: 10px 20px;
-  border: 2px solid #FFC633;
-  border-radius: 25px;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-button);
   cursor: pointer;
   font-size: 0.9rem;
-  transition: all 0.3s ease;
-  background: linear-gradient(45deg, #FFC633, #FFA500); /* 添加渐变背景 */
-  color: #333;
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+  color: var(--color-text-main);
   font-weight: bold;
 }
 
 .filter-btn.active {
-  background: linear-gradient(45deg, #f9729a, #f75982);
-  border-color: #f9729a;
+  background: linear-gradient(45deg, var(--color-accent), var(--color-accent));
+  border-color: var(--color-accent);
   color: white;
   box-shadow: 0 4px 12px rgba(249, 114, 154, 0.3);
 }
 
-.filter-btn:hover:not(.active) {
-  background: linear-gradient(45deg, #FFDB58, #FFC633); /* 悬停时的渐变 */
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
 .chart-button-container {
   display: flex;
-  gap: 20px; /* 增加按钮间距 */
+  gap: 20px;
   justify-content: center;
   flex-wrap: wrap;
-  margin: 30px 0 10px 0; /* 增加上下间距，让按钮离下面更远，但离表格有一定距离 */
+  margin: 30px 0 10px 0;
 }
 
 
 .action-controls {
   display: flex;
-  gap: 20px; /* 增加按钮间距 */
+  gap: 20px;
   justify-content: center;
   flex-wrap: wrap;
-  margin: 30px 0; /* 增加上下间距，让按钮离下面更远 */
+  margin: 30px 0;
 }
 
 .action-btn {
   padding: 8px 16px;
   border: none;
-  border-radius: 30px; /* 更圆润的超椭圆形状 */
+  border-radius: var(--radius-button);
   cursor: pointer;
   font-size: 0.85rem;
-  transition: all 0.3s ease;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 120px; /* 最小宽度确保圆形效果 */
+  min-width: 120px;
 }
 
 .action-btn.primary {
-  background: linear-gradient(45deg, #FFC633, #FFA500);
-  color: #333;
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+  color: var(--color-text-main);
   font-weight: bold;
 }
 
 .action-btn.secondary {
-  background: linear-gradient(45deg, #f9729a, #f75982);
+  background: linear-gradient(45deg, var(--color-accent), var(--color-accent));
   color: white;
 }
 
 .action-btn.danger {
-  background: linear-gradient(45deg, #dc3545, #c82333);
+  background: linear-gradient(45deg, #E74C3C, #c82333);
   color: white;
-}
-
-.action-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .info-section {
@@ -2989,21 +2998,21 @@ export default {
 }
 
 .page-title {
-  color: #FFC633;
+  color: var(--color-primary);
   font-size: 1.5rem;
   margin-bottom: 5px;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .refresh-time {
-  color: #f9729a;
+  color: var(--color-accent);
   font-size: 0.9rem;
 }
 
 .chart-info {
-  background: #FEEFEF;
-  border: 2px solid #f9729a;
-  border-radius: 30px; /* 超椭圆曲线 */
+  background: rgba(255, 107, 157, 0.1);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-card);
   padding: 15px;
   margin: 20px 0;
   text-align: center;
@@ -3013,9 +3022,9 @@ export default {
   display: none;
   text-align: center;
   margin: 20px 0;
-  height: 500px;
+  height: 750px;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 30px; /* 超椭圆曲线 */
+  border-radius: var(--radius-card);
   padding: 20px;
 }
 
@@ -3026,6 +3035,11 @@ export default {
 #chartCanvas {
   width: 100% !important;
   height: 100% !important;
+}
+
+.vrpsp-dialog-chart {
+  width: 100%;
+  min-height: 400px;
 }
 
 .loading-state, .error-state {
@@ -3040,8 +3054,8 @@ export default {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid rgba(255, 198, 51, 0.3);
-  border-top: 4px solid #FFC633;
+  border: 4px solid rgba(246, 177, 0, 0.3);
+  border-top: 4px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 15px;
@@ -3060,18 +3074,12 @@ export default {
 
 .retry-btn {
   padding: 10px 20px;
-  background: linear-gradient(45deg, #33CC99, #28a745);
+  background: linear-gradient(45deg, #27AE60, #27AE60);
   color: white;
   border: none;
-  border-radius: 20px;
+  border-radius: var(--radius-button);
   cursor: pointer;
   font-size: 0.9rem;
-  transition: all 0.3s ease;
-}
-
-.retry-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
 }
 
 
@@ -3082,13 +3090,13 @@ export default {
 }
 
 .total-revenue {
-  color: #f9729a !important; /* 高亮重要数值 */
+  color: var(--color-accent) !important; /* 高亮重要数值 */
   font-weight: bold;
   font-size: 1.1em; /* 稍微增大重要数值的字号 */
 }
 
 .duration-cell {
-  color: #f9729a;
+  color: var(--color-accent);
 }
 
 .duration-value {
@@ -3117,23 +3125,22 @@ export default {
 }
 
 .status-badge.live {
-  background: #f9729a; /* 实心洋红色背景，与查看详细数据按钮相同 */
-  color: white; /* 白色文字，与查看详细数据按钮相同 */
-  border: 2px solid #f9729a; /* 洋红色边框，与查看详细数据按钮相同 */
-  border-radius: 30px; /* 更圆润的超椭圆形状 */
-  padding: 4px 8px; /* 内边距，与查看详细数据按钮相似 */
-  cursor: pointer; /* 鼠标指针 */
-  font-size: 0.8rem; /* 字体大小，与查看详细数据按钮相同 */
-  transition: all 0.3s ease; /* 过渡效果 */
-  font-weight: bold; /* 加粗 */
-  text-decoration: none; /* 去除下划线 */
-  display: inline-block; /* 行内块显示 */
-  min-width: 80px; /* 最小宽度确保圆形效果 */
+  background: var(--color-accent);
+  color: white;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-button);
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-decoration: none;
+  display: inline-block;
+  min-width: 80px;
 }
 
 .status-badge.offline {
   background: rgba(255, 255, 255, 0.2);
-  color: #ccc;
+  color: rgba(142, 123, 80, 0.3);
 }
 
 .live-link {
@@ -3149,22 +3156,14 @@ export default {
 
 .view-btn {
   padding: 6px 12px;
-  background: #f9729a; /* 实心洋红色背景 */
-  color: white; /* 白色文字 */
-  border: 2px solid #f9729a; /* 洋红色边框 */
-  border-radius: 30px; /* 更圆润的超椭圆形状 */
+  background: var(--color-accent);
+  color: white;
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-button);
   cursor: pointer;
   font-size: 0.8rem;
-  transition: all 0.3s ease;
   font-weight: bold;
-  min-width: 120px; /* 最小宽度确保圆形效果 */
-}
-
-.view-btn:hover {
-  background: #e0658a; /* 悬停时更深的洋红色 */
-  color: white; /* 悬停时文字保持白色 */
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(249, 114, 154, 0.3);
+  min-width: 120px;
 }
 
 
@@ -3175,24 +3174,16 @@ export default {
 
 /* 网格布局样式 */
 .anchor-grid-item {
-  background: linear-gradient(135deg, #FFF8E1, #FFF5C2); /* 添加轻微渐变背景 */
-  border: 1px solid #FFC633;
-  border-radius: 20px; /* 增加圆角 */
-  padding: 15px; /* 增加内边距 */
-  margin-bottom: 15px; /* 增加外边距 */
-  box-shadow: 0 6px 16px rgba(255, 198, 51, 0.2); /* 添加更柔和的阴影 */
-  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* 使用更平滑的缓动函数 */
-  position: relative; /* 为高级动效添加相对定位 */
-  overflow: hidden; /* 确保内容不会溢出 */
-  will-change: transform; /* 优化性能 */
-  transform: translateZ(0); /* 启用硬件加速 */
-}
-
-/* 卡片悬停动效 */
-.anchor-grid-item:hover {
-  transform: translateY(-8px) scale(1.02); /* 上浮并轻微放大 */
-  box-shadow: 0 12px 30px rgba(255, 198, 51, 0.4); /* 增强阴影 */
-  border-color: #FFA500; /* 边框颜色变化 */
+  background: linear-gradient(135deg, var(--color-card), var(--color-card));
+  border: 1px solid var(--color-primary);
+  border-radius: 20px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 6px 16px rgba(246, 177, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 /* 光泽扫过效果 */
@@ -3210,30 +3201,24 @@ export default {
     rgba(255, 255, 255, 0) 100%
   );
   transform: rotate(30deg);
-  transition: all 0.6s ease;
   z-index: 1;
 }
 
-.anchor-grid-item:hover::before {
-  left: 120%;
-  transition: all 0.8s ease;
-}
-
 .anchor-grid-item.live-grid-item {
-  border: 2px solid #f9729a; /* 直播状态特殊边框 */
-  background: #FFF8E1; /* 浅黄色背景 */
+  border: 2px solid var(--color-accent);
+  background: var(--color-card);
 }
 
 .grid-header {
-  background: linear-gradient(135deg, #FFC633, #FFA500); /* 深色背景 */
-  color: white; /* 白色文字 */
-  padding: 12px; /* 增加内边距 */
-  border-radius: 12px; /* 增加圆角 */
-  margin-bottom: 12px; /* 增加间距 */
-  display: flex; /* 使用flex布局 */
-  align-items: center; /* 垂直居中 */
-  justify-content: space-between; /* 两端对齐 */
-  box-shadow: 0 4px 12px rgba(255, 198, 51, 0.3); /* 添加阴影 */
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary));
+  color: white;
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 12px rgba(246, 177, 0, 0.3);
 }
 
 .grid-rank {
@@ -3259,60 +3244,42 @@ export default {
 }
 
 .field-box {
-  background: rgba(255, 248, 225, 0.7); /* 淡黄色半透明背景 */
-  border: 1px solid #FFC633;
-  border-radius: 10px; /* 增加圆角 */
-  padding: 12px; /* 增加内边距 */
+  background: rgba(255, 248, 225, 0.7);
+  border: 1px solid var(--color-primary);
+  border-radius: 10px;
+  padding: 12px;
   min-width: 120px;
-  display: flex; /* 使用flex布局 */
-  flex-direction: column; /* 改为垂直布局 */
-  align-items: flex-start; /* 左对齐内容 */
-  text-align: left; /* 左对齐文本 */
-  margin-bottom: 6px; /* 添加底部间距 */
-  transition: all 0.2s ease; /* 添加过渡效果 */
-}
-
-.field-box:hover {
-  background: rgba(255, 240, 180, 0.8); /* 悬停时更亮的背景 */
-  transform: translateY(-1px); /* 悬停时轻微上移 */
-  box-shadow: 0 3px 8px rgba(255, 198, 51, 0.3); /* 悬停时添加阴影 */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  margin-bottom: 6px;
 }
 
 .field-label {
   font-weight: bold;
-  color: #FF8C00; /* 使用更醒目的颜色 */
-  font-size: 1.1em; /* 正常大小 */
+  color: var(--color-primary);
+  font-size: 1.1em;
   word-break: break-word;
-  margin-right: 10px; /* 增加与值之间的间距 */
-  flex-shrink: 0; /* 防止标签被压缩 */
-  transition: all 0.3s ease; /* 添加颜色过渡效果 */
-  background-color: rgba(255, 198, 51, 0.15); /* 添加轻微背景色 */
-  padding: 4px 8px; /* 添加内边距 */
-  border-radius: 8px; /* 添加圆角 */
-}
-
-.field-label:hover {
-  color: #FF6600; /* 悬停时更深的颜色 */
-  background-color: rgba(255, 165, 0, 0.25); /* 悬停时更深的背景色 */
+  margin-right: 10px;
+  flex-shrink: 0;
+  background-color: rgba(246, 177, 0, 0.15);
+  padding: 4px 8px;
+  border-radius: 8px;
 }
 
 .field-value {
-  color: #333;
-  font-size: 1.1em; /* 正常大小 */
+  color: var(--color-text-main);
+  font-size: 1.1em;
   word-break: break-word;
-  text-align: right; /* 值右对齐 */
-  margin-left: 10px; /* 增加与标签之间的间距 */
-  overflow: hidden; /* 防止溢出 */
-  text-overflow: ellipsis; /* 溢出时显示省略号 */
-  transition: all 0.3s ease; /* 添加颜色过渡效果 */
-}
-
-.field-value:hover {
-  color: #f9729a; /* 悬停时使用主题色 */
+  text-align: right;
+  margin-left: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .total-revenue {
-  color: #f9729a !important;
+  color: var(--color-accent) !important;
   font-weight: bold;
 }
 
@@ -3323,49 +3290,48 @@ export default {
 
 /* 旧的卡片布局样式（保留用于可能的回退） */
 .anchor-card {
-  background: linear-gradient(135deg, #FFF8E1, #FFF5C2); /* 添加轻微渐变背景 */
-  border: 1px solid #FFC633;
+  background: linear-gradient(135deg, var(--color-card), var(--color-card));
+  border: 1px solid var(--color-primary);
   border-radius: 20px;
-  padding: 12px; /* 压缩内边距 */
-  margin-bottom: 12px; /* 压缩外边距 */
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); /* 减少阴影 */
-  transition: all 0.3s ease;
+  padding: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
 }
 
 .anchor-card.live-card {
-  border: 2px solid #f9729a; /* 直播状态特殊边框 */
-  background: #FFF8E1; /* 浅黄色背景 */
+  border: 2px solid var(--color-accent);
+  background: var(--color-card);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(45deg, #FFC633, #FFA500); /* 深色背景 */
-  color: white; /* 白色文字 */
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+  color: white;
   padding: 10px;
   border-radius: 10px;
-  margin-bottom: 8px; /* 压缩间距 */
+  margin-bottom: 8px;
 }
 
 .card-rank {
   font-weight: bold;
-  color: #FF8C00; /* 更醒目的颜色 */
-  font-size: 1.3em; /* 增大字号 */
+  color: var(--color-primary);
+  font-size: 1.3em;
 }
 
 .card-name {
   font-weight: bold;
-  color: #333;
+  color: var(--color-text-main);
   flex-grow: 1;
   text-align: center;
-  font-size: 1.2em; /* 增大字号 */
+  font-size: 1.2em;
 }
 
 .card-union {
-  color: #f9729a;
-  font-weight: 600; /* 加粗 */
-  font-size: 1.1em; /* 增大字号 */
+  color: var(--color-accent);
+  font-weight: 600;
+  font-size: 1.1em;
 }
 
 .card-body {
@@ -3377,33 +3343,33 @@ export default {
 .card-row {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0; /* 优化间距 */
-  border-bottom: 1px solid #f0f0f0; /* 使用实线分隔 */
+  padding: 4px 0;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .field-label {
   font-weight: bold;
-  color: #FF8C00; /* 使用更醒目的颜色 */
-  min-width: 100px; /* 增加最小宽度 */
-  font-size: 1.1em; /* 增大字号 */
-  margin-right: 10px; /* 增加标签右侧间距 */
-  background-color: rgba(255, 198, 51, 0.15); /* 添加轻微背景色 */
-  padding: 4px 8px; /* 添加内边距 */
-  border-radius: 8px; /* 添加圆角 */
-  flex-shrink: 0; /* 防止标签被压缩 */
+  color: var(--color-primary);
+  min-width: 100px;
+  font-size: 1.1em;
+  margin-right: 10px;
+  background-color: rgba(246, 177, 0, 0.15);
+  padding: 4px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .field-value {
   text-align: right;
-  color: #333;
+  color: var(--color-text-main);
   flex-grow: 1;
-  font-size: 1.1em; /* 增大字号 */
-  word-break: break-word; /* 允许长内容换行 */
-  font-weight: 500; /* 稍微加粗 */
+  font-size: 1.1em;
+  word-break: break-word;
+  font-weight: 500;
 }
 
 .total-revenue {
-  color: #f9729a !important; /* 高亮重要数值 */
+  color: var(--color-accent) !important;
   font-weight: bold;
 }
 
@@ -3720,11 +3686,11 @@ export default {
 }
 
 .cluster-chart-container {
-  background: #FFF8E1;
-  border-radius: 20px;
+  background: var(--color-card);
+  border-radius: var(--radius-card);
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid #FFC633;
+  border: 1px solid var(--color-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -3737,19 +3703,12 @@ export default {
 
 .close-chart-btn {
   padding: 8px 16px;
-  background: #f9729a;
+  background: var(--color-accent);
   color: white;
   border: none;
   border-radius: 10px;
   cursor: pointer;
   font-weight: bold;
-  transition: all 0.3s ease;
-}
-
-.close-chart-btn:hover {
-  background: #e0658a;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(249, 114, 154, 0.3);
 }
 
 .analysis-results {
@@ -3786,25 +3745,18 @@ export default {
 
 .chart-navigation button {
   padding: 8px 16px;
-  background: #f9729a;
+  background: var(--color-accent);
   color: white;
   border: none;
   border-radius: 20px;
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.3s ease;
   flex: 1;
   min-width: 120px;
 }
 
-.chart-navigation button:hover {
-  background: #e0658a;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(249, 114, 154, 0.3);
-}
-
 .chart-navigation button.active {
-  background: #e0658a;
+  background: color-mix(in srgb, var(--color-accent) 80%, black);
   font-weight: bold;
   box-shadow: 0 4px 12px rgba(249, 114, 154, 0.3);
 }
@@ -3836,20 +3788,45 @@ export default {
 }
 
 .loading-content {
-  background: #FFF8E1;
-  border-radius: 20px;
+  background: var(--color-card);
+  border-radius: var(--radius-card);
   padding: 30px;
   text-align: center;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f9729a;
+  border: 4px solid var(--color-accent);
+  border-top: 4px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+
+.variable-select {
+  padding: 10px;
+  border: 2px solid var(--color-accent);
+  border-radius: 10px;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  width: 100%;
+}
+
+.variable-select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-accent) 80%, black);
+  box-shadow: 0 0 10px rgba(249, 114, 154, 0.3);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--color-accent);
   border-top: 4px solid transparent;
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -3863,17 +3840,16 @@ export default {
 
 .variable-select {
   padding: 10px;
-  border: 2px solid #f9729a;
+  border: 2px solid var(--color-accent);
   border-radius: 10px;
   font-size: 16px;
   background: rgba(255, 255, 255, 0.8);
-  transition: all 0.3s ease;
   width: 100%;
 }
 
 .variable-select:focus {
   outline: none;
-  border-color: #e0658a;
+  border-color: color-mix(in srgb, var(--color-accent) 80%, black);
   box-shadow: 0 0 10px rgba(249, 114, 154, 0.3);
 }
 
@@ -3904,11 +3880,11 @@ export default {
 }
 
 .regression-chart-container {
-  background: #FFF8E1;
-  border-radius: 20px;
+  background: var(--color-card);
+  border-radius: var(--radius-card);
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid #FFC633;
+  border: 1px solid var(--color-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -3921,19 +3897,12 @@ export default {
 
 .close-chart-btn {
   padding: 8px 16px;
-  background: #f9729a;
+  background: var(--color-accent);
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-button);
   cursor: pointer;
   font-weight: bold;
-  transition: all 0.3s ease;
-}
-
-.close-chart-btn:hover {
-  background: #e0658a;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(249, 114, 154, 0.3);
 }
 
 .analysis-results {
@@ -3975,7 +3944,7 @@ export default {
 }
 
 .coefficients-table th {
-  background: rgba(249, 114, 154, 0.2);
+  background: rgba(255, 107, 157, 0.2);
   font-weight: bold;
 }
 
@@ -4000,21 +3969,21 @@ export default {
 }
 
 .modal-content {
-  background: #FFF8E1;
-  border-radius: 20px;
+  background: var(--color-card);
+  border-radius: var(--radius-card);
   padding: 25px;
   width: 400px;
   max-width: 90%;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .modal-content h3 {
   margin-top: 0;
   margin-bottom: 20px;
-  color: #f9729a;
+  color: var(--color-accent);
   text-align: center;
 }
 
@@ -4032,21 +4001,20 @@ export default {
 
 .form-group label {
   font-weight: bold;
-  color: #333;
+  color: var(--color-text-main);
 }
 
 .month-input {
   padding: 10px;
-  border: 2px solid #f9729a;
+  border: 2px solid var(--color-accent);
   border-radius: 10px;
   font-size: 16px;
   background: rgba(255, 255, 255, 0.8);
-  transition: all 0.3s ease;
 }
 
 .month-input:focus {
   outline: none;
-  border-color: #e0658a;
+  border-color: color-mix(in srgb, var(--color-accent) 80%, black);
   box-shadow: 0 0 10px rgba(249, 114, 154, 0.3);
 }
 
@@ -4060,33 +4028,20 @@ export default {
   flex: 1;
   padding: 10px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-button);
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
-  transition: all 0.3s ease;
 }
 
 .confirm-btn {
-  background: linear-gradient(45deg, #f9729a, #f75982);
+  background: linear-gradient(45deg, var(--color-accent), var(--color-accent));
   color: white;
-}
-
-.confirm-btn:hover {
-  background: linear-gradient(45deg, #e0658a, #d05572);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(249, 114, 154, 0.3);
 }
 
 .cancel-btn {
-  background: #ccc;
+  background: var(--color-text-secondary);
   color: white;
-}
-
-.cancel-btn:hover {
-  background: #bbb;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* 图表导航样式 */
@@ -4099,25 +4054,18 @@ export default {
 
 .chart-navigation button {
   padding: 8px 16px;
-  background: #f9729a;
+  background: var(--color-accent);
   color: white;
   border: none;
-  border-radius: 20px;
+  border-radius: var(--radius-button);
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.3s ease;
   flex: 1;
   min-width: 120px;
 }
 
-.chart-navigation button:hover {
-  background: #e0658a;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(249, 114, 154, 0.3);
-}
-
 .chart-navigation button.active {
-  background: #e0658a;
+  background: color-mix(in srgb, var(--color-accent) 80%, black);
   font-weight: bold;
   box-shadow: 0 4px 12px rgba(249, 114, 154, 0.3);
 }
@@ -4145,12 +4093,6 @@ export default {
   .anchor-grid-item {
     margin-bottom: 0; /* 在网格布局中不需要底部边距 */
     height: fit-content; /* 高度自适应内容 */
-    transition: transform 0.3s ease, box-shadow 0.3s ease; /* 添加悬停效果 */
-  }
-
-  .anchor-grid-item:hover {
-    transform: translateY(-5px); /* 悬停时轻微上移 */
-    box-shadow: 0 8px 24px rgba(255, 198, 51, 0.4); /* 增强阴影效果 */
   }
 }
 
@@ -4158,20 +4100,14 @@ export default {
 @media (min-width: 769px) and (max-width: 1023px) {
   .grid-container {
     display: grid !important;
-    grid-template-columns: repeat(2, 1fr); /* 固定2列 */
-    gap: 15px; /* 卡片间距 */
-    padding: 10px; /* 内边距 */
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    padding: 10px;
   }
 
   .anchor-grid-item {
-    margin-bottom: 0; /* 在网格布局中不需要底部边距 */
-    height: fit-content; /* 高度自适应内容 */
-    transition: transform 0.3s ease, box-shadow 0.3s ease; /* 添加悬停效果 */
-  }
-
-  .anchor-grid-item:hover {
-    transform: translateY(-5px); /* 悬停时轻微上移 */
-    box-shadow: 0 8px 24px rgba(255, 198, 51, 0.4); /* 增强阴影效果 */
+    margin-bottom: 0;
+    height: fit-content;
   }
 }
 
@@ -4215,7 +4151,7 @@ export default {
   align-items: center;
   gap: 4px;
   font-size: 14px;
-  color: #333;
+  color: var(--color-text-main);
 }
 
 .legend-avatar {
@@ -4225,7 +4161,7 @@ export default {
   object-fit: cover;
   vertical-align: middle;
   margin-right: 4px;
-  border: 1px solid #FFC633;
+  border: 1px solid var(--color-primary);
 }
 
 .legend-dot {

@@ -298,5 +298,30 @@
     "super_chat": 3590.0,
     "title": "阿萨来唱歌了GOGOGO!",
     "total_revenue": 12778.8
+  },
+  {
+    "avg_concurrency": 2348.8423236514523,
+    "current_concurrency": null,
+    "danmaku_count": 41487,
+    "duration_minutes": 364,
+    "end_attention": 1715002,
+    "end_fans_count": 7551,
+    "end_guard_1": 1955,
+    "end_guard_2": 59,
+    "end_guard_3": 1,
+    "end_time": "2026-06-14 02:06:08",
+    "gift": 7000.2,
+    "guard": 13146.0,
+    "max_concurrency": 2869,
+    "new_fans_count": 2,
+    "start_attention": 1715000,
+    "start_fans_count": 7505,
+    "start_guard_1": 1957,
+    "start_guard_2": 58,
+    "start_guard_3": 1,
+    "start_time": "2026-06-13 20:01:22",
+    "super_chat": 5458.0,
+    "title": "咋来了！9点半回宫！",
+    "total_revenue": 25604.2
   }
 ]

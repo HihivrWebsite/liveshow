@@ -798,5 +798,30 @@
     "super_chat": 702.0,
     "title": "教练，我要打篮球！",
     "total_revenue": 4643.6
+  },
+  {
+    "avg_concurrency": 3492.229922992299,
+    "current_concurrency": 7056,
+    "danmaku_count": 15279,
+    "duration_minutes": 0,
+    "end_attention": null,
+    "end_fans_count": 0,
+    "end_guard_1": 0,
+    "end_guard_2": 0,
+    "end_guard_3": 0,
+    "end_time": "",
+    "gift": 41.3,
+    "guard": 780.0,
+    "max_concurrency": 7151,
+    "new_fans_count": -1,
+    "start_attention": 425238,
+    "start_fans_count": 8774,
+    "start_guard_1": 1151,
+    "start_guard_2": 40,
+    "start_guard_3": 1,
+    "start_time": "2026-06-14 15:04:55",
+    "super_chat": 580.0,
+    "title": "先来开火车！",
+    "total_revenue": 1401.3
   }
 ]

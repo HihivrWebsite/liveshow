@@ -348,5 +348,30 @@
     "super_chat": 980.0,
     "title": "玩三谋",
     "total_revenue": 2987.9
+  },
+  {
+    "avg_concurrency": 2139.75,
+    "current_concurrency": null,
+    "danmaku_count": 26478,
+    "duration_minutes": 92,
+    "end_attention": 42162,
+    "end_fans_count": 2856,
+    "end_guard_1": 275,
+    "end_guard_2": 28,
+    "end_guard_3": 0,
+    "end_time": "2026-06-14 14:18:39",
+    "gift": 448.8,
+    "guard": 198.0,
+    "max_concurrency": 2652,
+    "new_fans_count": 70,
+    "start_attention": 42092,
+    "start_fans_count": 2665,
+    "start_guard_1": 274,
+    "start_guard_2": 28,
+    "start_guard_3": 0,
+    "start_time": "2026-06-14 12:46:38",
+    "super_chat": 1052.0,
+    "title": "玩三谋",
+    "total_revenue": 1698.8
   }
 ]

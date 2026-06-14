@@ -18,6 +18,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path
       },
+      '/cache': {
+        target: 'http://localhost:2992',
+        changeOrigin: true,
+        rewrite: (path) => path
+      },
       '/api': {
         target: 'http://localhost:2992',
         changeOrigin: true,

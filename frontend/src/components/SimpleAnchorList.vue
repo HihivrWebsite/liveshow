@@ -278,11 +278,11 @@ export default {
 
 <style scoped>
 .simple-anchor-list {
-  background: #FFF8E1;
+  background: var(--color-background);
   border-radius: 30px; /* 超椭圆曲线 */
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid #FFC633;
+  border: 1px solid var(--color-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -300,25 +300,25 @@ export default {
 
 .filter-btn {
   padding: 10px 20px;
-  border: 2px solid #FFC633;
+  border: 2px solid var(--color-primary);
   border-radius: 25px;
   cursor: pointer;
   font-size: 0.9rem;
   transition: all 0.3s ease;
-  background: linear-gradient(45deg, #FFC633, #FFA500); /* 添加渐变背景 */
-  color: #333;
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary)); /* 添加渐变背景 */
+  color: var(--color-text-main);
   font-weight: bold;
 }
 
 .filter-btn.active {
-  background: linear-gradient(45deg, #f9729a, #f75982);
-  border-color: #f9729a;
+  background: linear-gradient(45deg, var(--color-accent), var(--color-accent));
+  border-color: var(--color-accent);
   color: white;
   box-shadow: 0 4px 12px rgba(249, 114, 154, 0.3);
 }
 
 .filter-btn:hover:not(.active) {
-  background: linear-gradient(45deg, #FFDB58, #FFC633); /* 悬停时的渐变 */
+  background: linear-gradient(45deg, #FFDB58, var(--color-primary)); /* 悬停时的渐变 */
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
@@ -346,7 +346,7 @@ export default {
 }
 
 .action-btn.secondary {
-  background: linear-gradient(45deg, #f9729a, #f75982);
+  background: linear-gradient(45deg, var(--color-accent), var(--color-accent));
   color: white;
 }
 
@@ -361,7 +361,7 @@ export default {
 }
 
 .page-title {
-  color: #FFC633;
+  color: var(--color-primary);
   font-size: 1.5rem;
   margin-bottom: 5px;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
@@ -385,7 +385,7 @@ export default {
   width: 40px;
   height: 40px;
   border: 4px solid rgba(255, 198, 51, 0.3);
-  border-top: 4px solid #FFC633;
+  border-top: 4px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 15px;
@@ -428,7 +428,7 @@ export default {
 .anchor-table {
   width: 100%;
   border-collapse: collapse;
-  background: #FFF8E1;
+  background: var(--color-background);
   border-radius: 30px; /* 添加超椭圆曲线 */
   overflow: hidden; /* 确保圆角生效 */
 }
@@ -442,8 +442,8 @@ export default {
 }
 
 .anchor-table th {
-  background: linear-gradient(45deg, #FFC633, #FFA500);
-  color: #333;
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+  color: var(--color-text-main);
   padding: 12px 8px;
   text-align: left;
   font-weight: bold;
@@ -459,8 +459,8 @@ export default {
 
 .anchor-table td {
   padding: 10px 8px;
-  border-bottom: 1px solid #FFC633;
-  color: #333;
+  border-bottom: 1px solid var(--color-primary);
+  color: var(--color-text-main);
 }
 
 .anchor-table tbody tr {
@@ -468,22 +468,22 @@ export default {
 }
 
 .anchor-table tbody tr:nth-child(even) {
-  background: #FFE5B4; /* 橙色略微变深的背景 */
+  background: rgba(246, 177, 0, 0.15); /* 橙色略微变深的背景 */
 }
 
 .anchor-table tbody tr:hover {
-  background: #FFD580; /* 橙色变浅的悬停效果 */
-  color: #333;
+  background: rgba(246, 177, 0, 0.2); /* 橙色变浅的悬停效果 */
+  color: var(--color-text-main);
 }
 
 .live-row {
-  background: #FFF8E1; /* 浅黄色背景 */
-  color: #333;
+  background: var(--color-background); /* 浅黄色背景 */
+  color: var(--color-text-main);
 }
 
 .rank-cell {
   font-weight: bold;
-  color: #FFC633;
+  color: var(--color-primary);
   text-align: center;
 }
 
@@ -493,7 +493,7 @@ export default {
 }
 
 .union-cell {
-  color: #f9729a;
+  color: var(--color-accent);
   font-weight: 500;
 }
 
@@ -504,12 +504,12 @@ export default {
 }
 
 .total-revenue {
-  color: #f9729a;
+  color: var(--color-accent);
   font-weight: bold;
 }
 
 .duration-cell {
-  color: #f9729a;
+  color: var(--color-accent);
 }
 
 .status-cell {
@@ -525,9 +525,9 @@ export default {
 }
 
 .status-badge.live {
-  background: #f9729a; /* 实心洋红色背景，与查看详细数据按钮相同 */
+  background: var(--color-accent); /* 实心洋红色背景，与查看详细数据按钮相同 */
   color: white; /* 白色文字，与查看详细数据按钮相同 */
-  border: 2px solid #f9729a; /* 洋红色边框，与查看详细数据按钮相同 */
+  border: 2px solid var(--color-accent); /* 洋红色边框，与查看详细数据按钮相同 */
   border-radius: 30px; /* 更圆润的超椭圆形状 */
   padding: 4px 8px; /* 内边距，与查看详细数据按钮相似 */
   cursor: pointer; /* 鼠标指针 */
@@ -543,19 +543,19 @@ export default {
 /* 闪光动画 */
 @keyframes glow {
   0% {
-    box-shadow: 0 0 5px #f9729a;
+    box-shadow: 0 0 5px var(--color-accent);
   }
   50% {
-    box-shadow: 0 0 20px #f9729a;
+    box-shadow: 0 0 20px var(--color-accent);
   }
   100% {
-    box-shadow: 0 0 5px #f9729a;
+    box-shadow: 0 0 5px var(--color-accent);
   }
 }
 
 .status-badge.offline {
   background: rgba(255, 255, 255, 0.2);
-  color: #ccc;
+  color: rgba(142, 123, 80, 0.3);
 }
 
 .live-link {
@@ -569,9 +569,9 @@ export default {
 
 .view-btn {
   padding: 6px 12px;
-  background: #f9729a; /* 实心洋红色背景 */
+  background: var(--color-accent); /* 实心洋红色背景 */
   color: white; /* 白色文字 */
-  border: 2px solid #f9729a; /* 洋红色边框 */
+  border: 2px solid var(--color-accent); /* 洋红色边框 */
   border-radius: 30px; /* 更圆润的超椭圆形状 */
   cursor: pointer;
   font-size: 0.8rem;
@@ -581,7 +581,7 @@ export default {
 }
 
 .view-btn:hover {
-  background: #e0658a; /* 悬停时更深的洋红色 */
+  background: color-mix(in srgb, var(--color-accent) 80%, black); /* 悬停时更深的洋红色 */
   color: white; /* 悬停时文字保持白色 */
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(249, 114, 154, 0.3);

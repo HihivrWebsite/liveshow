@@ -1,36 +1,60 @@
 <template>
-  <div v-if="visible" class="modal-overlay" @click="$emit('cancel')">
-    <div class="modal-content" @click.stop>
-      <h3>{{ title }}</h3>
-      <div class="modal-form">
-        <template v-if="mode === 'single'">
-          <div class="form-group">
-            <label>选择月份:</label>
-            <input type="month" v-model="singleMonth" class="month-input" :min="min">
-          </div>
-        </template>
-        <template v-else>
-          <div class="form-group">
-            <label>起始月份:</label>
-            <input type="month" v-model="rangeStart" class="month-input" :min="min">
-          </div>
-          <div class="form-group">
-            <label>结束月份:</label>
-            <input type="month" v-model="rangeEnd" class="month-input" :min="min">
-          </div>
-        </template>
-        <div class="button-group">
-          <button @click="handleConfirm" class="confirm-btn">确定</button>
-          <button @click="$emit('cancel')" class="cancel-btn">取消</button>
+  <GlassDialog
+    :visible="visible"
+    :title="title"
+    width="420px"
+    @close="$emit('cancel')"
+    @update:visible="(v) => !v && $emit('cancel')"
+  >
+    <div class="modal-form">
+      <template v-if="mode === 'single'">
+        <div class="form-group">
+          <label class="form-label">选择月份:</label>
+          <GlassInput
+            type="month"
+            v-model="singleMonth"
+            :placeholder="'请选择月份'"
+          />
         </div>
-      </div>
+      </template>
+      <template v-else>
+        <div class="form-group">
+          <label class="form-label">起始月份:</label>
+          <GlassInput
+            type="month"
+            v-model="rangeStart"
+            :placeholder="'请选择起始月份'"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label">结束月份:</label>
+          <GlassInput
+            type="month"
+            v-model="rangeEnd"
+            :placeholder="'请选择结束月份'"
+          />
+        </div>
+      </template>
     </div>
-  </div>
+
+    <template #footer>
+      <GlassButton variant="secondary" @click="handleConfirm">
+        <Check :size="16" /> 确定
+      </GlassButton>
+      <GlassButton variant="default" @click="$emit('cancel')">
+        <X :size="16" /> 取消
+      </GlassButton>
+    </template>
+  </GlassDialog>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
 import { getCurrentYearMonth, MIN_MONTH } from '@/utils/monthUtils'
+import GlassDialog from '@/components/ui/GlassDialog.vue'
+import GlassButton from '@/components/ui/GlassButton.vue'
+import GlassInput from '@/components/ui/GlassInput.vue'
+import { Check, X } from 'lucide-vue-next'
 
 const props = defineProps({
   visible: Boolean,
@@ -79,36 +103,6 @@ function handleConfirm() {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: #FFF8E1;
-  border: 2px solid #FFC633;
-  border-radius: 20px;
-  padding: 30px;
-  min-width: 350px;
-  max-width: 450px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-}
-
-.modal-content h3 {
-  color: #FFC633;
-  text-align: center;
-  margin-bottom: 20px;
-  font-size: 1.3rem;
-}
-
 .modal-form {
   display: flex;
   flex-direction: column;
@@ -121,51 +115,9 @@ function handleConfirm() {
   gap: 5px;
 }
 
-.form-group label {
-  color: #333;
+.form-label {
+  color: var(--color-text-main);
   font-weight: bold;
   font-size: 0.95rem;
-}
-
-.month-input {
-  width: 100%;
-  padding: 10px;
-  border: 2px solid #FFC633;
-  border-radius: 10px;
-  font-size: 1rem;
-  box-sizing: border-box;
-}
-
-.button-group {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 10px;
-}
-
-.confirm-btn,
-.cancel-btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 15px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: all 0.3s ease;
-}
-
-.confirm-btn {
-  background: linear-gradient(45deg, #f9729a, #f75982);
-  color: white;
-}
-
-.cancel-btn {
-  background: linear-gradient(45deg, #6c757d, #5a6268);
-  color: white;
-}
-
-.confirm-btn:hover,
-.cancel-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 </style>

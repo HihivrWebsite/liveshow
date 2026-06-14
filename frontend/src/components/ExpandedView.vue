@@ -1,10 +1,10 @@
 <template>
-  <div class="expanded-view">
+  <div ref="pageRef" class="expanded-view">
     <div class="controls-section">
       <div class="action-controls">
-        <button @click="goBack" class="action-btn secondary">
+        <GlassButton variant="default" size="md" @click="goBack">
           返回列表页
-        </button>
+        </GlassButton>
       </div>
     </div>
 
@@ -15,16 +15,16 @@
 
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
-      <p>加载中...</p>
+      <p class="loading-text">加载中...</p>
     </div>
 
     <div v-else-if="error" class="error-state">
       <p class="error-message">{{ error }}</p>
-      <button @click="fetchData" class="retry-btn">重试</button>
+      <GlassButton variant="success" size="md" @click="fetchData">重试</GlassButton>
     </div>
 
     <div v-else class="data-section">
-      <div class="grid-container">
+      <div ref="gridRef" class="grid-container">
         <BaseCard
           v-for="(item, index) in anchors"
           :key="item.room_id || item.id || index"
@@ -32,19 +32,20 @@
           :rank="index + 1"
           :title="getTitle(item, index)"
           :subtitle="''"
-          :default-collapsed="false"  <!-- 所有卡片默认展开 -->
+          :default-collapsed="false"
           :fields="getFields(item)"
           :action-button="getActionButton(item)"
           :action-data="item"
           @action-click="handleActionClick(item)"
         >
           <template #actions>
-            <button
+            <GlassButton
+              :variant="sourceFromRoute === 'live-sessions' ? 'info' : 'primary'"
+              size="sm"
               @click="handleActionClick(item)"
-              :class="getActionButtonClass(item)"
             >
               {{ getActionButtonText(item) }}
-            </button>
+            </GlassButton>
           </template>
         </BaseCard>
       </div>
@@ -57,35 +58,38 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { anchorAPI } from '@/api'
 import BaseCard from '@/components/BaseCard.vue'
+import GlassButton from '@/components/ui/GlassButton.vue'
 import { formatCurrency, formatNumber } from '@/utils/dataProcessor'
+import { usePageEnter } from '@/composables/usePageEnter'
+import { useStaggerCards } from '@/composables/useCardEnter'
 
 export default {
   name: 'ExpandedView',
   components: {
-    BaseCard
+    BaseCard,
+    GlassButton
   },
   setup() {
     const router = useRouter()
     const route = useRoute()
+    const pageRef = ref(null)
+    const gridRef = ref(null)
     const anchors = ref([])
     const title = ref('维阿PSP斗虫榜（全部展开视图）')
     const refreshTime = ref(new Date().toLocaleString())
     const loading = ref(true)
     const error = ref(null)
 
-    // 从路由参数获取数据
     const filterFromRoute = route.query.filter || 'all'
     const monthFromRoute = route.query.month || null
-
-    // 从路由参数获取原始页面来源
     const sourceFromRoute = route.query.source || 'anchor'
-
-    // 从路由参数获取房间ID和工会信息（用于直播会话页面）
     const roomId = route.query.room_id
     const union = route.query.union
     const anchorName = route.query.anchor_name
 
-    // 更新标题
+    usePageEnter(pageRef)
+    useStaggerCards(gridRef, '.base-card')
+
     if (monthFromRoute) {
       const year = monthFromRoute.substring(0, 4)
       const month = parseInt(monthFromRoute.substring(4, 6)).toString().padStart(2, '0')
@@ -95,31 +99,24 @@ export default {
                    filterFromRoute === 'psp' ? 'PSPlive斗虫榜（全部展开视图）' : '维阿PSP斗虫榜（全部展开视图）'
     }
 
-    // 获取数据
     const fetchData = async () => {
       try {
         loading.value = true
         error.value = null
         let response;
 
-        // 根据来源页面获取数据
         if (sourceFromRoute === 'live-sessions') {
-          // 从LiveSessions页面跳转来的，需要获取直播会话数据
           if (roomId && union) {
             response = await anchorAPI.getLiveSessions(roomId, union, monthFromRoute);
-            // 将会话数据转换为适合显示的格式
             anchors.value = response.sessions || response.data || [];
             title.value = `${anchorName || '主播'} 的直播会话详情（全部展开视图）`;
           } else {
-            // 如果缺少必要参数，显示提示信息而不是抛出错误
-            console.warn('缺少房间ID或工会信息，将显示空数据');
             anchors.value = [];
             title.value = '直播会话详情（缺少必要参数）';
             refreshTime.value = new Date().toLocaleString();
-            return; // 提前返回，避免后续处理
+            return;
           }
         } else {
-          // 从AnchorList页面跳转来的，获取主播数据
           if (monthFromRoute) {
             response = await anchorAPI.getAnchorsByMonth(monthFromRoute, filterFromRoute);
           } else {
@@ -130,29 +127,20 @@ export default {
 
         refreshTime.value = response.refresh_time || new Date().toLocaleString()
       } catch (err) {
-        console.error('获取数据失败:', err)
-        console.error('错误详情:', err.response || err.message || err)
-
-        // 更详细的错误信息处理
         let errorMessage = '获取数据失败，请稍后重试';
         if (err.response) {
-          // 服务器响应了错误状态码
           errorMessage = `服务器错误 (${err.response.status}): ${err.response.data?.message || '请求失败'}`;
         } else if (err.request) {
-          // 请求已发出但没有收到响应
           errorMessage = '网络连接失败，请检查网络连接';
         } else {
-          // 其他错误
           errorMessage = err.message || '发生未知错误';
         }
-
         error.value = errorMessage;
       } finally {
         loading.value = false
       }
     }
 
-    // 计算总营收
     const calculateTotalRevenue = (anchor) => {
       const gift = parseFloat(anchor.gift) || 0
       const guard = parseFloat(anchor.guard) || 0
@@ -160,33 +148,25 @@ export default {
       return gift + guard + superChat
     }
 
-    // 查看直播会话
     const viewLiveSessions = (roomId, union) => {
       const currentMonth = route.query.month || new Date().toISOString().slice(0, 7).replace('-', '');
       router.push(`/live-sessions?room_id=${roomId}&union=${union}&month=${currentMonth}`)
     }
 
-    // 返回上一页
     const goBack = () => {
       router.go(-1)
     }
 
-    // 获取卡片标题 - 需要通过作用域插槽传递索引
-    // 实际上在模板中使用 (item, index) 来获取索引
     const getTitle = (item, index) => {
       if (sourceFromRoute === 'live-sessions') {
-        // 直播会话数据
         return item.title || `直播会话 ${index + 1}`;
       } else {
-        // 主播数据
         return `${item.anchor_name || item.name} [${item.union || item.group}]`;
       }
     };
 
-    // 获取卡片字段
     const getFields = (item) => {
       if (sourceFromRoute === 'live-sessions') {
-        // 直播会话数据字段
         return [
           { label: '标题', value: item.title || '无标题' },
           { label: '开始时间', value: item.start_time },
@@ -201,7 +181,6 @@ export default {
           { label: '总营收', value: formatCurrency(parseFloat(item.gift_income || 0) + parseFloat(item.guard_income || 0) + parseFloat(item.sc_income || 0)), type: 'currency' }
         ];
       } else {
-        // 主播数据字段
         return [
           { label: '关注数', value: formatNumber(item.attention || 0), type: 'number' },
           { label: '有效天', value: item.effective_days || 0 },
@@ -219,7 +198,6 @@ export default {
       }
     };
 
-    // 获取行动按钮配置
     const getActionButton = (item) => {
       if (sourceFromRoute === 'live-sessions') {
         return { text: '查看直播间', className: 'view-btn' };
@@ -228,7 +206,6 @@ export default {
       }
     };
 
-    // 获取行动按钮文本
     const getActionButtonText = (item) => {
       if (sourceFromRoute === 'live-sessions') {
         return '查看直播间';
@@ -237,20 +214,16 @@ export default {
       }
     };
 
-    // 获取行动按钮类名
     const getActionButtonClass = (item) => {
       return sourceFromRoute === 'live-sessions' ? 'live-room-btn' : 'view-btn';
     };
 
-    // 处理行动点击
     const handleActionClick = (item) => {
       if (sourceFromRoute === 'live-sessions') {
-        // 如果是直播会话，跳转到直播间
         if (item.room_id) {
           window.open(`https://live.bilibili.com/${item.room_id}`, '_blank');
         }
       } else {
-        // 如果是主播数据，查看详细直播数据
         viewLiveSessions(item.room_id, item.union);
       }
     };
@@ -260,11 +233,14 @@ export default {
     })
 
     return {
+      pageRef,
+      gridRef,
       anchors,
       title,
       refreshTime,
       loading,
       error,
+      sourceFromRoute,
       calculateTotalRevenue,
       formatCurrency,
       formatNumber,
@@ -304,42 +280,24 @@ export default {
   flex-wrap: wrap;
 }
 
-.action-btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  min-width: 100px;
-  text-align: center;
-}
-
-.action-btn.secondary {
-  background: #f0f0f0;
-  color: #333;
-}
-
-.action-btn.secondary:hover {
-  background: #e0e0e0;
-}
-
 .info-section {
   text-align: center;
   margin-bottom: 20px;
 }
 
 .page-title {
-  color: #333;
-  margin-bottom: 10px;
+  color: var(--color-text-main);
+  margin-bottom: 8px;
+  font-size: 1.4rem;
 }
 
 .refresh-time {
-  color: #666;
-  font-size: 14px;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
 }
 
-.loading-state, .error-state {
+.loading-state,
+.error-state {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -351,11 +309,11 @@ export default {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #ff6b6b;
+  border: 4px solid rgba(246, 177, 0, 0.2);
+  border-top: 4px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 @keyframes spin {
@@ -363,14 +321,14 @@ export default {
   100% { transform: rotate(360deg); }
 }
 
-.retry-btn {
-  padding: 8px 16px;
-  background: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-top: 10px;
+.loading-text {
+  color: var(--color-text-secondary);
+}
+
+.error-message {
+  color: var(--color-accent);
+  font-size: 1.05rem;
+  margin-bottom: 16px;
 }
 
 .grid-container {
@@ -384,14 +342,18 @@ export default {
   .grid-container {
     grid-template-columns: 1fr;
   }
-  
+
   .controls-section {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .action-controls {
     justify-content: center;
+  }
+
+  .page-title {
+    font-size: 1.2rem;
   }
 }
 </style>

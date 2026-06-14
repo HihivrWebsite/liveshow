@@ -1,5 +1,5 @@
 <template>
-  <footer class="footer">
+  <footer class="footer" ref="footerRef">
     <div class="footer-content">
       <div class="footer-info">
         <p class="copyright">
@@ -10,23 +10,31 @@
         </p>
       </div>
       <div class="footer-links">
-        <a href="https://hihivr.top" target="_blank" class="footer-button">
+        <GlassButton variant="primary" size="lg" cta class="footer-button" @click="openMainSite">
           向阳Hihi粉丝站
-        </a>
+        </GlassButton>
       </div>
     </div>
   </footer>
 </template>
 
-<script>
-export default {
-  name: 'FooterSection'
+<script setup>
+import { ref } from 'vue'
+import GlassButton from '@/components/ui/GlassButton.vue'
+import { usePageEnter } from '@/composables/usePageEnter'
+
+const footerRef = ref(null)
+
+usePageEnter(footerRef, { duration: 0.6, y: 20, delay: 0.2 })
+
+const openMainSite = () => {
+  window.open('https://hihivr.top', '_blank')
 }
 </script>
 
 <style scoped>
 .footer {
-  background: #FFF8E1;
+  background: var(--color-background);
   padding: 20px 0;
   margin-top: auto;
 }
@@ -47,14 +55,14 @@ export default {
 }
 
 .copyright {
-  color: #FFC633;
-  font-size: 1.8rem; /* 放大一倍 */
+  color: var(--color-primary);
+  font-size: 1.8rem;
   margin-bottom: 5px;
   font-weight: bold;
 }
 
 .tech-stack {
-  color: #f9729a;
+  color: var(--color-accent);
   font-size: 0.8rem;
 }
 
@@ -65,43 +73,9 @@ export default {
 }
 
 .footer-button {
-  color: white;
-  text-decoration: none;
-  font-size: 1.8rem; /* 放大一倍 */
+  font-size: 1.8rem;
   padding: 10px 20px;
-  background: linear-gradient(45deg, #FFC633, #FFA500);
-  border: none;
-  border-radius: 25px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: all 0.3s ease;
-  display: inline-block;
-  animation: shine 3s infinite; /* 添加闪光动画 */
-}
-
-.footer-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.separator {
-  color: #666;
-}
-
-/* 闪光动画 */
-@keyframes shine {
-  0% {
-    background-position: 0% 50%;
-    box-shadow: 0 0 15px #FFC633;
-  }
-  50% {
-    background-position: 100% 50%;
-    box-shadow: 0 0 25px #FFA500;
-  }
-  100% {
-    background-position: 0% 50%;
-    box-shadow: 0 0 15px #FFC633;
-  }
+  text-decoration: none;
 }
 
 /* 响应式设计 */
@@ -111,18 +85,19 @@ export default {
     text-align: center;
     gap: 10px;
   }
-  
+
   .footer-links {
     justify-content: center;
   }
-  
+
   .copyright,
   .tech-stack {
     font-size: 0.8rem;
   }
-  
-  .footer-link {
-    font-size: 0.8rem;
+
+  .footer-button {
+    font-size: 1rem;
+    padding: 8px 20px;
   }
 }
 </style>

@@ -69,7 +69,7 @@
       <!-- 刷新按钮 -->
       <div class="action-buttons">
         <button @click="refreshStats" :disabled="isLoading" class="btn-refresh">
-          <span v-if="!isLoading">🔄 刷新统计</span>
+          <span v-if="!isLoading"><RefreshCw :size="14" class="btn-icon" /> 刷新统计</span>
           <span v-else>加载中...</span>
         </button>
         <div class="last-updated" v-if="lastUpdated">
@@ -99,9 +99,13 @@
 <script>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import axios from 'axios'
+import { RefreshCw } from 'lucide-vue-next'
 
 export default {
   name: 'CacheStats',
+  components: {
+    RefreshCw
+  },
   setup() {
     const stats = ref({
       hit_rate_percentage: 'N/A',
@@ -200,7 +204,7 @@ export default {
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   padding: 15px;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--glass-blur));
   transition: all 0.3s ease;
 }
 
@@ -268,6 +272,11 @@ export default {
 .btn-refresh:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btn-icon {
+  vertical-align: middle;
+  margin-right: 4px;
 }
 
 .last-updated {

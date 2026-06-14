@@ -1,0 +1,33 @@
+:root {
+  /* ===== Colors ===== */
+  --color-background: #F7F1DF;
+  --color-primary: #F6B100;
+  --color-accent: #FF6B9D;
+  --color-text-main: #5D4B24;
+  --color-text-secondary: #8E7B50;
+  --color-card: #FFF3D0;
+
+  /* ===== Border Radius ===== */
+  --radius-button: 999px;
+  --radius-input: 24px;
+  --radius-card: 32px;
+  --radius-dialog: 40px;
+
+  /* ===== Box Shadow ===== */
+  --shadow-default: 0 8px 24px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --shadow-dialog: 0 20px 60px rgba(0, 0, 0, 0.12);
+
+  /* ===== Glassmorphism ===== */
+  --glass-blur: 24px;
+  --glass-bg: rgba(246, 177, 0, 0.08);
+  --glass-border: rgba(246, 177, 0, 0.15);
+
+  /* ===== Animation ===== */
+  --duration-fast: 0.15s;
+  --duration-normal: 0.3s;
+  --duration-slow: 0.5s;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}

@@ -16,26 +16,34 @@ export function getAvatarSync(roomId) {
   return avatarStore[String(roomId)] || ''
 }
 
+function loadImage(base64, retries = 2) {
+  return new Promise(resolve => {
+    const attempt = (remaining) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => {
+        if (remaining > 0) {
+          setTimeout(() => attempt(remaining - 1), 100)
+        } else {
+          resolve(null)
+        }
+      }
+      img.src = base64
+    }
+    attempt(retries)
+  })
+}
+
 export async function getAvatar(roomId) {
   const base64 = avatarStore[String(roomId)]
   if (!base64) return null
-  return new Promise(resolve => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => resolve(null)
-    img.src = base64
-  })
+  return loadImage(base64)
 }
 
 export async function getAvatarByUid(uid) {
   const base64 = avatarStore[`uid_${uid}`]
   if (!base64) return null
-  return new Promise(resolve => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => resolve(null)
-    img.src = base64
-  })
+  return loadImage(base64)
 }
 
 export function scaleAvatar(img, size) {

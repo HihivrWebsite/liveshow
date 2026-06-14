@@ -2,47 +2,63 @@
   <div class="rank-comparison">
     <HeaderSection />
 
-    <div v-if="showDateModal" class="modal-overlay" @click="closeDateModal">
-      <div class="modal-content" @click.stop>
-        <h3>📊 选择日期范围</h3>
+    <GlassDialog
+      :visible="showDateModal"
+      title="选择日期范围"
+      width="460px"
+      @close="closeDateModal"
+      @update:visible="(v) => !v && closeDateModal()"
+    >
+      <div class="modal-form">
         <div class="form-group">
-          <label>起始月份:</label>
-          <input type="month" v-model="startDate" class="month-input" min="2025-08">
+          <label class="form-label">起始月份:</label>
+          <GlassInput type="month" v-model="startDate" placeholder="请选择起始月份" />
         </div>
         <div class="form-group">
-          <label>结束月份:</label>
-          <input type="month" v-model="endDate" class="month-input" min="2025-08">
-        </div>
-        <div class="button-group">
-          <button @click="confirmDateRange" class="confirm-btn">确定</button>
-          <button @click="closeDateModal" class="cancel-btn">取消</button>
+          <label class="form-label">结束月份:</label>
+          <GlassInput type="month" v-model="endDate" placeholder="请选择结束月份" />
         </div>
       </div>
-    </div>
+      <template #footer>
+        <GlassButton variant="secondary" @click="confirmDateRange">
+          <Check :size="16" /> 确定
+        </GlassButton>
+        <GlassButton variant="default" @click="closeDateModal">
+          <X :size="16" /> 取消
+        </GlassButton>
+      </template>
+    </GlassDialog>
 
-    <div v-if="showMetricModal" class="modal-overlay" @click="closeMetricModal">
-      <div class="modal-content" @click.stop>
-        <h3>📊 选择对比指标</h3>
-        <select v-model="selectedMetric" class="metric-select">
-          <option v-for="(label, key) in metricNameMap" :key="key" :value="key">{{ label }}</option>
-        </select>
-        <div class="button-group">
-          <button @click="confirmMetric" class="confirm-btn">确定</button>
-          <button @click="closeMetricModal" class="cancel-btn">取消</button>
-        </div>
-      </div>
-    </div>
+    <GlassDialog
+      :visible="showMetricModal"
+      title="选择对比指标"
+      width="460px"
+      @close="closeMetricModal"
+      @update:visible="(v) => !v && closeMetricModal()"
+    >
+      <select v-model="selectedMetric" class="metric-select">
+        <option v-for="(label, key) in metricNameMap" :key="key" :value="key">{{ label }}</option>
+      </select>
+      <template #footer>
+        <GlassButton variant="secondary" @click="confirmMetric">
+          <Check :size="16" /> 确定
+        </GlassButton>
+        <GlassButton variant="default" @click="closeMetricModal">
+          <X :size="16" /> 取消
+        </GlassButton>
+      </template>
+    </GlassDialog>
 
-    <div v-if="chartVisible" class="chart-page">
+    <GlassCard v-if="chartVisible" class="chart-page" padding="30px">
       <div class="chart-header">
-        <h2>{{ currentMetricName }}排名变化</h2>
+        <h2 class="chart-title">{{ currentMetricName }}排名变化</h2>
         <div class="battle-info">
-          <span>日期：{{ startDate }} 至 {{ endDate }}</span>
-          <span>主播：{{ selectedAnchors.length }} 人</span>
+          <span><Calendar :size="14" /> {{ startDate }} 至 {{ endDate }}</span>
+          <span><Users :size="14" /> {{ selectedAnchors.length }} 人</span>
         </div>
       </div>
 
-      <div class="chart-legend">
+      <GlassCard variant="subtle" class="chart-legend" padding="20px">
         <span v-for="anchor in selectedAnchors" :key="anchor.room_id">
           <input type="checkbox" :checked="visibleAnchors.includes(anchor.room_id)"
             @change="toggleAnchorVisibility(anchor.room_id)">
@@ -51,19 +67,27 @@
           <span class="legend-dot" :style="{ backgroundColor: getAnchorColor(anchor.room_id) }"></span>
           {{ anchor.anchor_name }}
         </span>
-      </div>
+      </GlassCard>
 
-      <div class="chart-scroll-wrapper">
+      <GlassCard variant="strong" class="chart-scroll-wrapper" padding="30px">
         <div class="chart-container">
-          <canvas ref="chartCanvas"></canvas>
+          <div ref="chartCanvas" style="width:6000px;height:1400px;"></div>
         </div>
-      </div>
+      </GlassCard>
 
       <div class="action-buttons">
-        <button @click="goBack" class="btn btn-back">返回主页</button>
-        <button @click="resetSelection" class="btn btn-reset">重新选择</button>
-        <button @click="refreshData" class="btn btn-refresh" :disabled="isRefreshing">刷新/补全数据</button>
-        <button @click="exportChart" class="btn btn-export">导出图表</button>
+        <GlassButton variant="default" @click="goBack">
+          <ArrowLeft :size="16" /> 返回主页
+        </GlassButton>
+        <GlassButton variant="primary" @click="resetSelection">
+          <RotateCcw :size="16" /> 重新选择
+        </GlassButton>
+        <GlassButton variant="info" :disabled="isRefreshing" @click="refreshData">
+          <RefreshCw :size="16" /> 刷新/补全数据
+        </GlassButton>
+        <GlassButton variant="success" @click="exportChart">
+          <Download :size="16" /> 导出图表
+        </GlassButton>
       </div>
 
       <div v-if="isRefreshing" class="refreshing-overlay">
@@ -71,31 +95,35 @@
         <p>正在刷新数据...</p>
         <p v-if="currentRefreshingAnchor">正在获取：{{ currentRefreshingAnchor }}</p>
       </div>
-    </div>
+    </GlassCard>
 
     <FooterSection />
   </div>
 </template>
 
 <script>
-import { Chart, registerables } from 'chart.js'
+import * as echarts from 'echarts'
+import '@/utils/echartsTheme.js'
 import { anchorAPI } from '@/api'
 import { getMonthRange } from '@/utils/monthUtils'
 import { getAvatar, scaleAvatar } from '@/utils/avatarCache'
 import HeaderSection from '@/components/HeaderSection.vue'
 import FooterSection from '@/components/FooterSection.vue'
-
-Chart.register(...registerables)
+import GlassDialog from '@/components/ui/GlassDialog.vue'
+import GlassButton from '@/components/ui/GlassButton.vue'
+import GlassInput from '@/components/ui/GlassInput.vue'
+import GlassCard from '@/components/ui/GlassCard.vue'
+import { Check, X, Calendar, Users, ArrowLeft, RotateCcw, RefreshCw, Download } from 'lucide-vue-next'
 
 const colorPalette = [
-  '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
-  '#FF9F40', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4',
+  'var(--color-accent)', '#00BCD4', 'var(--color-primary)', '#00BCD4', '#9C27B0',
+  '#FF9F40', '#FF6B6B', '#00BCD4', '#45B7D1', '#96CEB4',
   '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE'
 ]
 
 export default {
   name: 'RankComparison',
-  components: { HeaderSection, FooterSection },
+  components: { HeaderSection, FooterSection, GlassDialog, GlassButton, GlassInput, GlassCard, Check, X, Calendar, Users, ArrowLeft, RotateCcw, RefreshCw, Download },
   props: {
     initialAnchors: { type: Array, default: () => [] }
   },
@@ -150,7 +178,7 @@ export default {
   },
   beforeDestroy() {
     if (this.battleChart) {
-      this.battleChart.destroy()
+      this.battleChart.dispose()
     }
   },
   methods: {
@@ -327,114 +355,101 @@ export default {
       const { allDates, rankings } = this.calculateRankings()
 
       await this.$nextTick()
-      const canvas = this.$refs.chartCanvas
-      if (!canvas) return
-
-      canvas.width = 6000
-      canvas.height = 1400
+      const dom = this.$refs.chartCanvas
+      if (!dom) return
 
       if (this.battleChart) {
-        this.battleChart.destroy()
+        this.battleChart.dispose()
       }
 
-      const scaledAvatars = {}
       const avatarDataUrls = {}
+      const avatarSymbols = {}
+      const symbolSize = 36
       for (const anchor of this.selectedAnchors) {
         const img = await getAvatar(anchor.room_id)
         if (img) {
-          scaledAvatars[anchor.room_id] = scaleAvatar(img, 20)
           const c = document.createElement('canvas')
           c.width = img.naturalWidth; c.height = img.naturalHeight
           c.getContext('2d').drawImage(img, 0, 0)
           avatarDataUrls[anchor.room_id] = c.toDataURL('image/jpeg', 0.8)
+          const circular = scaleAvatar(img, symbolSize)
+          if (circular) {
+            avatarSymbols[anchor.room_id] = circular.toDataURL('image/png')
+          }
         }
       }
       this.avatarDataUrls = avatarDataUrls
 
-      const datasets = this.selectedAnchors
-        .filter(a => this.visibleAnchors.includes(a.room_id))
-        .map((anchor) => {
-          const roomId = anchor.room_id
-          const data = allDates.map(date => rankings[date][roomId] || null)
-          const avatarImg = scaledAvatars[roomId]
-          return {
-            label: anchor.anchor_name,
-            data,
-            borderColor: this.getAnchorColor(roomId),
-            backgroundColor: this.getAnchorColor(roomId) + '20',
-            pointStyle: avatarImg || 'circle',
-            pointRadius: avatarImg ? 10 : 5,
-            pointHoverRadius: avatarImg ? 14 : 8,
-            pointBorderColor: '#fff',
-            pointBorderWidth: 2,
-            borderWidth: 3,
-            fill: false,
-            tension: 0.3,
-            spanGaps: true
-          }
-        })
-
-      const labels = allDates.map(d => d.substring(5))
-
-      this.battleChart = new Chart(canvas.getContext('2d'), {
-        type: 'line',
-        data: { labels, datasets },
-        options: {
-          responsive: false,
-          animation: { duration: 300, easing: 'easeOutQuart' },
-          plugins: {
-            legend: { display: false },
-            title: {
-              display: true,
-              text: `${this.currentMetricName}排名变化 - ${this.startDate} 至 ${this.endDate}`,
-              font: { size: 36, weight: 'bold' },
-              color: '#FF6600',
-              padding: { top: 20, bottom: 30 }
-            },
-            tooltip: {
-              mode: 'index',
-              intersect: false,
-              callbacks: {
-                label: (context) => {
-                  const rank = context.parsed.y
-                  return `${context.dataset.label}: 第${rank}名`
-                }
-              }
-            }
+      const visible = this.selectedAnchors.filter(a => this.visibleAnchors.includes(a.room_id))
+      const series = visible.map((anchor) => {
+        const roomId = anchor.room_id
+        const data = allDates.map(date => rankings[date][roomId] || null)
+        const color = this.getAnchorColor(roomId)
+        const hasAvatar = !!avatarSymbols[roomId]
+        return {
+          name: anchor.anchor_name,
+          type: 'line',
+          data,
+          smooth: 0.3,
+          symbol: hasAvatar ? `image://${avatarSymbols[roomId]}` : 'circle',
+          symbolSize: hasAvatar ? symbolSize : 10,
+          lineStyle: { width: 3, color },
+          itemStyle: {
+            color: hasAvatar ? 'transparent' : color,
+            borderColor: hasAvatar ? 'transparent' : '#fff',
+            borderWidth: hasAvatar ? 0 : 2
           },
-          scales: {
-            y: {
-              reverse: true,
-              min: 1,
-              max: this.selectedAnchors.length,
-              ticks: {
-                stepSize: 1,
-                font: { size: 18 },
-                callback: (value) => `第${value}名`
-              },
-              title: {
-                display: true,
-                text: '排名',
-                font: { size: 24, weight: 'bold' }
-              }
-            },
-            x: {
-              ticks: {
-                font: { size: 14 },
-                maxRotation: 45
-              },
-              title: {
-                display: true,
-                text: '日期',
-                font: { size: 24, weight: 'bold' }
-              }
-            }
-          },
-          interaction: {
-            mode: 'nearest',
-            axis: 'x'
+          emphasis: {
+            itemStyle: { symbolSize: hasAvatar ? symbolSize * 1.3 : 14 }
           }
         }
+      })
+
+      this.battleChart = echarts.init(dom, 'liveshow')
+      this.battleChart.setOption({
+        title: {
+          text: `${this.currentMetricName}排名变化 - ${this.startDate} 至 ${this.endDate}`,
+          left: 'center',
+          top: 20,
+          textStyle: { fontSize: 36, fontWeight: 'bold', color: 'var(--color-primary)' }
+        },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'cross' },
+          formatter: (params) => {
+            let lines = [params[0].axisValueLabel]
+            params.forEach(p => {
+              if (p.value != null) lines.push(`${p.seriesName}: 第${p.value}名`)
+            })
+            return lines.join('<br>')
+          }
+        },
+        legend: { show: false },
+        grid: { left: 100, right: 100, top: 120, bottom: 80 },
+        xAxis: {
+          type: 'category',
+          data: allDates,
+          axisLabel: { fontSize: 14, rotate: 45 },
+          name: '日期',
+          nameTextStyle: { fontSize: 24, fontWeight: 'bold' }
+        },
+        yAxis: {
+          type: 'value',
+          inverse: true,
+          min: 1,
+          max: this.selectedAnchors.length,
+          interval: 1,
+          axisLabel: {
+            fontSize: 18,
+            formatter: (v) => `第${v}名`
+          },
+          name: '排名',
+          nameTextStyle: { fontSize: 24, fontWeight: 'bold' }
+        },
+        series,
+        animation: true,
+        animationDuration: 300,
+        animationEasing: 'cubicOut'
       })
     },
 
@@ -474,7 +489,7 @@ export default {
       if (!this.battleChart) return
       const link = document.createElement('a')
       link.download = `排名对比_${this.currentMetricName}_${this.startDate}-${this.endDate}.png`
-      link.href = this.battleChart.toBase64Image()
+      link.href = this.battleChart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' })
       link.click()
     },
 
@@ -483,7 +498,7 @@ export default {
       this.chartVisible = false
       this.showDateModal = true
       if (this.battleChart) {
-        this.battleChart.destroy()
+        this.battleChart.dispose()
         this.battleChart = null
       }
     }
@@ -492,46 +507,194 @@ export default {
 </script>
 
 <style scoped>
-.rank-comparison { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; overflow-y: auto }
-.modal-overlay { display: flex; align-items: center; justify-content: center; min-height: 100vh }
-.modal-content { background: #FFF8E1; border: 2px solid #FFC633; border-radius: 20px; padding: 30px; min-width: 400px; max-width: 500px; box-shadow: 0 10px 40px rgba(0,0,0,0.3) }
-.modal-content h3 { color: #FFC633; text-align: center; margin-bottom: 20px }
-.form-group { margin-bottom: 15px }
-.form-group label { display: block; margin-bottom: 5px; color: #333; font-weight: bold }
-.month-input { width: 100%; padding: 10px; border: 2px solid #FFC633; border-radius: 10px; font-size: 1rem }
-.metric-select { width: 100%; padding: 12px; border: 2px solid #FFC633; border-radius: 10px; font-size: 1rem; margin-bottom: 15px; background: white }
-.button-group { display: flex; gap: 10px; justify-content: center }
-.confirm-btn, .cancel-btn { padding: 10px 20px; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; transition: all 0.3s ease }
-.confirm-btn { background: linear-gradient(45deg, #f9729a, #f75982); color: white }
-.cancel-btn { background: linear-gradient(45deg, #6c757d, #5a6268); color: white }
-.confirm-btn:hover, .cancel-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3) }
-.chart-page { background: #FFF8E1; min-height: 100vh; padding: 30px }
-.chart-header { text-align: center; margin-bottom: 30px }
-.chart-header h2 { color: #FFC633; font-size: 2rem; margin-bottom: 15px }
-.battle-info { color: #f9729a; font-size: 1rem }
-.battle-info span { margin: 0 20px }
-.action-buttons { display: flex; gap: 20px; justify-content: center; margin: 30px 0; flex-wrap: wrap }
-.btn { padding: 14px 28px; border: none; border-radius: 25px; cursor: pointer; font-size: 1rem; font-weight: bold; transition: all 0.3s ease }
-.btn-back { background: linear-gradient(45deg, #6c757d, #5a6268); color: white }
-.btn-reset { background: linear-gradient(45deg, #FFC633, #FFA500); color: #333 }
-.btn-refresh { background: linear-gradient(45deg, #17a2b8, #138496); color: white }
-.btn-refresh:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none }
-.btn-export { background: linear-gradient(45deg, #28a745, #218838); color: white }
-.btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3) }
-.refreshing-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; color: white; font-size: 1.2rem }
-.spinner { width: 60px; height: 60px; border: 6px solid rgba(255,255,255,0.3); border-top-color: #FFC633; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px }
-@keyframes spin { to { transform: rotate(360deg) } }
-.refreshing-overlay p { margin: 10px 0; color: #FFC633; font-weight: bold }
-.chart-scroll-wrapper { width: 100%; overflow-x: auto; overflow-y: hidden; background: white; border-radius: 20px; padding: 30px; margin: 30px auto; border: 2px solid #FFC633; box-shadow: 0 8px 24px rgba(255,198,51,0.3); position: relative }
-.chart-scroll-wrapper::-webkit-scrollbar { height: 14px }
-.chart-scroll-wrapper::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px }
-.chart-scroll-wrapper::-webkit-scrollbar-thumb { background: linear-gradient(45deg, #FFC633, #FFA500); border-radius: 10px }
-.chart-scroll-wrapper::-webkit-scrollbar-thumb:hover { background: linear-gradient(45deg, #FFA500, #FF8C00) }
-.chart-container { height: 1400px !important; width: 6000px !important; position: relative; overflow: hidden }
-.chart-container canvas { width: 6000px !important; height: 1400px !important; max-width: none !important; max-height: none !important }
-.chart-legend { text-align: center; padding: 20px; background: #FEEFEF; border-radius: 20px; margin: 20px auto; max-width: 1400px; font-size: 1rem }
-.chart-legend span { margin: 8px 15px; display: inline-flex; align-items: center; cursor: pointer; font-size: 0.95rem }
-.chart-legend input[type="checkbox"] { margin-right: 5px }
-.legend-dot { width: 16px; height: 16px; border-radius: 50%; margin: 0 8px; display: inline-block }
-.legend-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 4px; border: 1px solid #FFC633 }
+.rank-comparison {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-label {
+  color: var(--color-text-main);
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+
+.metric-select {
+  width: 100%;
+  padding: 12px 20px;
+  border: 2px solid rgba(142, 123, 80, 0.25);
+  border-radius: 24px;
+  font-size: 1rem;
+  background: rgba(255, 248, 225, 0.6);
+  backdrop-filter: blur(var(--glass-blur));
+  color: var(--color-text-main);
+  outline: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  box-shadow: var(--shadow-default);
+}
+
+.metric-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(246, 177, 0, 0.2), var(--shadow-hover);
+}
+
+.chart-page {
+  min-height: 100vh;
+}
+
+.chart-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.chart-title {
+  color: var(--color-primary);
+  font-size: 2rem;
+  margin-bottom: 15px;
+}
+
+.battle-info {
+  color: var(--color-accent);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.battle-info span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin: 30px 0;
+  flex-wrap: wrap;
+}
+
+.refreshing-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  color: white;
+  font-size: 1.2rem;
+}
+
+.spinner {
+  width: 60px;
+  height: 60px;
+  border: 6px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.refreshing-overlay p {
+  margin: 10px 0;
+  color: var(--color-primary);
+  font-weight: bold;
+}
+
+.chart-scroll-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 30px auto;
+  position: relative;
+}
+
+.chart-scroll-wrapper::-webkit-scrollbar {
+  height: 14px;
+}
+
+.chart-scroll-wrapper::-webkit-scrollbar-track {
+  background: rgba(142, 123, 80, 0.1);
+  border-radius: 10px;
+}
+
+.chart-scroll-wrapper::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+  border-radius: 10px;
+}
+
+.chart-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+}
+
+.chart-container {
+  height: 1400px !important;
+  width: 6000px !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.chart-legend {
+  max-width: 1400px;
+  font-size: 1rem;
+  margin: 20px auto;
+}
+
+.chart-legend span {
+  margin: 8px 15px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.chart-legend input[type="checkbox"] {
+  margin-right: 5px;
+}
+
+.legend-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  margin: 0 8px;
+  display: inline-block;
+}
+
+.legend-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  vertical-align: middle;
+  margin-right: 4px;
+  border: 1px solid var(--color-primary);
+}
 </style>

@@ -37,8 +37,8 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #FFF8E1; /* 淡黄色背景 */
-  color: #333;
+  background-color: var(--color-background); /* 淡黄色背景 */
+  color: var(--color-text-main);
   min-height: 100vh;
   position: relative;
 }

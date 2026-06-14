@@ -2,27 +2,27 @@
   <div class="live-sessions">
     <div class="controls-section">
       <div class="action-controls">
-        <button @click="openMonthSelector" class="action-btn secondary">
+        <GlassButton @click="openMonthSelector" variant="secondary">
           切换不同月份
-        </button>
-        <button @click="showSessionChart" class="action-btn primary">
+        </GlassButton>
+        <GlassButton @click="showSessionChart" variant="primary">
           显示直播数据折线图
-        </button>
-        <button @click="hideChart" class="action-btn danger">
+        </GlassButton>
+        <GlassButton @click="hideChart" variant="danger">
           关闭图表
-        </button>
-        <button @click="goBack" class="action-btn default">
+        </GlassButton>
+        <GlassButton @click="goBack" variant="default">
           返回
-        </button>
-        <button @click="goToLiveRoom" class="action-btn success">
+        </GlassButton>
+        <GlassButton @click="goToLiveRoom" variant="success">
           跳转到直播间
-        </button>
-        <button @click="openMultiMonthModal" class="action-btn secondary">
+        </GlassButton>
+        <GlassButton @click="openMultiMonthModal" variant="secondary">
           多月份共同统计
-        </button>
-        <button @click="fetchFansData" class="action-btn primary" :disabled="fansLoading">
+        </GlassButton>
+        <GlassButton @click="fetchFansData" variant="primary" :disabled="fansLoading">
           {{ fansLoading ? '计算中...' : '计算新增粉丝数' }}
-        </button>
+        </GlassButton>
         <!--
         <button @click="openClusterAnalysisModal" class="action-btn secondary">
           进行聚类分析
@@ -57,16 +57,16 @@
     </div>
 
     <div class="chart-button-container">
-      <button @click="showSessionChart" class="action-btn primary">
+      <GlassButton @click="showSessionChart" variant="primary">
         显示直播数据折线图
-      </button>
-      <button @click="hideChart" class="action-btn danger">
+      </GlassButton>
+      <GlassButton @click="hideChart" variant="danger">
         关闭图表
-      </button>
+      </GlassButton>
     </div>
 
     <div class="chart-info" v-if="chartVisible">
-      <h3 style="color: #f9729a; margin-top: 0;">📊 图表交互说明</h3>
+      <h3 style="color: var(--color-accent); margin-top: 0;"><BarChart3 :size="20" class="heading-icon" /> 图表交互说明</h3>
       <p><strong>图表功能：</strong></p>
       <ul style="text-align: left; display: inline-block;">
         <li>点击图例可以隐藏/显示对应的数据显示</li>
@@ -77,7 +77,7 @@
     </div>
 
     <div :class="['chart-container', { visible: chartVisible }]">
-      <canvas id="chartCanvas" ref="chartCanvas"></canvas>
+      <div id="chartCanvas" ref="chartCanvas" style="width:100%;height:100%;"></div>
     </div>
 
     <div v-if="loading" class="loading-state">
@@ -87,7 +87,7 @@
     
     <div v-else-if="error" class="error-state">
       <p class="error-message">{{ error }}</p>
-      <button @click="fetchData()" class="retry-btn">重试</button>
+      <GlassButton @click="fetchData()" variant="success">重试</GlassButton>
     </div>
     
     <div v-else class="data-section">
@@ -96,7 +96,7 @@
 
       <!-- SC历史数据展示 -->
       <div v-if="scHistory && scHistory.list && scHistory.list.length > 0" class="sc-history-section hover-effect">
-        <h3 style="color: #FFC633; margin-top: 0;">💬 SC历史记录</h3>
+        <h3 style="color: var(--color-primary); margin-top: 0;"><MessageCircle :size="20" class="heading-icon" /> SC历史记录</h3>
         <div class="sc-history-container">
           <!-- 移动端：网格布局 -->
           <div class="grid-container mobile-grid">
@@ -128,7 +128,7 @@
       </div>
 
       <!-- 移动端：卡片布局 -->
-      <div class="cards-container mobile-cards">
+      <div class="cards-container mobile-cards" ref="cardsContainer">
         <BaseCard
           v-for="(session, index) in sessions"
           :key="index"
@@ -225,12 +225,14 @@
           @action-click="viewSuperChatDetails(session.start_time, session.end_time)"
         >
           <template #actions>
-            <button
+            <GlassButton
               @click="viewSuperChatDetails(session.start_time, session.end_time)"
-              class="sc-btn hover-effect"
+              variant="secondary"
+              size="sm"
+              cta
             >
               查看SuperChat详情
-            </button>
+            </GlassButton>
           </template>
         </BaseCard>
       </div>
@@ -242,23 +244,29 @@
 <script>
 import { ref, onMounted, watch, nextTick, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Chart, registerables } from 'chart.js'
+import * as echarts from 'echarts'
+import '@/utils/echartsTheme.js'
 import { anchorAPI } from '@/api'
 import BaseCard from '@/components/BaseCard.vue'
 import NavigationTable from '@/components/NavigationTable.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
+import GlassButton from '@/components/ui/GlassButton.vue'
+import { BarChart3, MessageCircle } from 'lucide-vue-next'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
 import { getAvatar, getAvatarSync } from '@/utils/avatarCache'
-
-Chart.register(...registerables)
+import { staggerEnter } from '@/composables/useGSAP'
+import gsap from 'gsap'
 
 export default {
   name: 'LiveSessions',
   components: {
     BaseCard,
     NavigationTable,
-    MonthSelector
+    MonthSelector,
+    GlassButton,
+    BarChart3,
+    MessageCircle
   },
   setup() {
     const router = useRouter()
@@ -275,6 +283,7 @@ export default {
     const anchorAvatar = ref('')
     let sessionChart = null
     const chartCanvas = ref(null)
+    const cardsContainer = ref(null)
 
     // 创建并提供全局卡片状态
     const globalCardState = provideGlobalCardState()
@@ -408,14 +417,14 @@ export default {
     }
 
     const showSessionChart = async () => {
-      console.log('准备显示图表，会话数据数量:', sessions.value.length) // 添加调试日志
+      console.log('准备显示图表，会话数据数量:', sessions.value.length)
       chartVisible.value = true
 
       await nextTick()
 
       if (sessionChart) {
-        console.log('销毁现有图表实例') // 添加调试日志
-        sessionChart.destroy()
+        console.log('销毁现有图表实例')
+        sessionChart.dispose()
       }
 
       const labels = []
@@ -424,35 +433,32 @@ export default {
       const superChatData = []
       const totalRevenueData = []
       const durationData = []
-      const newGuard3Data = []  // 新增总督
-      const newGuard2Data = []  // 新增提督
-      const newGuard1Data = []  // 新增舰长
-      const newFansData = []    // 新增粉丝团
-      const danmakuData = []    // 弹幕数
-      const avgConcurrencyData = []  // 平均同接
-      const maxConcurrencyData = []  // 最高同接
-      const newFansCountData = []    // 新增粉丝数 (从后端 API 计算)
+      const newGuard3Data = []
+      const newGuard2Data = []
+      const newGuard1Data = []
+      const newFansData = []
+      const danmakuData = []
+      const avgConcurrencyData = []
+      const maxConcurrencyData = []
+      const newFansCountData = []
 
-      console.log('开始处理会话数据，共', sessions.value.length, '个会话') // 添加调试日志
+      console.log('开始处理会话数据，共', sessions.value.length, '个会话')
       sessions.value.forEach((session, index) => {
-        console.log(`处理第${index+1}个会话:`, session) // 添加调试日志
+        console.log(`处理第${index+1}个会话:`, session)
         const startTime = session.start_time
-        // 使用后端返回的duration_minutes，如果没有则在前端计算
         const durationMinutes = session.duration_minutes || parseFloat(calculateDuration(session.start_time, session.end_time).split('分钟')[0]) || 0
         const gift = parseFloat(session.gift) || 0
         const guard = parseFloat(session.guard) || 0
         const superChat = parseFloat(session.super_chat) || 0
         const totalRevenue = parseFloat(calculateTotalRevenue(session)) || 0
-        // 计算新增数量，如果直播正在进行中则显示为 0
         const newGuard3 = (session.end_guard_3 != null ? Number(session.end_guard_3) : 0) - (session.start_guard_3 != null ? Number(session.start_guard_3) : 0)
         const newGuard2 = session.end_time === null || session.end_time === '' ? 0 : (session.end_guard_2 != null ? Number(session.end_guard_2) : 0) - (session.start_guard_2 != null ? Number(session.start_guard_2) : 0)
         const newGuard1 = session.end_time === null || session.end_time === '' ? 0 : (session.end_guard_1 != null ? Number(session.end_guard_1) : 0) - (session.start_guard_1 != null ? Number(session.start_guard_1) : 0)
         const newFans = session.end_time === null || session.end_time === '' ? 0 : (session.end_fans_count != null ? Number(session.end_fans_count) : 0) - (session.start_fans_count != null ? Number(session.start_fans_count) : 0)
         const danmakuCount = session.danmaku_count != null ? Number(session.danmaku_count) : 0
-        // 同接人数和新增粉丝数
         const avgConcurrency = session.avg_concurrency !== null ? Number(session.avg_concurrency) : 0
         const maxConcurrency = session.max_concurrency !== null ? Number(session.max_concurrency) : 0
-        const newFansCount = session.new_fans_count !== undefined && session.new_fans_count !== -1 
+        const newFansCount = session.new_fans_count !== undefined && session.new_fans_count !== -1
           ? Number(session.new_fans_count) : 0
 
         labels.push((startTime.split(' ')[0] || '直播场次'))
@@ -470,272 +476,230 @@ export default {
         maxConcurrencyData.push(maxConcurrency)
         newFansCountData.push(newFansCount)
         console.log(`会话${index+1}处理完成，数据:`, {
-          durationMinutes,
-          gift,
-          guard,
-          superChat,
-          totalRevenue,
-          newGuard3,
-          newGuard2,
-          newGuard1,
-          newFans,
-          danmakuCount,
-          avgConcurrency,
-          maxConcurrency,
-          newFansCount
-        }) // 添加调试日志
+          durationMinutes, gift, guard, superChat, totalRevenue,
+          newGuard3, newGuard2, newGuard1, newFans, danmakuCount,
+          avgConcurrency, maxConcurrency, newFansCount
+        })
       })
 
-      console.log('数据处理完成，标签数量:', labels.length) // 添加调试日志
+      console.log('数据处理完成，标签数量:', labels.length)
 
       if (labels.length === 0) {
-        console.log('没有可用的数据来生成图表') // 添加调试日志
+        console.log('没有可用的数据来生成图表')
         alert('没有可用的数据来生成图表')
         hideChart()
         return
       }
 
       if (!chartCanvas.value) {
-        console.error('图表画布不存在') // 添加调试日志
+        console.error('图表画布不存在')
         return
       }
 
-      const ctx = chartCanvas.value.getContext('2d')
-      console.log('准备创建图表实例') // 添加调试日志
-      sessionChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: '直播时长',
-              data: durationData,
-              borderColor: '#FF6384',
-              backgroundColor: 'rgba(255, 99, 132, 0.1)',
-              yAxisID: 'y',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'circle'  // 圆形
-            },
-            {
-              label: '礼物收入',
-              data: giftData,
-              borderColor: '#36A2EB',
-              backgroundColor: 'rgba(54, 162, 235, 0.1)',
-              yAxisID: 'y1',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'triangle'  // 三角形
-            },
-            {
-              label: '舰长收入',
-              data: guardData,
-              borderColor: '#FFCE56',
-              backgroundColor: 'rgba(255, 206, 86, 0.1)',
-              yAxisID: 'y1',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'rect'  // 矩形
-            },
-            {
-              label: 'SC收入',
-              data: superChatData,
-              borderColor: '#4BC0C0',
-              backgroundColor: 'rgba(75, 192, 192, 0.1)',
-              yAxisID: 'y1',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'rectRot'  // 旋转矩形
-            },
-            {
-              label: '新增总督',
-              data: newGuard3Data,
-              borderColor: '#FF6B6B',
-              backgroundColor: 'rgba(255, 107, 107, 0.1)',
-              yAxisID: 'y1',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'cross'  // 十字形
-            },
-            {
-              label: '新增提督',
-              data: newGuard2Data,
-              borderColor: '#4ECDC4',
-              backgroundColor: 'rgba(78, 205, 196, 0.1)',
-              yAxisID: 'y1',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'crossRot'  // 旋转十字形
-            },
-            {
-              label: '新增舰长',
-              data: newGuard1Data,
-              borderColor: '#45B7D1',
-              backgroundColor: 'rgba(69, 183, 209, 0.1)',
-              yAxisID: 'y1',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'star'  // 星形
-            },
-            {
-              label: '新增粉丝团',
-              data: newFansData,
-              borderColor: '#96CEB4',
-              backgroundColor: 'rgba(150, 206, 180, 0.1)',
-              yAxisID: 'y1',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'line'  // 线形
-            },
-            {
-              label: '弹幕数',
-              data: danmakuData,
-              borderColor: '#FFEAA7',
-              backgroundColor: 'rgba(255, 234, 167, 0.1)',
-              yAxisID: 'y1',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'dash'  // 虚线形
-            },
-            {
-              label: '总营收',
-              data: totalRevenueData,
-              borderColor: '#9966FF',
-              backgroundColor: 'rgba(153, 102, 255, 0.1)',
-              yAxisID: 'y1',
-              fill: true,
-              borderWidth: 3,
-              pointRadius: 6,
-              pointHoverRadius: 10,
-              tension: 0.4,
-              pointStyle: 'circle'  // 圆形，加粗显示
-            },
-            {
-              label: '平均同接',
-              data: avgConcurrencyData,
-              borderColor: '#2E86AB',
-              backgroundColor: 'rgba(46, 134, 171, 0.1)',
-              yAxisID: 'y2',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'circle'  // 圆形
-            },
-            {
-              label: '最高同接',
-              data: maxConcurrencyData,
-              borderColor: '#A23B72',
-              backgroundColor: 'rgba(162, 59, 114, 0.1)',
-              yAxisID: 'y2',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'triangle'  // 三角形
-            },
-            {
-              label: '新增粉丝数',
-              data: newFansCountData,
-              borderColor: '#F18F01',
-              backgroundColor: 'rgba(241, 143, 1, 0.1)',
-              yAxisID: 'y2',
-              fill: true,
-              pointRadius: 5,
-              pointHoverRadius: 8,
-              tension: 0.4,
-              pointStyle: 'rect'  // 矩形
-            }
-          ]
+      console.log('准备创建图表实例')
+      sessionChart = echarts.init(chartCanvas.value, 'liveshow')
+      sessionChart.setOption({
+        title: {
+          text: '直播数据趋势图',
+          left: 'center',
+          textStyle: { fontSize: 16 }
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: {
-              display: true,
-              text: '直播数据趋势图',
-              font: {
-                size: 16
-              }
-            },
-            legend: {
-              position: 'top',
-            }
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'cross' }
+        },
+        legend: {
+          top: 30,
+          type: 'scroll'
+        },
+        grid: {
+          left: 80,
+          right: 80,
+          top: 80,
+          bottom: 60
+        },
+        xAxis: {
+          type: 'category',
+          data: labels,
+          boundaryGap: false
+        },
+        yAxis: [
+          {
+            type: 'value',
+            name: '直播时长 (分钟)',
+            position: 'left'
           },
-          scales: {
-            y: {
-              type: 'linear',
-              display: true,
-              position: 'left',
-              title: {
-                display: true,
-                text: '直播时长 (分钟)'
-              }
-            },
-            y1: {
-              type: 'linear',
-              display: true,
-              position: 'right',
-              title: {
-                display: true,
-                text: '收入 (元)'
-              },
-              grid: {
-                drawOnChartArea: false,
-              },
-            },
-            y2: {
-              type: 'linear',
-              display: true,
-              position: 'right',
-              title: {
-                display: true,
-                text: '人数'
-              },
-              grid: {
-                drawOnChartArea: false,
-              },
-            }
+          {
+            type: 'value',
+            name: '收入 (元)',
+            position: 'right',
+            splitLine: { show: false }
           },
-          interaction: {
-            mode: 'index',
-            intersect: false
-          },
-          plugins: {
-            tooltip: {
-              enabled: true,
-              mode: 'index',
-              intersect: false
-            }
+          {
+            type: 'value',
+            name: '人数',
+            position: 'right',
+            offset: 60,
+            splitLine: { show: false }
           }
-        }
+        ],
+        series: [
+          {
+            name: '直播时长',
+            type: 'line',
+            data: durationData,
+            yAxisIndex: 0,
+            smooth: 0.4,
+            symbol: 'circle',
+            symbolSize: 5,
+            itemStyle: { color: '#FF6384' },
+            areaStyle: { color: 'rgba(255, 99, 132, 0.1)' }
+          },
+          {
+            name: '礼物收入',
+            type: 'line',
+            data: giftData,
+            yAxisIndex: 1,
+            smooth: 0.4,
+            symbol: 'triangle',
+            symbolSize: 5,
+            itemStyle: { color: '#36A2EB' },
+            areaStyle: { color: 'rgba(54, 162, 235, 0.1)' }
+          },
+          {
+            name: '舰长收入',
+            type: 'line',
+            data: guardData,
+            yAxisIndex: 1,
+            smooth: 0.4,
+            symbol: 'rect',
+            symbolSize: 5,
+            itemStyle: { color: '#FFCE56' },
+            areaStyle: { color: 'rgba(255, 206, 86, 0.1)' }
+          },
+          {
+            name: 'SC收入',
+            type: 'line',
+            data: superChatData,
+            yAxisIndex: 1,
+            smooth: 0.4,
+            symbol: 'diamond',
+            symbolSize: 5,
+            itemStyle: { color: '#4BC0C0' },
+            areaStyle: { color: 'rgba(75, 192, 192, 0.1)' }
+          },
+          {
+            name: '新增总督',
+            type: 'line',
+            data: newGuard3Data,
+            yAxisIndex: 1,
+            smooth: 0.4,
+            symbol: 'cross',
+            symbolSize: 5,
+            itemStyle: { color: '#FF6B6B' },
+            areaStyle: { color: 'rgba(255, 107, 107, 0.1)' }
+          },
+          {
+            name: '新增提督',
+            type: 'line',
+            data: newGuard2Data,
+            yAxisIndex: 1,
+            smooth: 0.4,
+            symbol: 'arrow',
+            symbolSize: 5,
+            itemStyle: { color: '#4ECDC4' },
+            areaStyle: { color: 'rgba(78, 205, 196, 0.1)' }
+          },
+          {
+            name: '新增舰长',
+            type: 'line',
+            data: newGuard1Data,
+            yAxisIndex: 1,
+            smooth: 0.4,
+            symbol: 'star',
+            symbolSize: 5,
+            itemStyle: { color: '#45B7D1' },
+            areaStyle: { color: 'rgba(69, 183, 209, 0.1)' }
+          },
+          {
+            name: '新增粉丝团',
+            type: 'line',
+            data: newFansData,
+            yAxisIndex: 1,
+            smooth: 0.4,
+            symbol: 'rect',
+            symbolSize: 5,
+            itemStyle: { color: '#96CEB4' },
+            areaStyle: { color: 'rgba(150, 206, 180, 0.1)' }
+          },
+          {
+            name: '弹幕数',
+            type: 'line',
+            data: danmakuData,
+            yAxisIndex: 1,
+            smooth: 0.4,
+            symbol: 'none',
+            itemStyle: { color: '#FFEAA7' },
+            areaStyle: { color: 'rgba(255, 234, 167, 0.1)' }
+          },
+          {
+            name: '总营收',
+            type: 'line',
+            data: totalRevenueData,
+            yAxisIndex: 1,
+            smooth: 0.4,
+            symbol: 'circle',
+            symbolSize: 6,
+            lineStyle: { width: 3 },
+            itemStyle: { color: '#9966FF' },
+            areaStyle: { color: 'rgba(153, 102, 255, 0.1)' }
+          },
+          {
+            name: '平均同接',
+            type: 'line',
+            data: avgConcurrencyData,
+            yAxisIndex: 2,
+            smooth: 0.4,
+            symbol: 'circle',
+            symbolSize: 5,
+            itemStyle: { color: '#2E86AB' },
+            areaStyle: { color: 'rgba(46, 134, 171, 0.1)' }
+          },
+          {
+            name: '最高同接',
+            type: 'line',
+            data: maxConcurrencyData,
+            yAxisIndex: 2,
+            smooth: 0.4,
+            symbol: 'triangle',
+            symbolSize: 5,
+            itemStyle: { color: '#A23B72' },
+            areaStyle: { color: 'rgba(162, 59, 114, 0.1)' }
+          },
+          {
+            name: '新增粉丝数',
+            type: 'line',
+            data: newFansCountData,
+            yAxisIndex: 2,
+            smooth: 0.4,
+            symbol: 'rect',
+            symbolSize: 5,
+            itemStyle: { color: '#F18F01' },
+            areaStyle: { color: 'rgba(241, 143, 1, 0.1)' }
+          }
+        ],
+        dataZoom: [
+          { type: 'inside', start: 0, end: 100 },
+          { type: 'slider', start: 0, end: 100 }
+        ]
       })
-      console.log('图表创建完成') // 添加调试日志
+      console.log('图表创建完成')
     }
 
     const hideChart = () => {
       chartVisible.value = false
       if (sessionChart) {
-        sessionChart.destroy()
+        sessionChart.dispose()
         sessionChart = null
       }
     }
@@ -802,6 +766,12 @@ export default {
         error.value = '获取数据失败，请稍后重试'
       } finally {
         loading.value = false
+        nextTick(() => {
+          if (cardsContainer.value) {
+            const cards = cardsContainer.value.querySelectorAll(':scope > *')
+            if (cards.length) staggerEnter(cards)
+          }
+        })
       }
     }
 
@@ -938,12 +908,8 @@ export default {
             if (targetElement) {
               targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
-              // 添加临时高亮效果
-              targetElement.style.transition = 'background-color 0.5s ease'
-              targetElement.style.backgroundColor = 'rgba(249, 114, 154, 0.3)'
-              setTimeout(() => {
-                targetElement.style.backgroundColor = ''
-              }, 2000)
+              gsap.set(targetElement, { backgroundColor: 'rgba(249, 114, 154, 0.3)' })
+              gsap.to(targetElement, { backgroundColor: 'transparent', duration: 0.5, delay: 1.5 })
             }
           })
         }
@@ -990,19 +956,21 @@ export default {
       performMultiMonthQuery,
       // 粉丝数计算相关
       fansLoading,
-      fetchFansData
+      fetchFansData,
+      cardsContainer
     }
   }
 }
 </script>
 
 <style scoped>
+.heading-icon { vertical-align: middle; margin-right: 4px }
 .live-sessions {
-  background: #FFF8E1;
-  border-radius: 30px; /* 超椭圆曲线 */
+  background: var(--color-card);
+  border-radius: var(--radius-card);
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid #FFC633;
+  border: 1px solid var(--color-primary);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
@@ -1029,46 +997,40 @@ export default {
 .action-btn {
   padding: 8px 16px;
   border: none;
-  border-radius: 30px; /* 更圆润的超椭圆形状 */
+  border-radius: var(--radius-button);
   cursor: pointer;
   font-size: 0.85rem;
-  transition: all 0.3s ease;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 120px; /* 最小宽度确保圆形效果 */
+  min-width: 120px;
 }
 
 .action-btn.primary {
-  background: linear-gradient(45deg, #FFC633, #FFA500);
-  color: #333;
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+  color: var(--color-text-main);
   font-weight: bold;
 }
 
 .action-btn.secondary {
-  background: linear-gradient(45deg, #f9729a, #f75982);
+  background: linear-gradient(45deg, var(--color-accent), var(--color-accent));
   color: white;
 }
 
 .action-btn.danger {
-  background: linear-gradient(45deg, #dc3545, #c82333);
+  background: linear-gradient(45deg, #E74C3C, #c0392b);
   color: white;
 }
 
 .action-btn.default {
-  background: linear-gradient(45deg, #6c757d, #5a6268);
+  background: linear-gradient(45deg, var(--color-text-secondary), #7a6940);
   color: white;
 }
 
 .action-btn.success {
-  background: linear-gradient(45deg, #28a745, #218838);
+  background: linear-gradient(45deg, #27AE60, #219653);
   color: white;
-}
-
-.action-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .info-section {
@@ -1077,20 +1039,20 @@ export default {
 }
 
 .page-title {
-  color: #FFC633;
+  color: var(--color-primary);
   font-size: 1.5rem;
   margin-bottom: 5px;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .refresh-time {
-  color: #f9729a;
+  color: var(--color-accent);
   font-size: 0.9rem;
   margin-bottom: 10px;
 }
 
 .queried-user {
-  color: #FFC633;
+  color: var(--color-primary);
   font-size: 1.5rem;
   font-weight: bold;
   display: flex;
@@ -1104,13 +1066,13 @@ export default {
   height: 80px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #FFC633;
+  border: 2px solid var(--color-primary);
 }
 
 .chart-info {
-  background: #FEEFEF;
-  border: 2px solid #f9729a;
-  border-radius: 30px; /* 超椭圆曲线 */
+  background: rgba(255, 107, 157, 0.1);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-card);
   padding: 15px;
   margin: 20px 0;
   text-align: center;
@@ -1122,7 +1084,7 @@ export default {
   margin: 20px 0;
   height: 500px;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 30px; /* 超椭圆曲线 */
+  border-radius: var(--radius-card);
   padding: 20px;
 }
 
@@ -1147,8 +1109,8 @@ export default {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid rgba(255, 198, 51, 0.3);
-  border-top: 4px solid #FFC633;
+  border: 4px solid rgba(246, 177, 0, 0.3);
+  border-top: 4px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 15px;
@@ -1167,18 +1129,12 @@ export default {
 
 .retry-btn {
   padding: 10px 20px;
-  background: linear-gradient(45deg, #33CC99, #28a745);
+  background: linear-gradient(45deg, #27AE60, #219653);
   color: white;
   border: none;
   border-radius: 20px;
   cursor: pointer;
   font-size: 0.9rem;
-  transition: all 0.3s ease;
-}
-
-.retry-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
 }
 
 .table-container {
@@ -1198,10 +1154,10 @@ export default {
 .sessions-table {
   width: 100%;
   border-collapse: collapse;
-  background: #FFF8E1;
-  border-radius: 30px; /* 添加超椭圆曲线 */
-  overflow: hidden; /* 确保圆角生效 */
-  table-layout: auto; /* 允许列宽自适应内容 */
+  background: var(--color-card);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  table-layout: auto;
 }
 
 .sessions-table th:first-child {
@@ -1213,8 +1169,8 @@ export default {
 }
 
 .sessions-table th {
-  background: linear-gradient(45deg, #FFC633, #FFA500);
-  color: #333;
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+  color: var(--color-text-main);
   padding: 12px 8px;
   text-align: left;
   font-weight: bold;
@@ -1237,39 +1193,38 @@ export default {
 
 .sessions-table td {
   padding: 10px 8px;
-  border-bottom: 1px solid #FFC633;
-  color: #333;
+  border-bottom: 1px solid var(--color-primary);
+  color: var(--color-text-main);
 }
 
 .sessions-table tbody tr {
-  transition: background-color 0.3s ease;
 }
 
 .sessions-table tbody tr:nth-child(even) {
-  background: #FFE5B4; /* 橙色略微变深的背景 */
+  background: rgba(246, 177, 0, 0.15); /* 橙色略微变深的背景 */
 }
 
 .sessions-table tbody tr:hover {
-  background: #FFD580; /* 橙色变浅的悬停效果 */
-  color: #333;
+  background: rgba(246, 177, 0, 0.2); /* 橙色变浅的悬停效果 */
+  color: var(--color-text-main);
 }
 
 .index-cell {
-  color: #FF6600;
+  color: var(--color-primary);
   font-weight: bold;
   text-align: center;
-  background-color: #FFF3CD;
+  background-color: rgba(246, 177, 0, 0.15);
 }
 
 .date-cell {
-  color: #f9729a;
+  color: var(--color-accent);
   font-family: 'Courier New', monospace;
   white-space: nowrap;
   font-weight: bold;
 }
 
 .duration-cell {
-  color: #f9729a;
+  color: var(--color-accent);
   font-weight: bold;
   text-align: center;
 }
@@ -1280,25 +1235,25 @@ export default {
 
 .amount {
   display: block;
-  color: #333;  /* 改为黑色 */
+  color: var(--color-text-main);  /* 改为黑色 */
   font-weight: bold;
 }
 
 .percentage {
   display: block;
   font-size: 0.8rem;
-  color: #f9729a;
-  font-weight: bold;  /* 加粗 */
+  color: var(--color-accent);
+  font-weight: bold;
 }
 
 .total-revenue {
-  color: #f9729a;
+  color: var(--color-accent);
   font-weight: bold;
   text-align: right;
 }
 
 .title-cell {
-  color: #f9729a;
+  color: var(--color-accent);
   max-width: 200px;
   white-space: nowrap;
   overflow: hidden;
@@ -1323,16 +1278,16 @@ export default {
 .sc-history-table {
   width: 100%;
   border-collapse: collapse;
-  background: #FFF8E1;
-  border-radius: 30px; /* 添加超椭圆曲线 */
-  overflow: hidden; /* 确保圆角生效 */
-  min-width: auto; /* 允许在窄屏上收缩 */
-  table-layout: auto; /* 允许列宽自适应 */
+  background: var(--color-card);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  min-width: auto;
+  table-layout: auto;
 }
 
 .sc-history-table th {
-  background: linear-gradient(45deg, #FFC633, #FFA500);
-  color: #333;
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+  color: var(--color-text-main);
   padding: 12px 8px;
   text-align: left;
   font-weight: bold;
@@ -1343,8 +1298,8 @@ export default {
 
 .sc-history-table td {
   padding: 10px 8px;
-  border-bottom: 1px solid #FFC633;
-  color: #333;
+  border-bottom: 1px solid var(--color-primary);
+  color: var(--color-text-main);
 }
 
 /* SC历史记录表格单元格内容截断处理 */
@@ -1450,34 +1405,32 @@ export default {
 
 /* 网格布局样式 */
 .session-grid-item {
-  background: #FFF8E1;
-  border: 1px solid #FFC633;
+  background: var(--color-card);
+  border: 1px solid var(--color-primary);
   border-radius: 15px;
   padding: 12px;
   margin-bottom: 12px;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
 }
 
 .sc-grid-item {
-  background: #FFF8E1;
-  border: 1px solid #FFC633;
+  background: var(--color-card);
+  border: 1px solid var(--color-primary);
   border-radius: 15px;
   padding: 12px;
   margin-bottom: 12px;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
 }
 
 .grid-header {
-  background: linear-gradient(45deg, #FFC633, #FFA500); /* 深色背景 */
-  color: white; /* 白色文字 */
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+  color: white;
   padding: 8px;
   border-radius: 10px;
   margin-bottom: 8px;
-  display: flex; /* 使用flex布局 */
-  align-items: center; /* 垂直居中 */
-  justify-content: space-between; /* 两端对齐 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .grid-index {
@@ -1490,7 +1443,7 @@ export default {
   margin: 5px 0;
   font-size: 1.2em; /* 增大字号 */
   text-align: center; /* 居中对齐 */
-  color: #333; /* 设置颜色 */
+  color: var(--color-text-main); /* 设置颜色 */
   flex-grow: 1; /* 占据剩余空间 */
   padding: 0 10px; /* 添加左右内边距 */
 }
@@ -1509,62 +1462,50 @@ export default {
 }
 
 .field-box {
-  background: rgba(255, 248, 225, 0.7); /* 淡黄色半透明背景，与AnchorList一致 */
-  border: 1px solid #FFC633;
-  border-radius: 10px; /* 增加圆角，与AnchorList一致 */
-  padding: 12px; /* 增加内边距，与AnchorList一致 */
+  background: rgba(255, 248, 225, 0.7);
+  border: 1px solid var(--color-primary);
+  border-radius: 10px;
+  padding: 12px;
   min-width: 120px;
-  display: flex; /* 使用flex布局 */
-  flex-direction: column; /* 改为垂直布局，与AnchorList一致 */
-  align-items: flex-start; /* 左对齐内容，与AnchorList一致 */
-  text-align: left; /* 左对齐文本，与AnchorList一致 */
-  margin-bottom: 6px; /* 添加底部间距 */
-  transition: all 0.2s ease; /* 添加过渡效果 */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  margin-bottom: 6px;
 }
 
 .field-label {
   font-weight: bold;
-  color: #FF8C00; /* 使用更醒目的颜色，与AnchorList一致 */
-  font-size: 1.1em; /* 正常大小，与AnchorList一致 */
+  color: var(--color-primary);
+  font-size: 1.1em;
   word-break: break-word;
-  margin-bottom: 4px; /* 与值之间添加间距 */
-  flex-shrink: 0; /* 防止标签被压缩，与AnchorList一致 */
-  transition: all 0.3s ease; /* 添加颜色过渡效果 */
-  background-color: rgba(255, 198, 51, 0.15); /* 添加轻微背景色 */
-  padding: 4px 8px; /* 添加内边距 */
-  border-radius: 8px; /* 添加圆角 */
-}
-
-.field-label:hover {
-  color: #FF6600; /* 悬停时更深的颜色，与AnchorList一致 */
-  background-color: rgba(255, 165, 0, 0.25); /* 悬停时更深的背景色 */
+  margin-bottom: 4px;
+  flex-shrink: 0;
+  background-color: rgba(246, 177, 0, 0.15);
+  padding: 4px 8px;
+  border-radius: 8px;
 }
 
 .field-value {
-  color: #333;
-  font-size: 1.1em; /* 正常大小，与AnchorList一致 */
+  color: var(--color-text-main);
+  font-size: 1.1em;
   word-break: break-word;
-  text-align: left; /* 值左对齐 */
-  margin-left: 0; /* 与标签之间添加间距，与AnchorList一致 */
-  overflow: hidden; /* 防止溢出 */
-  text-overflow: ellipsis; /* 溢出时显示省略号 */
-  transition: all 0.3s ease; /* 添加颜色过渡效果 */
-  align-self: flex-start; /* 左对齐 */
-  width: 100%; /* 占满整个宽度 */
-}
-
-.field-value:hover {
-  color: #f9729a; /* 悬停时使用主题色，与AnchorList一致 */
+  text-align: left;
+  margin-left: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  align-self: flex-start;
+  width: 100%;
 }
 
 /* 高亮重要数值 */
 .total-revenue {
-  color: #f9729a !important;
+  color: var(--color-accent) !important;
   font-weight: bold;
 }
 
 .currency-cell {
-  color: #f9729a !important;
+  color: var(--color-accent) !important;
   font-weight: bold;
 }
 
@@ -1575,84 +1516,70 @@ export default {
 
 /* 旧的卡片布局样式（保留用于可能的回退） */
 .session-card {
-  background: linear-gradient(135deg, #FFF8E1, #FFF5C2); /* 添加轻微渐变背景 */
-  border: 1px solid #FFC633;
+  background: linear-gradient(135deg, var(--color-card), var(--color-card));
+  border: 1px solid var(--color-primary);
   border-radius: 20px;
-  padding: 15px; /* 增加内边距以改善视觉效果 */
-  margin-bottom: 15px; /* 增加外边距以改善视觉效果 */
-  box-shadow: 0 6px 16px rgba(255, 198, 51, 0.2); /* 添加更柔和的阴影，与AnchorList一致 */
-  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* 使用更平滑的缓动函数 */
-  position: relative; /* 为高级动效添加相对定位 */
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 6px 16px rgba(246, 177, 0, 0.2);
+  position: relative;
   overflow: hidden; /* 确保内容不会溢出 */
   will-change: transform; /* 优化性能 */
   transform: translateZ(0); /* 启用硬件加速 */
-}
-
-.session-card:hover {
-  transform: translateY(-8px) scale(1.02); /* 上浮并轻微放大 */
-  box-shadow: 0 12px 30px rgba(255, 198, 51, 0.4); /* 增强阴影 */
-  border-color: #FFA500; /* 边框颜色变化 */
 }
 
 
 .sc-card {
-  background: linear-gradient(135deg, #FFF8E1, #FFF5C2); /* 添加轻微渐变背景，与AnchorList一致 */
-  border: 1px solid #FFC633;
+  background: linear-gradient(135deg, var(--color-card), var(--color-card));
+  border: 1px solid var(--color-primary);
   border-radius: 20px;
-  padding: 15px; /* 增加内边距以改善视觉效果 */
-  margin-bottom: 15px; /* 增加外边距以改善视觉效果 */
-  box-shadow: 0 6px 16px rgba(255, 198, 51, 0.2); /* 添加更柔和的阴影，与AnchorList一致 */
-  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); /* 使用更平滑的缓动函数 */
-  position: relative; /* 为高级动效添加相对定位 */
-  overflow: hidden; /* 确保内容不会溢出 */
-  will-change: transform; /* 优化性能 */
-  transform: translateZ(0); /* 启用硬件加速 */
-}
-
-.sc-card:hover {
-  transform: translateY(-8px) scale(1.02); /* 上浮并轻微放大 */
-  box-shadow: 0 12px 30px rgba(255, 198, 51, 0.4); /* 增强阴影 */
-  border-color: #FFA500; /* 边框颜色变化 */
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 6px 16px rgba(246, 177, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 
 .card-header {
   display: flex;
-  justify-content: center; /* 改为居中对齐 */
+  justify-content: center;
   align-items: center;
-  background: linear-gradient(45deg, #FFC633, #FFA500); /* 深色背景 */
-  color: white; /* 白色文字 */
+  background: linear-gradient(45deg, var(--color-primary), var(--color-primary));
+  color: white;
   padding: 10px;
   border-radius: 10px;
-  margin-bottom: 8px; /* 压缩间距 */
+  margin-bottom: 8px;
 }
 
 .card-index {
   font-weight: bold;
-  color: #FF8C00; /* 更醒目的颜色 */
+  color: var(--color-primary);
   text-align: center;
-  background-color: #FFF3CD;
+  background-color: rgba(246, 177, 0, 0.15);
   border-radius: 50%;
-  width: 35px; /* 稍微增大 */
+  width: 35px;
   height: 35px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2em; /* 增大字号 */
+  font-size: 1.2em;
 }
 
 .card-title {
-  color: #333;
+  color: var(--color-text-main);
   font-weight: bold;
   text-align: center;
-  font-size: 1.2em; /* 增大字号 */
+  font-size: 1.2em;
 }
 
 .card-time {
-  color: #4CAF50;
+  color: #27AE60;
   font-weight: bold;
   text-align: center;
-  font-size: 1.1em; /* 增大字号 */
+  font-size: 1.1em;
 }
 
 .card-body {
@@ -1679,53 +1606,50 @@ export default {
 
 .field-label {
   font-weight: bold;
-  color: #FF8C00; /* 使用更醒目的颜色，与AnchorList一致 */
-  font-size: 1em; /* 增大字号 */
+  color: var(--color-primary);
+  font-size: 1em;
   word-break: break-word;
-  margin-bottom: 4px; /* 与值之间添加间距 */
-  align-self: flex-start; /* 左对齐 */
-  transition: all 0.3s ease; /* 添加颜色过渡效果 */
-  background-color: rgba(255, 198, 51, 0.15); /* 添加轻微背景色 */
-  padding: 4px 8px; /* 添加内边距 */
-  border-radius: 8px; /* 添加圆角 */
-  min-width: 80px; /* 设置最小宽度 */
+  margin-bottom: 4px;
+  align-self: flex-start;
+  background-color: rgba(246, 177, 0, 0.15);
+  padding: 4px 8px;
+  border-radius: 8px;
+  min-width: 80px;
 }
 
 .field-label:hover {
-  color: #FF6600; /* 悬停时更深的颜色 */
-  background-color: rgba(255, 165, 0, 0.25); /* 悬停时更深的背景色 */
+  color: var(--color-primary);
+  background-color: rgba(255, 165, 0, 0.25);
 }
 
 .field-value {
-  text-align: left; /* 值左对齐，与标签对齐 */
-  color: #333;
-  font-size: 1.1em; /* 增大字号 */
+  text-align: left;
+  color: var(--color-text-main);
+  font-size: 1.1em;
   word-break: break-word;
-  text-align: left; /* 值左对齐 */
-  overflow: hidden; /* 防止溢出 */
-  text-overflow: ellipsis; /* 溢出时显示省略号 */
-  transition: all 0.3s ease; /* 添加颜色过渡效果 */
-  align-self: flex-start; /* 左对齐 */
-  width: 100%; /* 占满整个宽度 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  align-self: flex-start;
+  width: 100%;
 }
 
 .field-value:hover {
-  color: #f9729a; /* 悬停时使用主题色 */
+  color: var(--color-accent);
 }
 
 .card-footer {
-  margin-top: 10px; /* 压缩间距 */
+  margin-top: 10px;
   text-align: center;
 }
 
 /* 高亮重要数值 */
 .total-revenue {
-  color: #f9729a !important;
+  color: var(--color-accent) !important;
   font-weight: bold;
 }
 
 .currency-cell {
-  color: #f9729a !important;
+  color: var(--color-accent) !important;
   font-weight: bold;
 }
 
@@ -2029,15 +1953,14 @@ export default {
 
 .sc-btn {
   padding: 6px 12px;
-  background: linear-gradient(45deg, #f9729a, #f75982);
+  background: linear-gradient(45deg, var(--color-accent), var(--color-accent));
   color: white;
   border: none;
-  border-radius: 30px; /* 超椭圆形状 */
+  border-radius: var(--radius-button);
   cursor: pointer;
   font-size: 0.8rem;
-  transition: all 0.3s ease;
   font-weight: bold;
-  min-width: 120px; /* 最小宽度确保圆形效果 */
+  min-width: 120px;
   animation: buttonGlow 2s infinite alternate;
 }
 
@@ -2057,13 +1980,13 @@ export default {
 
 @keyframes magentaGlow {
   0% {
-    box-shadow: 0 0 5px rgba(249, 114, 154, 0.5); /* 洋红色 */
+    box-shadow: 0 0 5px rgba(255, 107, 157, 0.5);
   }
   50% {
-    box-shadow: 0 0 15px rgba(249, 114, 154, 0.8); /* 洋红色 */
+    box-shadow: 0 0 15px rgba(255, 107, 157, 0.8);
   }
   100% {
-    box-shadow: 0 0 25px rgba(249, 114, 154, 1); /* 洋红色 */
+    box-shadow: 0 0 25px rgba(255, 107, 157, 1);
   }
 }
 
@@ -2073,8 +1996,7 @@ export default {
 }
 
 .sc-btn:hover {
-  background: linear-gradient(45deg, #ff88ad, #f06a8a); /* 变亮效果 */
-  box-shadow: 0 2px 8px rgba(249, 114, 154, 0.3);
+  background: linear-gradient(45deg, #ff88ad, #f06a8a);
 }
 
 @keyframes buttonGlow {
@@ -2100,26 +2022,12 @@ export default {
 
 /* 与主界面保持一致的悬停效果 */
 .hover-effect {
-  transition: all 0.3s ease;
   position: relative;
   z-index: 1;
 }
 
-.hover-effect:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
-  z-index: 10;
-}
-
 /* 为表格行添加悬停效果 */
 .sessions-table tbody tr {
-  transition: all 0.3s ease;
-}
-
-.sessions-table tbody tr:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* 为按钮添加统一的悬停效果 */
@@ -2132,22 +2040,8 @@ export default {
 .primary,
 .success,
 .danger {
-  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
-}
-
-.action-btn:hover,
-.sc-btn:hover,
-.view-btn:hover,
-.follow-btn:hover,
-.retry-btn:hover,
-.default:hover,
-.primary:hover,
-.success:hover,
-.danger:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
 }
 
 /* 按钮闪烁效果 */
@@ -2181,7 +2075,7 @@ export default {
 }
 
 .start-time {
-  color: #4CAF50;
+  color: #27AE60;
   font-weight: bold;
 }
 
@@ -2190,7 +2084,7 @@ export default {
   font-weight: bold;
   margin-top: 4px;
   padding-top: 4px;
-  border-top: 1px dashed #ccc;
+  border-top: 1px dashed rgba(142, 123, 80, 0.3);
 }
 
 .action-cell {
@@ -2262,21 +2156,21 @@ export default {
 }
 
 .modal-content {
-  background: #FFF8E1;
-  border-radius: 20px;
+  background: var(--color-card);
+  border-radius: var(--radius-card);
   padding: 25px;
   width: 400px;
   max-width: 90%;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
 }
 
 .modal-content h3 {
   margin-top: 0;
   margin-bottom: 20px;
-  color: #f9729a;
+  color: var(--color-accent);
   text-align: center;
 }
 
@@ -2294,22 +2188,21 @@ export default {
 
 .form-group label {
   font-weight: bold;
-  color: #333;
+  color: var(--color-text-main);
 }
 
 .month-input {
   padding: 10px;
-  border: 2px solid #f9729a;
+  border: 2px solid var(--color-accent);
   border-radius: 10px;
   font-size: 16px;
   background: rgba(255, 255, 255, 0.8);
-  transition: all 0.3s ease;
 }
 
 .month-input:focus {
   outline: none;
-  border-color: #e0658a;
-  box-shadow: 0 0 10px rgba(249, 114, 154, 0.3);
+  border-color: color-mix(in srgb, var(--color-accent) 80%, black);
+  box-shadow: 0 0 10px rgba(255, 107, 157, 0.3);
 }
 
 .button-group {
@@ -2322,33 +2215,20 @@ export default {
   flex: 1;
   padding: 10px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-button);
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
-  transition: all 0.3s ease;
 }
 
 .confirm-btn {
-  background: linear-gradient(45deg, #f9729a, #f75982);
+  background: linear-gradient(45deg, var(--color-accent), var(--color-accent));
   color: white;
-}
-
-.confirm-btn:hover {
-  background: linear-gradient(45deg, #e0658a, #d05572);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(249, 114, 154, 0.3);
 }
 
 .cancel-btn {
-  background: #ccc;
+  background: var(--color-text-secondary);
   color: white;
-}
-
-.cancel-btn:hover {
-  background: #bbb;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* 宽屏优化：在大屏幕上显示更多列 */
@@ -2363,12 +2243,6 @@ export default {
   .session-grid-item, .sc-grid-item {
     margin-bottom: 0; /* 在网格布局中不需要底部边距 */
     height: fit-content; /* 高度自适应内容 */
-    transition: transform 0.3s ease, box-shadow 0.3s ease; /* 添加悬停效果 */
-  }
-
-  .session-grid-item:hover, .sc-grid-item:hover {
-    transform: translateY(-5px); /* 悬停时轻微上移 */
-    box-shadow: 0 8px 24px rgba(255, 198, 51, 0.4); /* 增强阴影效果 */
   }
 }
 
@@ -2384,12 +2258,6 @@ export default {
   .session-card, .sc-card {
     margin-bottom: 0; /* 在网格布局中不需要底部边距 */
     height: fit-content; /* 高度自适应内容，与AnchorList一致 */
-    transition: transform 0.3s ease, box-shadow 0.3s ease; /* 添加悬停效果，与AnchorList一致 */
-  }
-
-  .session-card:hover, .sc-card:hover {
-    transform: translateY(-5px); /* 悬停时轻微上移，与AnchorList一致 */
-    box-shadow: 0 8px 24px rgba(255, 198, 51, 0.4); /* 增强阴影效果，与AnchorList一致 */
   }
 }
 
@@ -2407,7 +2275,7 @@ export default {
 
   .field-label {
     font-weight: bold;
-    color: #555;
+    color: var(--color-text-secondary);
   }
 
   .card-header {

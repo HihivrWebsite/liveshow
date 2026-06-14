@@ -9,8 +9,8 @@
       <h1 class="error-title">{{ errorCode || '404' }}</h1>
       <p class="error-message">{{ errorMessage || '页面未找到' }}</p>
       <div class="error-actions">
-        <button @click="goHome" class="action-btn primary">返回首页</button>
-        <button @click="goBack" class="action-btn secondary">返回上一页</button>
+        <GlassButton @click="goHome" variant="primary" size="lg">返回首页</GlassButton>
+        <GlassButton @click="goBack" variant="secondary" size="lg">返回上一页</GlassButton>
       </div>
     </div>
   </div>
@@ -18,9 +18,13 @@
 
 <script>
 import { useRouter } from 'vue-router'
+import GlassButton from '@/components/ui/GlassButton.vue'
 
 export default {
   name: 'ErrorPage',
+  components: {
+    GlassButton
+  },
   props: {
     errorCode: {
       type: String,
@@ -103,35 +107,6 @@ export default {
   flex-wrap: wrap;
 }
 
-.action-btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 25px;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.action-btn.primary {
-  background: linear-gradient(45deg, #FFC633, #FFA500);
-  color: #333;
-  font-weight: bold;
-}
-
-.action-btn.secondary {
-  background: linear-gradient(45deg, #f9729a, #f75982);
-  color: white;
-}
-
-.action-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
 /* 响应式设计 */
 @media (max-width: 768px) {
   .error-content {
@@ -150,11 +125,6 @@ export default {
   .error-actions {
     flex-direction: column;
     align-items: center;
-  }
-  
-  .action-btn {
-    width: 100%;
-    max-width: 250px;
   }
 }
 </style>

@@ -154,8 +154,8 @@ export default {
 <style scoped>
 /* 完全复制 AnchorList.vue 中的卡片样式 */
 .anchor-grid-item {
-  background: linear-gradient(135deg, #FFF8E1, #FFF5C2); /* 添加轻微渐变背景 */
-  border: 1px solid #FFC633;
+  background: linear-gradient(135deg, var(--color-background), var(--color-card)); /* 添加轻微渐变背景 */
+  border: 1px solid var(--color-primary);
   border-radius: 20px; /* 增加圆角 */
   padding: 15px; /* 增加内边距 */
   margin-bottom: 15px; /* 增加外边距 */
@@ -171,7 +171,7 @@ export default {
 .anchor-grid-item:hover {
   transform: translateY(-8px) scale(1.02); /* 上浮并轻微放大 */
   box-shadow: 0 12px 30px rgba(255, 198, 51, 0.4); /* 增强阴影 */
-  border-color: #FFA500; /* 边框颜色变化 */
+  border-color: var(--color-primary); /* 边框颜色变化 */
 }
 
 /* 光泽扫过效果 */
@@ -199,12 +199,12 @@ export default {
 }
 
 .anchor-grid-item.live-grid-item {
-  border: 2px solid #f9729a; /* 直播状态特殊边框 */
-  background: #FFF8E1; /* 浅黄色背景 */
+  border: 2px solid var(--color-accent); /* 直播状态特殊边框 */
+  background: var(--color-background); /* 浅黄色背景 */
 }
 
 .grid-header {
-  background: linear-gradient(135deg, #FF8C00, #FFA500); /* 橙色渐变背景 */
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary)); /* 橙色渐变背景 */
   color: white; /* 白色文字 */
   padding: 15px; /* 内边距 */
   border-radius: 15px; /* 圆角 */
@@ -255,7 +255,7 @@ export default {
 
 .field-box {
   background: rgba(255, 248, 225, 0.7); /* 淡黄色半透明背景 */
-  border: 1px solid #FFC633;
+  border: 1px solid var(--color-primary);
   border-radius: 10px; /* 增加圆角 */
   padding: 12px; /* 增加内边距 */
   min-width: 120px;
@@ -275,7 +275,7 @@ export default {
 
 .field-label {
   font-weight: bold;
-  color: #FF8C00; /* 使用更醒目的颜色 */
+  color: var(--color-primary); /* 使用更醒目的颜色 */
   font-size: 1.1em; /* 正常大小 */
   word-break: break-word;
   margin-right: 10px; /* 增加与值之间的间距 */
@@ -292,7 +292,7 @@ export default {
 }
 
 .field-value {
-  color: #333;
+  color: var(--color-text-main);
   font-size: 1.1em; /* 正常大小 */
   word-break: break-word;
   text-align: right; /* 值右对齐 */
@@ -303,11 +303,11 @@ export default {
 }
 
 .field-value:hover {
-  color: #f9729a; /* 悬停时使用主题色 */
+  color: var(--color-accent); /* 悬停时使用主题色 */
 }
 
 .total-revenue {
-  color: #f9729a !important;
+  color: var(--color-accent) !important;
   font-weight: bold;
 }
 
@@ -331,9 +331,9 @@ export default {
 }
 
 .status-badge.live {
-  background: #f9729a; /* 实心洋红色背景，与查看详细数据按钮相同 */
+  background: var(--color-accent); /* 实心洋红色背景，与查看详细数据按钮相同 */
   color: white; /* 白色文字，与查看详细数据按钮相同 */
-  border: 2px solid #f9729a; /* 洋红色边框，与查看详细数据按钮相同 */
+  border: 2px solid var(--color-accent); /* 洋红色边框，与查看详细数据按钮相同 */
   border-radius: 30px; /* 更圆润的超椭圆形状 */
   padding: 4px 8px; /* 内边距，与查看详细数据按钮相似 */
   cursor: pointer; /* 鼠标指针 */
@@ -347,7 +347,7 @@ export default {
 
 .status-badge.offline {
   background: rgba(255, 255, 255, 0.2);
-  color: #ccc;
+  color: rgba(142, 123, 80, 0.3);
 }
 
 .live-link {
@@ -363,9 +363,9 @@ export default {
 
 .view-btn {
   padding: 6px 12px;
-  background: #f9729a; /* 实心洋红色背景 */
+  background: var(--color-accent); /* 实心洋红色背景 */
   color: white; /* 白色文字 */
-  border: 2px solid #f9729a; /* 洋红色边框 */
+  border: 2px solid var(--color-accent); /* 洋红色边框 */
   border-radius: 30px; /* 更圆润的超椭圆形状 */
   cursor: pointer;
   font-size: 0.8rem;
@@ -375,7 +375,7 @@ export default {
 }
 
 .view-btn:hover {
-  background: #e0658a; /* 悬停时更深的洋红色 */
+  background: color-mix(in srgb, var(--color-accent) 80%, black); /* 悬停时更深的洋红色 */
   color: white; /* 悬停时文字保持白色 */
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(249, 114, 154, 0.3);
