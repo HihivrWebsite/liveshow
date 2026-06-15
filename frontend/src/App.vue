@@ -1,5 +1,6 @@
 <template>
   <div id="app" class="app">
+    <CursorProvider />
     <HeaderSection />
     <main class="main-content">
       <router-view v-slot="{ Component }">
@@ -16,12 +17,14 @@
 import { defineAsyncComponent } from 'vue'
 import HeaderSection from './components/HeaderSection.vue'
 import FooterSection from './components/FooterSection.vue'
+import CursorProvider from './components/ui/cursor/CursorProvider.vue'
 
 export default {
   name: 'App',
   components: {
     HeaderSection,
-    FooterSection
+    FooterSection,
+    CursorProvider
   }
 }
 </script>

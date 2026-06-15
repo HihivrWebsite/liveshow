@@ -2,6 +2,18 @@
 
 ## 版本历史
 
+### v4.3.0 — 2026-06-15 高级鼠标交互系统（Cursor System）
+
+- 安装 gsap 和 typescript 依赖
+- 新增 `tsconfig.json` TypeScript 配置
+- 新增 `useCursor.ts` 组合式函数：鼠标位置追踪、速度/方向计算、悬停/点击状态管理、移动端自动禁用
+- 新增 `CursorDot.vue`：8px 金色圆点光标，实时跟随鼠标
+- 新增 `CursorRing.vue`：32px 环形光标，带延迟跟随、速度弹性变形、悬停放大、点击缩小动画
+- 新增 `CursorRipple.vue`：点击时产生扩散波纹效果
+- 新增 `CursorProvider.vue`：光标系统容器，管理 hover 检测和 magnetic 元素吸附效果
+- `App.vue` 顶部挂载 CursorProvider，全局启用自定义光标
+- 移动端（<768px 或触摸设备）自动禁用，回退默认光标
+
 ### v4.2.2 — 2026-06-14 嵌入默认头像 + 禁用后台刷新
 
 - Python 脚本从 `cache_data/avatars_compressed/` 读取 85 个 40x40 JPEG 头像，转为 base64 data URL，生成 `defaultAvatars.js`（154 KB）
