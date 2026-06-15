@@ -1,5 +1,10 @@
 export function parseYearMonth(ymString) {
-  const [year, month] = ymString.split('-').map(Number)
+  if (ymString.includes('-')) {
+    const [year, month] = ymString.split('-').map(Number)
+    return { year, month }
+  }
+  const year = parseInt(ymString.substring(0, 4))
+  const month = parseInt(ymString.substring(4, 6))
   return { year, month }
 }
 
