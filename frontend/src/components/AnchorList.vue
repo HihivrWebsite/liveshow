@@ -1756,8 +1756,8 @@ export default {
 
         // 计算数据范围
         const maxX = Math.max(residuals.length - 1, 1)
-        const minY = Math.min(...residuals)
-        const maxY = Math.max(...residuals)
+        let minY = Math.min(...residuals)
+        let maxY = Math.max(...residuals)
 
         // 如果所有残差都相同，稍微扩展范围
         if (minY === maxY) {
