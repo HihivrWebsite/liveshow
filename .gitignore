@@ -13,6 +13,10 @@ Cargo.lock
 .DS_Store
 Thumbs.db
 
+# 部署产物
+logs/
+.backup/
+
 # IDE
 .vscode/
 .idea/
@@ -54,6 +58,7 @@ __pycache__/
 .env.development.local
 .env.test.local
 .env.production.local
+.deploy.env
 
 # 测试
 coverage/
