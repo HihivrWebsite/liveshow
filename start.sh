@@ -310,5 +310,6 @@ echo "╚═══════════════════════�
 echo ""
 log "启动服务中... 按 Ctrl+C 停止"
 
-# 使用 exec 执行 release 二进制，信号直接传递
+# 切换到后端目录执行（与 cargo run 行为一致，确保 ./dist/index.html 路径正确）
+cd "${BACKEND_DIR}"
 exec "${RELEASE_BINARY}"
