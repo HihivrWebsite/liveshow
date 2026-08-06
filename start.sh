@@ -98,7 +98,7 @@ if [[ "${CURRENT_BRANCH}" != "${BRANCH}" ]]; then
 fi
 
 # 检查工作区是否有未提交更改
-if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+if [[ -n "$(git diff --name-only HEAD 2>/dev/null)" ]]; then
     log "警告: 工作区有未提交的更改，自动更新将跳过"
     HAS_UNCOMMITTED=true
 else

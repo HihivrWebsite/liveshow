@@ -2359,14 +2359,33 @@ async fn serve_logo2() -> impl IntoResponse {
 }
 
 async fn index_handler() -> Html<String> {
-    Html(std::fs::read_to_string("../rust_backend/dist/index.html").unwrap())
+    match std::fs::read_to_string("../rust_backend/dist/index.html") {
+        Ok(content) => Html(content),
+        Err(e) => {
+            eprintln!("警告: 无法读取 index.html: {}", e);
+            Html(format!("<h1>500 - 页面未找到</h1><p>index.html 不存在: {}</p>", e))
+        }
+    }
 }
 
 async fn favicon() -> impl axum::response::IntoResponse {
-    axum::response::Response::builder()
-        .header("content-type", "image/x-icon")
-        .body(axum::body::Body::from(
-            std::fs::read("../rust_backend/dist/favicon.ico").unwrap(),
-        ))
-        .unwrap()
+    match std::fs::read("../rust_backend/dist/favicon.ico") {
+        Ok(data) => axum::response::Response::builder()
+            .header("content-type", "image/x-icon")
+            .body(axum::body::Body::from(data))
+            .unwrap_or_else(|e| {
+                eprintln!("警告: 构建 favicon 响应失败: {}", e);
+                axum::response::Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(axum::body::Body::empty())
+                    .unwrap()
+            }),
+        Err(e) => {
+            eprintln!("警告: 无法读取 favicon.ico: {}", e);
+            axum::response::Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(axum::body::Body::empty())
+                .unwrap()
+        }
+    }
 }
