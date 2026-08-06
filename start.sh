@@ -234,7 +234,14 @@ NEED_BACKEND_BUILD="${NEED_BACKEND_BUILD:-true}"
 RELEASE_BINARY="${BACKEND_DIR}/target/release/liveshow-backend"
 
 if [[ "${UPDATED}" == "false" && -f "${RELEASE_BINARY}" ]]; then
-    log "未检测到更新且 release 二进制已存在，跳过后端构建"
+    # 检查源码是否比二进制新（手动 git pull 后的情况）
+    NEWEST_SRC="$(find "${BACKEND_DIR}/src" -name '*.rs' -newer "${RELEASE_BINARY}" 2>/dev/null | head -1)"
+    if [[ -n "${NEWEST_SRC}" ]]; then
+        log "检测到源文件比二进制新，需要重新编译"
+        UPDATED="true"
+    else
+        log "未检测到更新且 release 二进制已存在，跳过后端构建"
+    fi
 else
     if [[ "${NEED_BACKEND_BUILD}" == "false" && -f "${RELEASE_BINARY}" ]]; then
         log "后端文件无变化且 release 二进制已存在，跳过后端构建"
