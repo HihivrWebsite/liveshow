@@ -15,7 +15,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::fs;
+
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 use tokio::time::timeout;
@@ -30,6 +30,7 @@ use base64::Engine;
 
 // 缓存条目结构，包含数据和大小估算
 #[derive(Clone)]
+#[allow(dead_code)]
 struct CacheEntry {
     data: Vec<Anchor>,
     size_estimate: usize,             // 大小估算（字节）
@@ -38,6 +39,7 @@ struct CacheEntry {
 
 // Attention数据缓存条目 - 存储某个月份的所有日期的关注数快照
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 struct AttentionCacheEntry {
     data: serde_json::Value, // 原始JSON数据 {"YYYYMMDD": count, ...}
     timestamp: std::time::SystemTime,
@@ -1849,7 +1851,7 @@ async fn fetch_live_session_from_api(
 
     let mut sessions = Vec::new();
 
-    for (index, item) in sessions_array.iter().enumerate() {
+    for (_index, item) in sessions_array.iter().enumerate() {
         // 安全地获取字符串值
         let start_time = item
             .get("start_time")
