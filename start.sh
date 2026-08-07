@@ -197,7 +197,14 @@ log "---------- §3 依赖安装 & 编译 ----------"
 NEED_FRONTEND_BUILD="${NEED_FRONTEND_BUILD:-true}"
 
 if [[ "${UPDATED}" == "false" && -d "${FRONTEND_DIR}/dist" ]]; then
-    log "未检测到更新且前端 dist/ 已存在，跳过前端构建"
+    # 检查前端源码是否比 dist 新（手动 git pull 后的情况）
+    NEWEST_FE_SRC="$(find "${FRONTEND_DIR}/src" -newer "${FRONTEND_DIR}/dist/index.html" 2>/dev/null | head -1)"
+    if [[ -n "${NEWEST_FE_SRC}" ]]; then
+        log "检测到前端源文件比 dist 新，需要重新构建"
+        UPDATED="true"
+    else
+        log "未检测到更新且前端 dist/ 已存在，跳过前端构建"
+    fi
 else
     if [[ "${NEED_FRONTEND_BUILD}" == "false" && -d "${FRONTEND_DIR}/dist" ]]; then
         log "前端文件无变化且 dist/ 已存在，跳过前端构建"
