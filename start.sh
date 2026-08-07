@@ -159,9 +159,9 @@ else
 
                 # 执行 git pull
                 log "正在拉取更新..."
-                if ! timeout "${UPDATE_TIMEOUT}" git pull "${REMOTE}" "${BRANCH}" 2>&1 | tee -a "${LOG_DIR}/update.log"; then
-                    log "错误: git pull 失败"
-                    exit 1
+                if ! timeout "${UPDATE_TIMEOUT}" git pull --rebase "${REMOTE}" "${BRANCH}" 2>&1 | tee -a "${LOG_DIR}/update.log"; then
+                    log "警告: git pull 失败，使用本地版本继续"
+                    git rebase --abort 2>/dev/null || true
                 fi
 
                 UPDATED=true

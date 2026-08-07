@@ -35,7 +35,7 @@ if git stash push -m "startr.sh auto-stash $(date '+%Y-%m-%d %H:%M:%S')" 2>/dev/
     echo "已暂存本地更改 (git stash)"
 fi
 
-if timeout 60 git pull origin main 2>&1; then
+if timeout 60 git pull --rebase origin main 2>&1; then
     REMOTE_HEAD="$(git rev-parse HEAD)"
     if [[ "${LOCAL_HEAD}" != "${REMOTE_HEAD}" ]]; then
         echo ""
