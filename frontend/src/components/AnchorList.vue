@@ -477,7 +477,7 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, nextTick, computed, provide } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick, computed, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Chart, registerables } from 'chart.js'
 import html2canvas from 'html2canvas'
@@ -725,7 +725,7 @@ export default {
           </tr>`
         })
 
-        const siteUrl = 'https:斜杠hihivr点top'
+        const siteUrl = 'hihivr点top'
         const htmlContent = `
           <div style="font-family:'Microsoft YaHei',sans-serif;background:#FFF8E1;padding:20px;width:1200px;">
             <header style="background:#FFF8E1;padding:20px 0;">
@@ -2778,6 +2778,34 @@ export default {
 
     onMounted(() => {
       fetchData()
+
+      // 监听 App.vue 弹窗按钮事件
+      const handlePopupBattle = () => {
+        if (selectedAnchorsForExport.value.length < 2) {
+          alert('请先在导航表格中勾选至少2个主播')
+          return
+        }
+        openBattleModal(selectedAnchorsForExport.value)
+      }
+      const handlePopupExport = () => {
+        openExportModal()
+      }
+      const handlePopupRank = () => {
+        if (selectedAnchorsForExport.value.length < 2) {
+          alert('请先在导航表格中勾选至少2个主播')
+          return
+        }
+        openRankModal(selectedAnchorsForExport.value)
+      }
+      window.addEventListener('popup-open-battle', handlePopupBattle)
+      window.addEventListener('popup-open-export', handlePopupExport)
+      window.addEventListener('popup-open-rank', handlePopupRank)
+
+      onUnmounted(() => {
+        window.removeEventListener('popup-open-battle', handlePopupBattle)
+        window.removeEventListener('popup-open-export', handlePopupExport)
+        window.removeEventListener('popup-open-rank', handlePopupRank)
+      })
     })
 
     return {

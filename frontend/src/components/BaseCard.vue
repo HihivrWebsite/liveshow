@@ -6,7 +6,7 @@
         <div v-if="title" class="card-title"><img v-if="avatarUrl" :src="avatarUrl" class="card-avatar" @error="$event.target.style.display='none'" />{{ title }}</div>
       </div>
       <div v-if="subtitle" class="card-subtitle">{{ subtitle }}</div>
-      <div class="card-subtitle-secondary"><strong><em>https</em></strong>斜杠<strong><em>dc</em></strong>点<strong><em>hihivr</em></strong>点<strong><em>top</em></strong></div>
+      <div class="card-subtitle-secondary">斜杠<strong><em>dc</em></strong>点<strong><em>hihivr</em></strong>点<strong><em>top</em></strong></div>
     </div>
 
     <div class="card-body" @click.stop>

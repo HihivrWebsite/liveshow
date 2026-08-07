@@ -38,7 +38,7 @@
           :style="{ backgroundColor: getSCColor(sc.price) }"
         >
           <div class="sc-header">
-            <span class="sc-additional-text">https<em><strong>斜杠dc点hihivr点top</strong></em></span>
+            <span class="sc-additional-text"><em><strong>斜杠dc点hihivr点top</strong></em></span>
             <span class="sc-name">{{ sc.uname }}</span>
             <span class="sc-uid">UID: {{ sc.uid }}</span>
             <span class="sc-time">{{ sc.send_time }}</span>
