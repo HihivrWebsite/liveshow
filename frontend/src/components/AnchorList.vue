@@ -744,13 +744,13 @@ export default {
               <div style="font-weight:bold;margin-bottom:4px;">使用导出功能制作</div>
               <div>使用方法：在主页勾选主播 → 点击导出截图 → 选择时间范围 → 确定导出</div>
             </div>
-            <div style="color:#f9729a;font-weight:bold;font-size:1.1rem;margin-bottom:10px;">${startLabel}-${endLabel}数据</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="color:#f9729a;font-weight:bold;font-size:1.1rem;">${startLabel}-${endLabel}数据</span><span style="color:#999;font-size:0.85rem;">向阳Hihi粉丝站-维阿PSP斗虫榜 dc.hihivr.top</span></div>
             <table style="width:100%;border-collapse:collapse;background:#FFF8E1;border-radius:15px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
               <thead>
                 <tr style="background:linear-gradient(45deg,#FFC633,#FFA500);color:#333;">
                   <th style="padding:10px 12px;text-align:center;width:50px;">排名</th>
                   <th style="padding:10px 12px;text-align:center;width:50px;">头像</th>
-                  <th style="padding:10px 12px;text-align:left;white-space:nowrap;">主播名-dc.hihivr.top</th>
+                  <th style="padding:10px 12px;text-align:left;white-space:nowrap;">主播名</th>
                   ${headerCells}
                 </tr>
               </thead>
