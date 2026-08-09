@@ -69,7 +69,7 @@ export default {
     }
   },
   mounted() {
-    window.addEventListener('selection-change', (e) => {
+    window.addEventListener('drawer-selection-change', (e) => {
       this.selectedCount = e.detail.count || 0
     })
   },
@@ -209,7 +209,7 @@ body {
   width: 100%;
   padding: 8px 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: 25px;
   font-size: 13px;
   font-weight: bold;
   cursor: pointer;
