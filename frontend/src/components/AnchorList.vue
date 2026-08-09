@@ -750,7 +750,7 @@ export default {
                 <tr style="background:linear-gradient(45deg,#FFC633,#FFA500);color:#333;">
                   <th style="padding:10px 12px;text-align:center;width:50px;">排名</th>
                   <th style="padding:10px 12px;text-align:center;width:50px;">头像</th>
-                  <th style="padding:10px 12px;text-align:left;white-space:nowrap;">主播名</th>
+                  <th style="padding:10px 12px;text-align:left;white-space:nowrap;">主播名-dc.hihivr.top</th>
                   ${headerCells}
                 </tr>
               </thead>
