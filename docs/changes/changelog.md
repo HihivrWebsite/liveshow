@@ -2,6 +2,21 @@
 
 ## 版本历史
 
+### v4.7.0 (待定) — 粉丝重合度查询
+
+#### 新增
+- 粉丝重合度查询功能：分析两个主播粉丝团的重叠情况
+- 后端代理端点 `/gift/fans_overlap`，调用上游 bilifanscache API
+- `FanOverlap.vue` 全屏覆盖层组件，包含等级分布柱状图和舰长统计
+- 右侧抽屉和导航表格均新增 🔍 粉丝重合度查询 按钮
+
+#### 变更
+- `App.vue`：抽屉新增第四个快捷操作按钮
+- `NavigationTable.vue`：控制按钮区域新增粉丝重合度查询按钮
+- `AnchorList.vue`：集成 FanOverlap 组件和事件桥接
+- `api/index.js`：新增 `getFanOverlap` API 函数
+- `main.rs`：新增 `/gift/fans_overlap` 路由和 handler
+
 ### v4.3.1 — 2026-06-16 修复多月份统计月份格式不匹配
 
 - 修复 `parseYearMonth` 无法解析无横杠月份格式（如 `"202601"`），兼容 `"2026-01"` 和 `"202601"` 两种格式

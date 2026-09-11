@@ -416,6 +416,7 @@
         @selection-change="onSelectionChange"
         @open-export="openExportModal"
         @open-rank="openRankModal"
+        @open-fan-overlap="openFanOverlapModal"
       />
 
 
@@ -431,6 +432,13 @@
         v-if="showRank"
         :initial-anchors="rankAnchors"
         @close="closeRankModal"
+      />
+
+      <!-- 粉丝重合度查询组件 -->
+      <FanOverlap
+        v-if="showFanOverlap"
+        :initial-anchors="fanOverlapAnchors"
+        @close="closeFanOverlapModal"
       />
 
       <div class="grid-container">
@@ -486,6 +494,7 @@ import BaseCard from '@/components/BaseCard.vue'
 import NavigationTable from '@/components/NavigationTable.vue'
 import AnchorBattle from '@/components/AnchorBattle.vue'
 import RankComparison from '@/components/RankComparison.vue'
+import FanOverlap from './FanOverlap.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
@@ -500,6 +509,7 @@ export default {
     NavigationTable,
     AnchorBattle,
     RankComparison,
+    FanOverlap,
     MonthSelector
   },
   setup() {
@@ -556,6 +566,20 @@ export default {
     const closeRankModal = () => {
       showRank.value = false
       rankAnchors.value = []
+    }
+
+    // 粉丝重合度查询相关
+    const showFanOverlap = ref(false)
+    const fanOverlapAnchors = ref([])
+
+    const openFanOverlapModal = (selected) => {
+      fanOverlapAnchors.value = selected
+      showFanOverlap.value = true
+    }
+
+    const closeFanOverlapModal = () => {
+      showFanOverlap.value = false
+      fanOverlapAnchors.value = []
     }
 
     // 导出截图相关
@@ -2802,10 +2826,20 @@ export default {
       window.addEventListener('popup-open-export', handlePopupExport)
       window.addEventListener('popup-open-rank', handlePopupRank)
 
+      const handlePopupFanOverlap = () => {
+        if (selectedAnchorsForExport.value.length < 2) {
+          alert('请先在导航表格中勾选至少2个主播')
+          return
+        }
+        openFanOverlapModal(selectedAnchorsForExport.value)
+      }
+      window.addEventListener('popup-open-fan-overlap', handlePopupFanOverlap)
+
       onUnmounted(() => {
         window.removeEventListener('popup-open-battle', handlePopupBattle)
         window.removeEventListener('popup-open-export', handlePopupExport)
         window.removeEventListener('popup-open-rank', handlePopupRank)
+        window.removeEventListener('popup-open-fan-overlap', handlePopupFanOverlap)
       })
     })
 
@@ -2897,6 +2931,11 @@ export default {
       rankAnchors,
       openRankModal,
       closeRankModal,
+      // 粉丝重合度查询相关
+      showFanOverlap,
+      fanOverlapAnchors,
+      openFanOverlapModal,
+      closeFanOverlapModal,
       // 导出截图相关
       selectedAnchorsCount,
       showExportModal,

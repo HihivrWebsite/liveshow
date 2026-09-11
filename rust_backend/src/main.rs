@@ -1055,6 +1055,13 @@ struct AvatarQuery {
     uid: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct FansOverlapQuery {
+    room_id_a: Option<String>,
+    room_id_b: Option<String>,
+    room_ids: Option<String>, // 逗号分隔的多个房间号，支持批量查询
+}
+
 #[derive(Debug, Serialize)]
 struct AvatarResponse {
     room_id: u64,
@@ -1127,6 +1134,7 @@ async fn main() {
         .route("/gift/avatar", get(get_avatar))
         .route("/gift/avatar_proxy", get(get_avatar_proxy))
         .route("/gift/avatars/batch", get(get_avatars_batch))
+        .route("/gift/fans_overlap", get(get_fans_overlap))
         .route("/cache/stats", get(get_cache_stats_endpoint))
         .route("/cache/clear", post(clear_cache_endpoint))
         .nest_service(
@@ -2388,4 +2396,223 @@ async fn favicon() -> impl axum::response::IntoResponse {
                 .unwrap()
         }
     }
+}
+
+async fn get_fans_overlap(
+    Query(query): Query<FansOverlapQuery>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    // 解析房间号列表：优先使用 room_ids（逗号分隔），兼容旧的 room_id_a + room_id_b
+    let room_ids: Vec<String> = if let Some(ids_str) = &query.room_ids {
+        ids_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    } else {
+        let mut ids = Vec::new();
+        if let Some(a) = &query.room_id_a {
+            if !a.is_empty() {
+                ids.push(a.clone());
+            }
+        }
+        if let Some(b) = &query.room_id_b {
+            if !b.is_empty() {
+                ids.push(b.clone());
+            }
+        }
+        ids
+    };
+
+    if room_ids.len() < 2 {
+        eprintln!("⚠️ [fans_overlap] 至少需要2个房间号，当前: {:?}", room_ids);
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // 为每个唯一房间号获取粉丝数据（每个房间只请求一次）
+    let ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+    let mut fans_cache: HashMap<String, serde_json::Value> = HashMap::new();
+
+    // 去重并并发请求所有房间
+    let unique_ids: Vec<String> = {
+        let mut seen = std::collections::HashSet::new();
+        room_ids
+            .iter()
+            .filter(|id| seen.insert((*id).clone()))
+            .cloned()
+            .collect()
+    };
+
+    // 并发获取所有房间的粉丝数据（使用 JoinSet）
+    let mut join_set = tokio::task::JoinSet::new();
+    for room_id in unique_ids.iter() {
+        let url = format!("https://fans.harei.cn/fans?room_id={}", room_id);
+        let rid = room_id.clone();
+        join_set.spawn(async move {
+            let resp = HTTP_CLIENT
+                .get(&url)
+                .header("User-Agent", ua)
+                .send()
+                .await;
+            match resp {
+                Ok(r) => {
+                    let json: Result<serde_json::Value, _> = r.json().await;
+                    (rid, json.ok())
+                }
+                Err(e) => {
+                    eprintln!("⚠️ [fans_overlap] 请求房间{}失败: {}", rid, e);
+                    (rid, None)
+                }
+            }
+        });
+    }
+
+    while let Some(join_result) = join_set.join_next().await {
+        match join_result {
+            Ok((room_id, json_opt)) => {
+                if let Some(json) = json_opt {
+                    if json.get("code").and_then(|c| c.as_i64()).unwrap_or(-1) != 0 {
+                        eprintln!("⚠️ [fans_overlap] 跳过房间{}（上游返回错误）", room_id);
+                        continue;
+                    }
+                    fans_cache.insert(room_id, json);
+                } else {
+                    eprintln!("⚠️ [fans_overlap] 跳过房间{}（获取失败）", room_id);
+                    continue;
+                }
+            }
+            Err(e) => {
+                eprintln!("⚠️ [fans_overlap] 跳过任务（JoinSet错误: {}）", e);
+                continue;
+            }
+        }
+    }
+
+    // 生成所有 C(n,2) 配对并计算重合度（仅使用有数据的房间）
+    let mut pairs = Vec::new();
+    let valid_ids: Vec<&String> = room_ids.iter().filter(|id| fans_cache.contains_key(id.as_str())).collect();
+    for i in 0..valid_ids.len() {
+        for j in (i + 1)..valid_ids.len() {
+            let a_id = valid_ids[i];
+            let b_id = valid_ids[j];
+            let json_a = fans_cache.get(a_id.as_str()).unwrap();
+            let json_b = fans_cache.get(b_id.as_str()).unwrap();
+            let pair = compute_pair_overlap(a_id, b_id, json_a, json_b);
+            pairs.push(pair);
+        }
+    }
+
+    let skipped: Vec<&String> = room_ids.iter().filter(|id| !fans_cache.contains_key(id.as_str())).collect();
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "pairs": pairs,
+        "skipped": skipped,
+    })))
+}
+
+/// 计算两个房间之间的粉丝重合度（提取为独立函数以复用逻辑）
+fn compute_pair_overlap(
+    a_room_id: &str,
+    b_room_id: &str,
+    json_a: &serde_json::Value,
+    json_b: &serde_json::Value,
+) -> serde_json::Value {
+    // 提取 medal 映射: uid_string -> medal_level
+    let medal_a: HashMap<String, i64> = json_a
+        .get("medal")
+        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .unwrap_or_default();
+    let medal_b: HashMap<String, i64> = json_b
+        .get("medal")
+        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .unwrap_or_default();
+
+    // 提取 guard_level 映射
+    let guard_a: HashMap<String, i64> = json_a
+        .get("guard_level")
+        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .unwrap_or_default();
+    let guard_b: HashMap<String, i64> = json_b
+        .get("guard_level")
+        .and_then(|m| serde_json::from_value(m.clone()).ok())
+        .unwrap_or_default();
+
+    let a_total = medal_a.len() as i64;
+    let b_total = medal_b.len() as i64;
+
+    // 计算交集
+    let keys_a: std::collections::HashSet<&String> = medal_a.keys().collect();
+    let keys_b: std::collections::HashSet<&String> = medal_b.keys().collect();
+    let intersection: Vec<&String> = keys_a.intersection(&keys_b).cloned().collect();
+    let intersection_count = intersection.len() as i64;
+
+    let a_in_b_percent = if a_total > 0 {
+        (intersection_count as f64 / a_total as f64 * 100.0 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+    let b_in_a_percent = if b_total > 0 {
+        (intersection_count as f64 / b_total as f64 * 100.0 * 100.0).round() / 100.0
+    } else {
+        0.0
+    };
+
+    // 等级分布桶: 1-10, 11-20, 21-30, 31-40, 41-50, 51-60
+    fn bucket_levels(medal: &HashMap<String, i64>) -> Vec<serde_json::Value> {
+        let buckets = [
+            ("1~10", 1, 10),
+            ("11~20", 11, 20),
+            ("21~30", 21, 30),
+            ("31~40", 31, 40),
+            ("41~50", 41, 50),
+            ("51~60", 51, 60),
+        ];
+        buckets
+            .iter()
+            .map(|(label, lo, hi)| {
+                let count = medal.values().filter(|&&v| v >= *lo && v <= *hi).count() as i64;
+                serde_json::json!({"range": label, "count": count})
+            })
+            .collect()
+    }
+
+    // 舰长等级桶: 舰长(3), 提督(2), 总督(1)
+    fn bucket_guard(guard: &HashMap<String, i64>) -> Vec<serde_json::Value> {
+        let tiers = [("舰长", 3), ("提督", 2), ("总督", 1)];
+        tiers
+            .iter()
+            .map(|(label, level)| {
+                let count = guard.values().filter(|&&v| v == *level).count() as i64;
+                serde_json::json!({"tier": label, "count": count})
+            })
+            .collect()
+    }
+
+    let a_levels = bucket_levels(&medal_a);
+    let b_levels = bucket_levels(&medal_b);
+    let a_guard = bucket_guard(&guard_a);
+    let b_guard = bucket_guard(&guard_b);
+
+    // 共同上舰: 交集UID中双方都有舰长身份的
+    let shared_guard = intersection
+        .iter()
+        .filter(|uid| {
+            guard_a.get(**uid).map_or(false, |&v| v > 0)
+                && guard_b.get(**uid).map_or(false, |&v| v > 0)
+        })
+        .count() as i64;
+
+    serde_json::json!({
+        "a_room_id": a_room_id,
+        "b_room_id": b_room_id,
+        "a_total": a_total,
+        "b_total": b_total,
+        "intersection": intersection_count,
+        "a_in_b_percent": a_in_b_percent,
+        "b_in_a_percent": b_in_a_percent,
+        "a_levels": a_levels,
+        "b_levels": b_levels,
+        "a_guard": a_guard,
+        "b_guard": b_guard,
+        "shared_guard": shared_guard,
+    })
 }

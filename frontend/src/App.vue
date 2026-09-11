@@ -43,6 +43,13 @@
           <p class="drawer-desc">选择多个主播后进行排名对比</p>
         </div>
 
+        <div class="drawer-item">
+          <button class="drawer-btn fan-overlap-btn" @click="emitFanOverlap">
+            🔍 粉丝重合度查询 ({{ selectedCount }})
+          </button>
+          <p class="drawer-desc">分析两个主播的粉丝重叠情况</p>
+        </div>
+
         <p class="drawer-footer">选择多个主播后点击进行数据对比</p>
       </div>
     </div>
@@ -82,6 +89,9 @@ export default {
     },
     emitRank() {
       window.dispatchEvent(new CustomEvent('popup-open-rank'))
+    },
+    emitFanOverlap() {
+      window.dispatchEvent(new CustomEvent('popup-open-fan-overlap'))
     }
   }
 }
@@ -228,6 +238,11 @@ body {
 
 .rank-btn {
   background: #45B7D1;
+  color: white;
+}
+
+.fan-overlap-btn {
+  background: #9B59B6;
   color: white;
 }
 

@@ -103,4 +103,21 @@ export const anchorAPI = {
     return apiClient.get(`/gift/attention?${params.toString()}`)
   },
 
+  // 粉丝重合度查询 - 分析两个主播粉丝重叠情况
+  getFanOverlap: (roomIdA, roomIdB) => {
+    const params = new URLSearchParams()
+    params.append('room_id_a', roomIdA)
+    params.append('room_id_b', roomIdB)
+
+    return apiClient.get(`/gift/fans_overlap?${params.toString()}`)
+  },
+
+  // 粉丝重合度批量查询 - 支持3-5个主播，返回所有两两配对
+  getFanOverlapMulti: (roomIds) => {
+    const params = new URLSearchParams()
+    params.append('room_ids', roomIds.join(','))
+
+    return apiClient.get(`/gift/fans_overlap?${params.toString()}`)
+  },
+
 }

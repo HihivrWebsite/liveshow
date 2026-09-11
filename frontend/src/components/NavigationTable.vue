@@ -23,6 +23,11 @@
         class="rank-btn">
         📊 排名对比 ({{ selectedAnchors.length }})
       </button>
+      <button
+        @click.stop="openFanOverlap"
+        class="fan-overlap-btn">
+        🔍 粉丝重合度查询 ({{ selectedAnchors.length }})
+      </button>
     </div>
     
     <div class="table-wrapper">
@@ -167,6 +172,14 @@ export default {
         return;
       }
       this.$emit('open-rank', this.selectedAnchors);
+    },
+    openFanOverlap() {
+      if (this.selectedAnchors.length < 2) {
+        this.battleHintVisible = true;
+        setTimeout(() => { this.battleHintVisible = false; }, 2000);
+        return;
+      }
+      this.$emit('open-fan-overlap', this.selectedAnchors);
     }
   },
   setup(props) {
@@ -337,6 +350,23 @@ export default {
 .rank-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(75, 192, 192, 0.6);
+}
+
+.fan-overlap-btn {
+  background: linear-gradient(45deg, #9B59B6, #8E44AD);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(155, 89, 182, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.fan-overlap-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(155, 89, 182, 0.6);
 }
 
 .battle-hint-alert {
