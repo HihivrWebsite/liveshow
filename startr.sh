@@ -120,24 +120,43 @@ log "后端编译完成"
 popd > /dev/null
 
 # ====================
-# §5  重启服务
+# §5  停止旧进程并重启
 # ====================
-log "---------- §5 重启服务 ----------"
+log "---------- §5 停止旧进程并重启 ----------"
 
-# 停止旧进程
+# 方法1: 通过端口查找 PID
+OLD_PID=""
 if command -v lsof &> /dev/null; then
-    OLD_PID="$(lsof -ti :${SERVER_PORT} 2>/dev/null || echo "")"
+    OLD_PID="$(lsof -ti :"${SERVER_PORT}" 2>/dev/null || echo "")"
 elif command -v ss &> /dev/null; then
     OLD_PID="$(ss -tlnp "sport = :${SERVER_PORT}" 2>/dev/null | grep -oP 'pid=\K[0-9]+' || echo "")"
-else
-    OLD_PID=""
+fi
+
+# 方法2: 通过进程名查找（兜底）
+if [[ -z "${OLD_PID}" ]]; then
+    OLD_PID="$(pgrep -f 'liveshow-backend' 2>/dev/null || echo "")"
 fi
 
 if [[ -n "${OLD_PID}" ]]; then
-    log "停止旧进程 (PID: ${OLD_PID})..."
-    kill "${OLD_PID}" 2>/dev/null || true
+    log "发现旧进程 (PID: ${OLD_PID})，正在停止..."
+    # 先优雅停止
+    kill ${OLD_PID} 2>/dev/null || true
     sleep 2
+    # 检查是否还活着，强制杀死
+    for pid in ${OLD_PID}; do
+        if kill -0 "${pid}" 2>/dev/null; then
+            log "进程 ${pid} 未响应，强制终止..."
+            kill -9 "${pid}" 2>/dev/null || true
+        fi
+    done
+    sleep 1
+    log "旧进程已清除"
+else
+    log "未发现旧进程"
 fi
+
+# 清理可能残留的旧备份
+rm -rf "${BACKEND_DIR}/.backup" 2>/dev/null || true
 
 # 版本 banner
 echo ""
