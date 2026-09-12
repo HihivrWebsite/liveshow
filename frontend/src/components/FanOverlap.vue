@@ -57,18 +57,18 @@
             </div>
           </div>
 
-          <!-- 等级分布（CSS 条形图） -->
+          <!-- 等级分布 -->
           <div class="level-section">
             <h4>等级分布</h4>
             <div v-for="(lv, i) in pair.a_levels" :key="i" class="level-row">
               <span class="level-label">{{ lv.range }}</span>
               <div class="level-bars">
                 <div class="level-bar level-a" :style="{ width: getBarWidth(lv.count, pair.a_total) + '%' }"></div>
-                <span class="level-count">{{ lv.count }}</span>
+                <span class="level-count">{{ lv.count }} {{ formatPercent(lv.count, pair.a_total) }}</span>
               </div>
               <div class="level-bars">
                 <div class="level-bar level-b" :style="{ width: getBarWidth(pair.b_levels[i].count, pair.b_total) + '%' }"></div>
-                <span class="level-count">{{ pair.b_levels[i].count }}</span>
+                <span class="level-count">{{ pair.b_levels[i].count }} {{ formatPercent(pair.b_levels[i].count, pair.b_total) }}</span>
               </div>
             </div>
           </div>
@@ -77,13 +77,13 @@
           <div class="guard-section">
             <div class="guard-row" v-for="(g, i) in pair.a_guard" :key="i">
               <span class="guard-tier">{{ g.tier }}</span>
-              <span class="guard-a">{{ g.count }}</span>
+              <span class="guard-a">{{ g.count }} {{ formatPercent(g.count, pair.a_total) }}</span>
               <span class="guard-vs">vs</span>
-              <span class="guard-b">{{ pair.b_guard[i].count }}</span>
+              <span class="guard-b">{{ pair.b_guard[i].count }} {{ formatPercent(pair.b_guard[i].count, pair.b_total) }}</span>
             </div>
             <div class="guard-row shared">
               <span class="guard-tier">共同上舰</span>
-              <span class="guard-shared">{{ pair.shared_guard }}</span>
+              <span class="guard-shared">{{ pair.shared_guard }} {{ formatPercent(pair.shared_guard, pair.a_total) }}</span>
             </div>
           </div>
         </div>
@@ -92,9 +92,9 @@
       <!-- 说明 -->
       <div class="explanation">
         <p>————说明————</p>
-        <p>A→B：A中拥有B牌子占A的比重</p>
-        <p>等级分布：交集粉丝按牌子等级分桶</p>
-        <p>舰长统计：交集粉丝中的舰长/提督/总督数量</p>
+        <p>{{ getAnchorName(pairs[0].a_room_id) }}&{{ getAnchorName(pairs[0].b_room_id) }}：{{ getAnchorName(pairs[0].a_room_id) }}中拥有{{ getAnchorName(pairs[0].b_room_id) }}牌子占{{ getAnchorName(pairs[0].a_room_id) }}的比重</p>
+        <p>{{ getAnchorName(pairs[0].a_room_id) }}&{{ getAnchorName(pairs[0].b_room_id) }} 1~10级：{{ getAnchorName(pairs[0].a_room_id) }}中拥有{{ getAnchorName(pairs[0].b_room_id) }}牌子且{{ getAnchorName(pairs[0].a_room_id) }}为1~10级</p>
+        <p>{{ getAnchorName(pairs[0].a_room_id) }}&{{ getAnchorName(pairs[0].b_room_id) }} 舰长：{{ getAnchorName(pairs[0].a_room_id) }}中拥有{{ getAnchorName(pairs[0].b_room_id) }}牌子且为{{ getAnchorName(pairs[0].a_room_id) }}舰长</p>
         <p>共同上舰：两者均有上舰（不论等级）</p>
       </div>
     </div>
@@ -137,6 +137,11 @@ function getAvatar(roomId) {
 // 计算条形图宽度百分比（最小 2% 保证可见）
 function getBarWidth(count, total) {
   return total > 0 ? Math.max((count / total) * 100, 2) : 0
+}
+
+// 格式化百分比（占总数）
+function formatPercent(count, total) {
+  return total > 0 ? (count / total * 100).toFixed(2) + '%' : '0%'
 }
 
 // 生命周期
