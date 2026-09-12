@@ -2556,48 +2556,77 @@ fn compute_pair_overlap(
         0.0
     };
 
-    // 等级分布桶: 1-10, 11-20, 21-30, 31-40, 41-50, 51-60
-    fn bucket_levels(medal: &HashMap<String, i64>) -> Vec<serde_json::Value> {
-        let buckets = [
-            ("1~10", 1, 10),
-            ("11~20", 11, 20),
-            ("21~30", 21, 30),
-            ("31~40", 31, 40),
-            ("41~50", 41, 50),
-            ("51~60", 51, 60),
-        ];
-        buckets
-            .iter()
-            .map(|(label, lo, hi)| {
-                let count = medal.values().filter(|&&v| v >= *lo && v <= *hi).count() as i64;
-                serde_json::json!({"range": label, "count": count})
-            })
-            .collect()
-    }
+    // 等级分布桶: 只统计交集粉丝，用各自主播的牌子等级
+    // 标准逻辑：A&B 1~10级 = A中拥有B牌子且A的牌子等级为1~10级的人数
+    let buckets = [
+        ("1~10", 1i64, 10i64),
+        ("11~20", 11, 20),
+        ("21~30", 21, 30),
+        ("31~40", 31, 40),
+        ("41~50", 41, 50),
+        ("51~60", 51, 60),
+    ];
+    let a_levels: Vec<serde_json::Value> = buckets
+        .iter()
+        .map(|(label, lo, hi)| {
+            let count = intersection
+                .iter()
+                .filter(|uid| {
+                    medal_a
+                        .get(uid.as_str())
+                        .map_or(false, |&v| v >= *lo && v <= *hi)
+                })
+                .count() as i64;
+            serde_json::json!({"range": label, "count": count})
+        })
+        .collect();
+    let b_levels: Vec<serde_json::Value> = buckets
+        .iter()
+        .map(|(label, lo, hi)| {
+            let count = intersection
+                .iter()
+                .filter(|uid| {
+                    medal_b
+                        .get(uid.as_str())
+                        .map_or(false, |&v| v >= *lo && v <= *hi)
+                })
+                .count() as i64;
+            serde_json::json!({"range": label, "count": count})
+        })
+        .collect();
 
-    // 舰长等级桶: 舰长(3), 提督(2), 总督(1)
-    fn bucket_guard(guard: &HashMap<String, i64>) -> Vec<serde_json::Value> {
-        let tiers = [("舰长", 3), ("提督", 2), ("总督", 1)];
-        tiers
-            .iter()
-            .map(|(label, level)| {
-                let count = guard.values().filter(|&&v| v == *level).count() as i64;
-                serde_json::json!({"tier": label, "count": count})
-            })
-            .collect()
-    }
+    // 舰长统计: 只统计交集粉丝，用各自主播的guard_level
+    // 标准逻辑：A&B 舰长 = A中拥有B牌子且为A的舰长的人数
+    let guard_tiers = [("舰长", 3i64), ("提督", 2), ("总督", 1)];
+    let a_guard: Vec<serde_json::Value> = guard_tiers
+        .iter()
+        .map(|(label, level)| {
+            let count = intersection
+                .iter()
+                .filter(|uid| guard_a.get(uid.as_str()).copied() == Some(*level))
+                .count() as i64;
+            serde_json::json!({"tier": label, "count": count})
+        })
+        .collect();
+    let b_guard: Vec<serde_json::Value> = guard_tiers
+        .iter()
+        .map(|(label, level)| {
+            let count = intersection
+                .iter()
+                .filter(|uid| guard_b.get(uid.as_str()).copied() == Some(*level))
+                .count() as i64;
+            serde_json::json!({"tier": label, "count": count})
+        })
+        .collect();
 
-    let a_levels = bucket_levels(&medal_a);
-    let b_levels = bucket_levels(&medal_b);
-    let a_guard = bucket_guard(&guard_a);
-    let b_guard = bucket_guard(&guard_b);
-
-    // 共同上舰: 交集UID中双方都有舰长身份的
+    // 共同上舰: 交集UID中双方guard_level都不为0且相等
+    // 标准逻辑：guardA(fan) == guardB(fan) != 0
     let shared_guard = intersection
         .iter()
         .filter(|uid| {
-            guard_a.get(**uid).map_or(false, |&v| v > 0)
-                && guard_b.get(**uid).map_or(false, |&v| v > 0)
+            let ga = guard_a.get(uid.as_str()).copied().unwrap_or(0);
+            let gb = guard_b.get(uid.as_str()).copied().unwrap_or(0);
+            ga > 0 && ga == gb
         })
         .count() as i64;
 

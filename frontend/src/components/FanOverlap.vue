@@ -32,59 +32,118 @@
             </div>
           </div>
 
-          <!-- 交集总数 -->
-          <div class="intersection-bar">
-            <span class="intersection-label">交集</span>
-            <span class="intersection-value">{{ pair.intersection }}</span>
-            <span class="intersection-sub">共同粉丝团</span>
-          </div>
-
-          <!-- 双向百分比对比条 -->
-          <div class="overlap-bars">
-            <div class="bar-row">
-              <span class="bar-label">{{ getAnchorName(pair.a_room_id) }} → {{ getAnchorName(pair.b_room_id) }}</span>
-              <div class="bar-track">
-                <div class="bar-fill" :style="{ width: pair.a_in_b_percent + '%' }"></div>
-              </div>
-              <span class="bar-percent">{{ pair.a_in_b_percent }}%</span>
+          <!-- 关键数据大数字展示 -->
+          <div class="hero-stats">
+            <div class="hero-stat hero-intersection">
+              <div class="hero-number">{{ pair.intersection }}</div>
+              <div class="hero-label">交集粉丝</div>
             </div>
-            <div class="bar-row">
-              <span class="bar-label">{{ getAnchorName(pair.b_room_id) }} → {{ getAnchorName(pair.a_room_id) }}</span>
-              <div class="bar-track">
-                <div class="bar-fill" :style="{ width: pair.b_in_a_percent + '%' }"></div>
-              </div>
-              <span class="bar-percent">{{ pair.b_in_a_percent }}%</span>
+            <div class="hero-stat">
+              <div class="hero-number hero-orange">{{ pair.a_in_b_percent }}%</div>
+              <div class="hero-label">{{ getAnchorName(pair.a_room_id) }} → {{ getAnchorName(pair.b_room_id) }}</div>
+            </div>
+            <div class="hero-stat">
+              <div class="hero-number hero-yellow">{{ pair.b_in_a_percent }}%</div>
+              <div class="hero-label">{{ getAnchorName(pair.b_room_id) }} → {{ getAnchorName(pair.a_room_id) }}</div>
             </div>
           </div>
 
-          <!-- 等级分布 -->
+          <!-- 韦恩图/交集可视化 -->
+          <div class="venn-container">
+            <div class="venn-diagram">
+              <div class="venn-circle venn-a">
+                <span class="venn-total">{{ pair.a_total }}</span>
+                <span class="venn-name">{{ getAnchorName(pair.a_room_id) }}</span>
+              </div>
+              <div class="venn-circle venn-b">
+                <span class="venn-total">{{ pair.b_total }}</span>
+                <span class="venn-name">{{ getAnchorName(pair.b_room_id) }}</span>
+              </div>
+              <div class="venn-intersection">
+                <span class="venn-intersect-num">{{ pair.intersection }}</span>
+                <span class="venn-intersect-label">交集</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 双向百分比水平对比条 -->
+          <div class="overlap-section">
+            <h4 class="section-title">双向占比</h4>
+            <div class="bar-row">
+              <span class="bar-label">{{ getAnchorName(pair.a_room_id) }}→{{ getAnchorName(pair.b_room_id) }}</span>
+              <div class="bar-track">
+                <div class="bar-fill bar-fill-a" :style="{ width: Math.max(pair.a_in_b_percent, 3) + '%' }">
+                  <span class="bar-inner-text" v-if="pair.a_in_b_percent > 15">{{ pair.a_in_b_percent }}%</span>
+                </div>
+              </div>
+              <span class="bar-percent bar-percent-a">{{ pair.a_in_b_percent }}%</span>
+              <span class="bar-count">({{ pair.intersection }}/{{ pair.a_total }})</span>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">{{ getAnchorName(pair.b_room_id) }}→{{ getAnchorName(pair.a_room_id) }}</span>
+              <div class="bar-track">
+                <div class="bar-fill bar-fill-b" :style="{ width: Math.max(pair.b_in_a_percent, 3) + '%' }">
+                  <span class="bar-inner-text" v-if="pair.b_in_a_percent > 15">{{ pair.b_in_a_percent }}%</span>
+                </div>
+              </div>
+              <span class="bar-percent bar-percent-b">{{ pair.b_in_a_percent }}%</span>
+              <span class="bar-count">({{ pair.intersection }}/{{ pair.b_total }})</span>
+            </div>
+          </div>
+
+          <!-- 等级分布 — 双色并排分组条形图 -->
           <div class="level-section">
-            <h4>等级分布</h4>
-            <div v-for="(lv, i) in pair.a_levels" :key="i" class="level-row">
+            <h4 class="section-title">等级分布</h4>
+            <div class="level-legend">
+              <span class="legend-item"><span class="legend-dot dot-a"></span>{{ getAnchorName(pair.a_room_id) }}</span>
+              <span class="legend-item"><span class="legend-dot dot-b"></span>{{ getAnchorName(pair.b_room_id) }}</span>
+            </div>
+            <div v-for="(lv, i) in pair.a_levels" :key="i" class="level-group">
               <span class="level-label">{{ lv.range }}</span>
-              <div class="level-bars">
-                <div class="level-bar level-a" :style="{ width: getBarWidth(lv.count, pair.a_total) + '%' }"></div>
-                <span class="level-count">{{ lv.count }} {{ formatPercent(lv.count, pair.a_total) }}</span>
-              </div>
-              <div class="level-bars">
-                <div class="level-bar level-b" :style="{ width: getBarWidth(pair.b_levels[i].count, pair.b_total) + '%' }"></div>
-                <span class="level-count">{{ pair.b_levels[i].count }} {{ formatPercent(pair.b_levels[i].count, pair.b_total) }}</span>
+              <div class="level-dual-bars">
+                <!-- A 的条形 -->
+                <div class="level-bar-wrapper">
+                  <div class="level-bar-track">
+                    <div class="level-bar level-a" :style="{ width: getBarWidth(lv.count, pair.a_total) + '%' }"></div>
+                  </div>
+                  <span class="level-bar-value">{{ lv.count }} <small>{{ formatPercent(lv.count, pair.a_total) }}</small></span>
+                </div>
+                <!-- B 的条形（并排） -->
+                <div class="level-bar-wrapper">
+                  <div class="level-bar-track">
+                    <div class="level-bar level-b" :style="{ width: getBarWidth(pair.b_levels[i].count, pair.b_total) + '%' }"></div>
+                  </div>
+                  <span class="level-bar-value">{{ pair.b_levels[i].count }} <small>{{ formatPercent(pair.b_levels[i].count, pair.b_total) }}</small></span>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- 舰长统计 -->
+          <!-- 舰长统计 — 对比表格 -->
           <div class="guard-section">
-            <div class="guard-row" v-for="(g, i) in pair.a_guard" :key="i">
-              <span class="guard-tier">{{ g.tier }}</span>
-              <span class="guard-a">{{ g.count }} {{ formatPercent(g.count, pair.a_total) }}</span>
-              <span class="guard-vs">vs</span>
-              <span class="guard-b">{{ pair.b_guard[i].count }} {{ formatPercent(pair.b_guard[i].count, pair.b_total) }}</span>
-            </div>
-            <div class="guard-row shared">
-              <span class="guard-tier">共同上舰</span>
-              <span class="guard-shared">{{ pair.shared_guard }} {{ formatPercent(pair.shared_guard, pair.a_total) }}</span>
-            </div>
+            <h4 class="section-title">舰长统计</h4>
+            <table class="guard-table">
+              <thead>
+                <tr>
+                  <th>等级</th>
+                  <th class="col-a">{{ getAnchorName(pair.a_room_id) }}</th>
+                  <th class="col-vs"></th>
+                  <th class="col-b">{{ getAnchorName(pair.b_room_id) }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(g, i) in pair.a_guard" :key="i">
+                  <td class="guard-tier">{{ g.tier }}</td>
+                  <td class="col-a">{{ g.count }} <small>{{ formatPercent(g.count, pair.a_total) }}</small></td>
+                  <td class="col-vs">vs</td>
+                  <td class="col-b">{{ pair.b_guard[i].count }} <small>{{ formatPercent(pair.b_guard[i].count, pair.b_total) }}</small></td>
+                </tr>
+                <tr class="guard-shared-row">
+                  <td class="guard-tier">共同上舰</td>
+                  <td colspan="3" class="guard-shared-val">{{ pair.shared_guard }} <small>{{ formatPercent(pair.shared_guard, pair.a_total) }}</small></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -231,10 +290,20 @@ onMounted(async () => {
   box-shadow: 0 4px 12px rgba(155, 89, 182, 0.4);
 }
 
+/* ========== 通用区块标题 ========== */
+.section-title {
+  color: #666;
+  font-size: 13px;
+  font-weight: bold;
+  margin: 0 0 10px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed #FFE5B4;
+}
+
 /* ========== 卡片网格 ========== */
 .pair-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
   gap: 20px;
 }
 
@@ -300,92 +369,251 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-/* ========== 交集横条 ========== */
-.intersection-bar {
-  text-align: center;
-  padding: 12px;
-  margin-bottom: 16px;
-  background: #FFE5B4;
+/* ========== 关键数据大数字展示 ========== */
+.hero-stats {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 18px;
+  padding: 14px 10px;
+  background: linear-gradient(135deg, #FFF5E6, #FFF0D4);
   border-radius: 12px;
+  border: 1px solid #FFE5B4;
 }
 
-.intersection-value {
-  font-size: 28px;
-  font-weight: bold;
+.hero-stat {
+  text-align: center;
+  flex: 1;
+}
+
+.hero-number {
+  font-size: 26px;
+  font-weight: 900;
   color: #E74C3C;
+  line-height: 1.2;
 }
 
-.intersection-label {
-  color: #666;
-  font-size: 12px;
-  margin-right: 8px;
+.hero-intersection .hero-number {
+  font-size: 36px;
+  color: #E74C3C;
+  text-shadow: 0 2px 8px rgba(231, 76, 60, 0.2);
 }
 
-.intersection-sub {
-  color: #888;
+.hero-orange {
+  color: #FF6600 !important;
+}
+
+.hero-yellow {
+  color: #E6A800 !important;
+}
+
+.hero-label {
   font-size: 11px;
-  margin-left: 8px;
+  color: #888;
+  margin-top: 4px;
+  line-height: 1.3;
 }
 
-/* ========== 双向百分比对比条 ========== */
-.overlap-bars {
-  margin-bottom: 16px;
+/* ========== 韦恩图/交集可视化 ========== */
+.venn-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 18px;
+  padding: 10px 0;
+}
+
+.venn-diagram {
+  position: relative;
+  width: 280px;
+  height: 160px;
+}
+
+.venn-circle {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  top: 0;
+}
+
+.venn-a {
+  left: 0;
+  background: rgba(255, 102, 0, 0.2);
+  border: 3px solid #FF6600;
+}
+
+.venn-b {
+  right: 0;
+  background: rgba(255, 198, 51, 0.2);
+  border: 3px solid #FFC633;
+}
+
+.venn-total {
+  font-size: 20px;
+  font-weight: 900;
+  color: #333;
+  line-height: 1;
+}
+
+.venn-name {
+  font-size: 10px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.venn-intersection {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 2;
+  background: rgba(255, 248, 225, 0.85);
+  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 10px rgba(231, 76, 60, 0.3);
+}
+
+.venn-intersect-num {
+  font-size: 20px;
+  font-weight: 900;
+  color: #E74C3C;
+  line-height: 1;
+}
+
+.venn-intersect-label {
+  font-size: 10px;
+  color: #E74C3C;
+  font-weight: bold;
+}
+
+/* ========== 双向百分比水平对比条 ========== */
+.overlap-section {
+  margin-bottom: 18px;
 }
 
 .bar-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .bar-label {
-  color: #666;
+  color: #555;
   font-size: 11px;
-  min-width: 120px;
+  min-width: 80px;
   text-align: right;
   flex-shrink: 0;
+  font-weight: bold;
 }
 
 .bar-track {
   flex: 1;
-  height: 16px;
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
+  height: 22px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 11px;
   overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #FF6600, #FFC633);
-  border-radius: 8px;
-  transition: width 0.5s ease;
+  border-radius: 11px;
+  transition: width 0.6s ease;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
+  min-width: 4px;
+}
+
+.bar-fill-a {
+  background: linear-gradient(90deg, #FF6600, #FF8C33);
+}
+
+.bar-fill-b {
+  background: linear-gradient(90deg, #FFC633, #FFD966);
+}
+
+.bar-inner-text {
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
 .bar-percent {
-  color: #333;
-  font-size: 12px;
-  font-weight: bold;
+  font-size: 15px;
+  font-weight: 900;
   min-width: 50px;
+  text-align: right;
   flex-shrink: 0;
 }
 
-/* ========== 等级分布（CSS 条形图） ========== */
+.bar-percent-a {
+  color: #FF6600;
+}
+
+.bar-percent-b {
+  color: #E6A800;
+}
+
+.bar-count {
+  color: #999;
+  font-size: 11px;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+/* ========== 等级分布（双色并排条形图） ========== */
 .level-section {
-  margin-bottom: 12px;
+  margin-bottom: 18px;
 }
 
-.level-section h4 {
-  color: #666;
-  font-size: 12px;
-  margin: 0 0 6px 0;
+.level-legend {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 8px;
 }
 
-.level-row {
+.legend-item {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-bottom: 3px;
+  font-size: 11px;
+  color: #666;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.dot-a {
+  background: #FF6600;
+}
+
+.dot-b {
+  background: #FFC633;
+}
+
+.level-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .level-label {
@@ -394,20 +622,35 @@ onMounted(async () => {
   min-width: 32px;
   text-align: right;
   flex-shrink: 0;
+  font-weight: bold;
 }
 
-.level-bars {
+.level-dual-bars {
   flex: 1;
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.level-bar-wrapper {
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+}
+
+.level-bar-track {
+  flex: 1;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 5px;
+  overflow: hidden;
 }
 
 .level-bar {
-  height: 10px;
+  height: 100%;
   border-radius: 5px;
   min-width: 2px;
-  transition: width 0.3s ease;
+  transition: width 0.4s ease;
 }
 
 .level-a {
@@ -418,55 +661,108 @@ onMounted(async () => {
   background: #FFC633;
 }
 
-.level-count {
-  color: #888;
-  font-size: 10px;
-  min-width: 24px;
+.level-bar-value {
+  color: #555;
+  font-size: 11px;
+  min-width: 80px;
   flex-shrink: 0;
+  font-weight: bold;
 }
 
-/* ========== 舰长统计 ========== */
+.level-bar-value small {
+  color: #999;
+  font-weight: normal;
+}
+
+/* ========== 舰长统计 — 对比表格 ========== */
 .guard-section {
   border-top: 1px solid #FFE5B4;
-  padding-top: 10px;
+  padding-top: 12px;
 }
 
-.guard-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  font-size: 12px;
+.guard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.guard-table thead th {
+  padding: 6px 8px;
+  text-align: center;
+  color: #888;
+  font-size: 11px;
+  font-weight: bold;
+  border-bottom: 2px solid #FFE5B4;
+}
+
+.guard-table thead th.col-a {
+  color: #FF6600;
+}
+
+.guard-table thead th.col-b {
+  color: #E6A800;
+}
+
+.guard-table tbody td {
+  padding: 6px 8px;
+  text-align: center;
+  border-bottom: 1px solid #FFF0D4;
+}
+
+.guard-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .guard-tier {
   color: #666;
-  min-width: 50px;
+  font-weight: bold;
+  text-align: left !important;
 }
 
-.guard-a {
+.guard-table .col-a {
   color: #FF6600;
   font-weight: bold;
 }
 
-.guard-vs {
-  color: #999;
+.guard-table .col-a small {
+  color: #FF9933;
+  font-weight: normal;
 }
 
-.guard-b {
-  color: #FFC633;
+.guard-table .col-vs {
+  color: #ccc;
+  font-size: 11px;
+}
+
+.guard-table .col-b {
+  color: #E6A800;
   font-weight: bold;
 }
 
-.guard-shared {
-  color: #E74C3C;
-  font-weight: bold;
+.guard-table .col-b small {
+  color: #CC9900;
+  font-weight: normal;
 }
 
-.guard-row.shared {
-  border-top: 1px dashed #FFE5B4;
-  margin-top: 4px;
-  padding-top: 8px;
+.guard-shared-row {
+  background: #FFF5C2;
+}
+
+.guard-shared-row td {
+  border-top: 2px dashed #FFE5B4 !important;
+}
+
+.guard-shared-val {
+  color: #E74C3C !important;
+  font-weight: bold;
+  text-align: center !important;
+  font-size: 15px;
+}
+
+.guard-shared-val small {
+  color: #E67E73;
+  font-weight: normal;
+  font-size: 12px;
 }
 
 /* ========== Loading ========== */
@@ -528,14 +824,33 @@ onMounted(async () => {
 }
 
 /* ========== 响应式 ========== */
-@media (max-width: 480px) {
+@media (max-width: 520px) {
   .pair-grid {
     grid-template-columns: 1fr;
   }
 
   .bar-label {
-    min-width: 80px;
+    min-width: 60px;
     font-size: 10px;
+  }
+
+  .hero-stats {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .venn-diagram {
+    width: 220px;
+    height: 130px;
+  }
+
+  .venn-circle {
+    width: 130px;
+    height: 130px;
+  }
+
+  .bar-count {
+    display: none;
   }
 }
 </style>
