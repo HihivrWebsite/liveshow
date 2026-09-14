@@ -78,6 +78,82 @@
         </div>
       </div>
     </div>
+    <!-- 金主依赖度区域 -->
+    <div
+      v-if="anchor.top1 != null"
+      class="whale-section"
+      @click="toggleWhale"
+      :title="showAllWhale ? '点击收起' : '点击展开全部'"
+    >
+      <div class="whale-header">
+        <span class="whale-title">🎯 金主依赖度</span>
+        <span class="whale-toggle">{{ showAllWhale ? '▲' : '▼' }}</span>
+      </div>
+      <!-- Top1 始终显示 -->
+      <div class="whale-row">
+        <span class="whale-label">Top1</span>
+        <div class="whale-bar-track">
+          <div
+            class="whale-bar-fill"
+            :style="{
+              width: Math.min(anchor.top1 * 100, 100) + '%',
+              backgroundColor: getWhaleColor(anchor.top1 * 100)
+            }"
+          ></div>
+        </div>
+        <span class="whale-percent" :style="{ color: getWhaleColor(anchor.top1 * 100) }">
+          {{ (anchor.top1 * 100).toFixed(2) }}%
+        </span>
+      </div>
+      <!-- Top5, Top10, Top1% 展开后显示 -->
+      <template v-if="showAllWhale">
+        <div v-if="anchor.top5 != null" class="whale-row">
+          <span class="whale-label">Top5</span>
+          <div class="whale-bar-track">
+            <div
+              class="whale-bar-fill"
+              :style="{
+                width: Math.min(anchor.top5 * 100, 100) + '%',
+                backgroundColor: getWhaleColor(anchor.top5 * 100)
+              }"
+            ></div>
+          </div>
+          <span class="whale-percent" :style="{ color: getWhaleColor(anchor.top5 * 100) }">
+            {{ (anchor.top5 * 100).toFixed(2) }}%
+          </span>
+        </div>
+        <div v-if="anchor.top10 != null" class="whale-row">
+          <span class="whale-label">Top10</span>
+          <div class="whale-bar-track">
+            <div
+              class="whale-bar-fill"
+              :style="{
+                width: Math.min(anchor.top10 * 100, 100) + '%',
+                backgroundColor: getWhaleColor(anchor.top10 * 100)
+              }"
+            ></div>
+          </div>
+          <span class="whale-percent" :style="{ color: getWhaleColor(anchor.top10 * 100) }">
+            {{ (anchor.top10 * 100).toFixed(2) }}%
+          </span>
+        </div>
+        <div v-if="anchor.top1_percent != null" class="whale-row">
+          <span class="whale-label">Top1%</span>
+          <div class="whale-bar-track">
+            <div
+              class="whale-bar-fill"
+              :style="{
+                width: Math.min(anchor.top1_percent * 100, 100) + '%',
+                backgroundColor: getWhaleColor(anchor.top1_percent * 100)
+              }"
+            ></div>
+          </div>
+          <span class="whale-percent" :style="{ color: getWhaleColor(anchor.top1_percent * 100) }">
+            {{ (anchor.top1_percent * 100).toFixed(2) }}%
+          </span>
+        </div>
+      </template>
+    </div>
     <div class="grid-footer">
       <slot name="actions">
         <button
@@ -92,6 +168,7 @@
 </template>
 
 <script>
+import { ref } from 'vue'
 import { formatCurrency, formatNumber, calculateTotalRevenue } from '@/utils/dataProcessor'
 
 export default {
@@ -108,6 +185,20 @@ export default {
   },
   emits: ['view-details'],
   setup() {
+    const showAllWhale = ref(false)
+
+    const toggleWhale = () => {
+      showAllWhale.value = !showAllWhale.value
+    }
+
+    // 根据依赖度百分比返回对应的颜色等级和颜色值
+    const getWhaleColor = (percent) => {
+      if (percent < 10) return '#4CAF50'   // 绿色 - 健康
+      if (percent < 30) return '#FFC107'   // 黄色 - 注意
+      if (percent < 50) return '#FF9800'   // 橙色 - 警告
+      return '#F44336'                      // 红色 - 高风险
+    }
+
     const formatDurationWithBreak = (durationStr) => {
       // 格式化时长并在括号前添加换行
       const formatted = formatLiveDuration(durationStr);
@@ -145,7 +236,10 @@ export default {
       formatCurrency,
       formatNumber,
       calculateTotalRevenue,
-      formatDurationWithBreak
+      formatDurationWithBreak,
+      showAllWhale,
+      toggleWhale,
+      getWhaleColor
     }
   }
 }
@@ -469,6 +563,86 @@ export default {
   .grid-name {
     font-size: 1em; /* 调整字体大小 */
   }
+}
+
+/* 金主依赖度区域 */
+.whale-section {
+  background: rgba(255, 248, 225, 0.85);
+  border: 1px solid #FFC633;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 10px 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.whale-section:hover {
+  background: rgba(255, 240, 180, 0.95);
+  box-shadow: 0 2px 8px rgba(255, 198, 51, 0.25);
+}
+
+.whale-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.whale-title {
+  font-weight: bold;
+  color: #FF8C00;
+  font-size: 0.95em;
+}
+
+.whale-toggle {
+  color: #FF8C00;
+  font-size: 0.75em;
+  transition: transform 0.3s ease;
+}
+
+.whale-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.whale-row:last-child {
+  margin-bottom: 0;
+}
+
+.whale-label {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: #555;
+  min-width: 42px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.whale-bar-track {
+  flex: 1;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 5px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.whale-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);
+  min-width: 3px;
+}
+
+.whale-percent {
+  font-size: 0.82em;
+  font-weight: bold;
+  min-width: 52px;
+  text-align: right;
+  flex-shrink: 0;
 }
 
 /* 触屏设备优化 */

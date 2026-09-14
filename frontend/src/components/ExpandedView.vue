@@ -214,7 +214,19 @@ export default {
           { label: '礼物收入', value: formatCurrency(item.gift || 0), type: 'currency' },
           { label: '舰长收入', value: formatCurrency(item.guard || 0), type: 'currency' },
           { label: 'SC收入', value: formatCurrency(item.super_chat || 0), type: 'currency' },
-          { label: '总营收', value: formatCurrency(calculateTotalRevenue(item)), type: 'currency' }
+          { label: '总营收', value: formatCurrency(calculateTotalRevenue(item)), type: 'currency' },
+          ...(item.top1 != null ? [
+            { label: 'Top1金主占比', value: (item.top1 * 100).toFixed(2) + '%', className: 'whale-field' },
+          ] : []),
+          ...(item.top5 != null ? [
+            { label: 'Top5金主占比', value: (item.top5 * 100).toFixed(2) + '%', className: 'whale-field' },
+          ] : []),
+          ...(item.top10 != null ? [
+            { label: 'Top10金主占比', value: (item.top10 * 100).toFixed(2) + '%', className: 'whale-field' },
+          ] : []),
+          ...(item.top1_percent != null ? [
+            { label: '前1%用户占比', value: (item.top1_percent * 100).toFixed(2) + '%', className: 'whale-field' },
+          ] : [])
         ];
       }
     };

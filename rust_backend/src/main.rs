@@ -936,6 +936,10 @@ pub struct Anchor {
     pub total_revenue: f64,
     pub union: String,
     pub current_concurrency: Option<i64>, // 即时同接人数，开播时显示具体数值，未开播时为null
+    pub top1: Option<f64>,
+    pub top5: Option<f64>,
+    pub top10: Option<f64>,
+    pub top1_percent: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1703,6 +1707,12 @@ async fn fetch_external_api(
                 .unwrap_or("")
                 .to_string();
 
+            let whale = item.get("whale_dependency");
+            let top1 = whale.and_then(|w| w.get("top1")).and_then(|v| v.as_f64());
+            let top5 = whale.and_then(|w| w.get("top5")).and_then(|v| v.as_f64());
+            let top10 = whale.and_then(|w| w.get("top10")).and_then(|v| v.as_f64());
+            let top1_percent = whale.and_then(|w| w.get("top1_percent")).and_then(|v| v.as_f64());
+
             anchors.push(Anchor {
                 anchor_name,
                 attention,
@@ -1723,6 +1733,10 @@ async fn fetch_external_api(
                 total_revenue: 0.0,
                 union: "".to_string(),
                 current_concurrency: item.get("current_concurrency").and_then(|v| v.as_i64()),
+                top1,
+                top5,
+                top10,
+                top1_percent,
             });
         }
     }

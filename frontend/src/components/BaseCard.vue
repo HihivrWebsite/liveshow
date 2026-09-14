@@ -427,6 +427,17 @@ export default {
   font-weight: bold;
 }
 
+/* 金主依赖度字段样式 */
+.field-box.whale-field .field-label {
+  color: #FF8C00;
+  background-color: rgba(255, 152, 0, 0.12);
+}
+
+.field-box.whale-field .field-value {
+  font-weight: bold;
+  color: #FF8C00;
+}
+
 .duration-value {
   text-align: right;
   display: block;
