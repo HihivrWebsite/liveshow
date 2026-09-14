@@ -34,6 +34,25 @@
       </div>
     </div>
 
+    <!-- 金主依赖度三栏 -->
+    <div v-if="whaleData" class="whale-section" @click.stop>
+      <div class="whale-title">🎯 金主依赖度</div>
+      <div class="whale-row">
+        <div class="whale-item">
+          <span class="whale-label">Top1</span>
+          <span class="whale-value" :style="{ color: getWhaleColor(whaleData.top1 * 100) }">{{ (whaleData.top1 * 100).toFixed(1) }}%</span>
+        </div>
+        <div class="whale-item">
+          <span class="whale-label">Top5</span>
+          <span class="whale-value" :style="{ color: getWhaleColor(whaleData.top5 * 100) }">{{ (whaleData.top5 * 100).toFixed(1) }}%</span>
+        </div>
+        <div class="whale-item">
+          <span class="whale-label">Top1%</span>
+          <span class="whale-value" :style="{ color: getWhaleColor(whaleData.top1_percent * 100) }">{{ (whaleData.top1_percent * 100).toFixed(1) }}%</span>
+        </div>
+      </div>
+    </div>
+
     <div class="card-footer" v-if="$slots.actions || showActions" @click.stop>
       <slot name="actions">
         <button
@@ -99,6 +118,10 @@ export default {
     avatarUrl: {
       type: String,
       default: ''
+    },
+    whaleData: {
+      type: Object,
+      default: null
     }
   },
   emits: ['action-click'],
@@ -139,8 +162,17 @@ export default {
       return durationStr
     }
 
+    // 金主依赖度颜色分级：<10%绿/10-30%黄/30-50%橙/>50%红
+    const getWhaleColor = (percent) => {
+      if (percent < 10) return '#4CAF50'
+      if (percent < 30) return '#FFC107'
+      if (percent < 50) return '#FF9800'
+      return '#F44336'
+    }
+
     return {
-      processValue
+      processValue,
+      getWhaleColor
     }
   }
 }
@@ -427,22 +459,38 @@ export default {
   font-weight: bold;
 }
 
-/* 金主依赖度字段样式 */
-.field-box.whale-field .field-label {
-  color: #FF8C00;
-  background-color: rgba(255, 152, 0, 0.12);
+/* 金主依赖度三栏 */
+.whale-section {
+  padding: 8px 12px;
+  background: rgba(255, 152, 0, 0.06);
+  border-top: 1px dashed rgba(255, 152, 0, 0.2);
+  margin-top: 4px;
 }
-
-.field-box.whale-field .field-value {
+.whale-title {
+  font-size: 11px;
+  color: #FF8C00;
   font-weight: bold;
-  color: #FF8C00;
+  margin-bottom: 6px;
 }
-
-/* 金主依赖度颜色分级 */
-.field-value.whale-green { color: #4CAF50 !important; }
-.field-value.whale-yellow { color: #FFC107 !important; }
-.field-value.whale-orange { color: #FF9800 !important; }
-.field-value.whale-red { color: #F44336 !important; }
+.whale-row {
+  display: flex;
+  gap: 8px;
+}
+.whale-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.whale-label {
+  font-size: 10px;
+  color: #999;
+}
+.whale-value {
+  font-size: 14px;
+  font-weight: bold;
+}
 
 .duration-value {
   text-align: right;
