@@ -691,6 +691,13 @@ export default {
                 combinedAnchors[key].gift += parseFloat(anchor.gift) || 0
                 combinedAnchors[key].guard += parseFloat(anchor.guard) || 0
                 combinedAnchors[key].super_chat += parseFloat(anchor.super_chat) || 0
+                // 金主依赖度是比率，保留最新月份的数据
+                if (anchor.top1 != null) {
+                  combinedAnchors[key].top1 = anchor.top1
+                  combinedAnchors[key].top5 = anchor.top5
+                  combinedAnchors[key].top10 = anchor.top10
+                  combinedAnchors[key].top1_percent = anchor.top1_percent
+                }
               }
             })
           } catch (err) {
