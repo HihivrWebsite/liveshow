@@ -622,7 +622,13 @@ export default {
         { label: '舰长收入', value: formatCurrency(anchor.guard) },
         { label: 'SC收入', value: formatCurrency(anchor.super_chat) },
         { label: '总营收', value: formatCurrency(calculateTotalRevenue(anchor)) },
-        { label: '即时同接', value: anchor.current_concurrency !== null ? formatNumber(anchor.current_concurrency) : '未开播' }
+        { label: '即时同接', value: anchor.current_concurrency !== null ? formatNumber(anchor.current_concurrency) : '未开播' },
+        ...(anchor.top1 != null ? [
+          { label: 'Top1金主', value: (anchor.top1 * 100).toFixed(2) + '%' },
+          { label: 'Top5金主', value: (anchor.top5 * 100).toFixed(2) + '%' },
+          { label: 'Top10金主', value: (anchor.top10 * 100).toFixed(2) + '%' },
+          { label: 'Top1%用户', value: (anchor.top1_percent * 100).toFixed(2) + '%' }
+        ] : [])
       ]
     }
 
