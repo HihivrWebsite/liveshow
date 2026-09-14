@@ -464,7 +464,13 @@
             { label: '舰长收入', value: formatCurrency(anchor.guard), type: 'currency' },
             { label: 'SC收入', value: formatCurrency(anchor.super_chat), type: 'currency' },
             { label: '总营收', value: formatCurrency(calculateTotalRevenue(anchor)), type: 'currency' },
-            { label: '即时同接', value: anchor.current_concurrency !== null ? formatNumber(anchor.current_concurrency) : '未开播', type: anchor.current_concurrency !== null ? 'number' : 'text' }
+            { label: '即时同接', value: anchor.current_concurrency !== null ? formatNumber(anchor.current_concurrency) : '未开播', type: anchor.current_concurrency !== null ? 'number' : 'text' },
+            ...(anchor.top1 != null ? [
+              { label: '🎯 Top1金主', value: (anchor.top1 * 100).toFixed(2) + '%', className: 'whale-field', valueClassName: getWhaleClass(anchor.top1 * 100) },
+              { label: 'Top5金主', value: (anchor.top5 * 100).toFixed(2) + '%', className: 'whale-field', valueClassName: getWhaleClass(anchor.top5 * 100) },
+              { label: 'Top10金主', value: (anchor.top10 * 100).toFixed(2) + '%', className: 'whale-field', valueClassName: getWhaleClass(anchor.top10 * 100) },
+              { label: 'Top1%用户', value: (anchor.top1_percent * 100).toFixed(2) + '%', className: 'whale-field', valueClassName: getWhaleClass(anchor.top1_percent * 100) }
+            ] : [])
           ]"
           :action-button="{ text: '查看详细数据', className: 'view-btn' }"
           :action-data="anchor"
@@ -1117,6 +1123,14 @@ export default {
 
     const formatNumber = (value) => {
       return new Intl.NumberFormat().format(value || 0)
+    }
+
+    // 金主依赖度颜色分级：<10%绿/10-30%黄/30-50%橙/>50%红
+    const getWhaleClass = (percent) => {
+      if (percent < 10) return 'whale-green'
+      if (percent < 30) return 'whale-yellow'
+      if (percent < 50) return 'whale-orange'
+      return 'whale-red'
     }
 
     const formatLiveDuration = (durationStr) => {
@@ -2871,6 +2885,7 @@ export default {
       calculateTotalRevenue,
       formatCurrency,
       formatNumber,
+      getWhaleClass,
       formatLiveDuration,
       formatDurationWithBreak,
       // 多月份统计相关

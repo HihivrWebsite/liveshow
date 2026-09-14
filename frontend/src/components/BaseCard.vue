@@ -438,6 +438,12 @@ export default {
   color: #FF8C00;
 }
 
+/* 金主依赖度颜色分级 */
+.field-value.whale-green { color: #4CAF50 !important; }
+.field-value.whale-yellow { color: #FFC107 !important; }
+.field-value.whale-orange { color: #FF9800 !important; }
+.field-value.whale-red { color: #F44336 !important; }
+
 .duration-value {
   text-align: right;
   display: block;
