@@ -623,11 +623,8 @@ export default {
         { label: 'SC收入', value: formatCurrency(anchor.super_chat) },
         { label: '总营收', value: formatCurrency(calculateTotalRevenue(anchor)) },
         { label: '即时同接', value: anchor.current_concurrency !== null ? formatNumber(anchor.current_concurrency) : '未开播' },
-        ...(anchor.top1 != null ? [
-          { label: 'Top1金主', value: (anchor.top1 * 100).toFixed(2) + '%' },
-          { label: 'Top5金主', value: (anchor.top5 * 100).toFixed(2) + '%' },
-          { label: 'Top10金主', value: (anchor.top10 * 100).toFixed(2) + '%' },
-          { label: 'Top1%用户', value: (anchor.top1_percent * 100).toFixed(2) + '%' }
+        ...(anchor.top1_percent != null ? [
+          { label: 'Top1%', value: (anchor.top1_percent * 100).toFixed(2) + '%' }
         ] : [])
       ]
     }
@@ -766,7 +763,7 @@ export default {
 
         const siteUrl = 'hihivr点top'
         const htmlContent = `
-          <div style="font-family:'Microsoft YaHei',sans-serif;background:#FFF8E1;padding:20px;width:1200px;">
+          <div style="font-family:'Microsoft YaHei',sans-serif;background:#FFF8E1;padding:20px;width:1400px;">
             <header style="background:#FFF8E1;padding:20px 0;">
               <div style="margin:0 auto;padding:0 20px;">
                 <div style="display:flex;align-items:center;justify-content:center;gap:15px;margin-bottom:15px;">
