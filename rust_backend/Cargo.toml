@@ -1,6 +1,6 @@
 [package]
 name = "liveshow-backend"
-version = "4.7.10"
+version = "4.7.11"
 edition = "2021"
 
 [dependencies]

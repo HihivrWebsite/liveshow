@@ -780,7 +780,7 @@ export default {
 
         const siteUrl = 'hihivr点top'
         const htmlContent = `
-          <div style="font-family:'Microsoft YaHei',sans-serif;background:#FFF8E1;padding:20px;width:2000px;">
+          <div style="font-family:'Microsoft YaHei',sans-serif;background:#FFF8E1;padding:20px;width:2200px;">
             <header style="background:#FFF8E1;padding:20px 0;">
               <div style="margin:0 auto;padding:0 20px;">
                 <div style="display:flex;align-items:center;justify-content:center;gap:15px;margin-bottom:15px;">
@@ -831,7 +831,7 @@ export default {
             scale: 2,
             backgroundColor: '#FFF8E1',
             logging: false,
-            windowWidth: 2000,
+            windowWidth: 2200,
             width: container.firstElementChild.scrollWidth
           })
 
