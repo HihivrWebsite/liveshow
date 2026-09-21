@@ -186,8 +186,8 @@
             },
             ...(session.captain_danmaku_count != null ? [
               { label: '舰长弹幕', value: formatNumber(session.captain_danmaku_count || 0), type: 'number' },
-              { label: '提督弹幕', value: formatNumber(session.governor_danmaku_count || 0), type: 'number' },
-              { label: '总督弹幕', value: formatNumber(session.admiral_danmaku_count || 0), type: 'number' },
+              { label: '提督弹幕', value: formatNumber(session.admiral_danmaku_count || 0), type: 'number' },
+              { label: '总督弹幕', value: formatNumber(session.governor_danmaku_count || 0), type: 'number' },
               { label: '普通弹幕', value: formatNumber(session.normal_danmaku_count || 0), type: 'number' }
             ] : []),
             {
@@ -332,7 +332,7 @@ export default {
 
       if (room_id) {
         router.push(`/live-sessions?room_id=${room_id}&union=${union.value}&month=${selectedMonth}`)
-        fetchData(selectedMonth)
+        // fetchData 由 watch(route.query) 自动触发，无需重复调用
         closeMonthSelector()
       } else {
         alert("无法切换月份，因为没有有效的 room_id。")

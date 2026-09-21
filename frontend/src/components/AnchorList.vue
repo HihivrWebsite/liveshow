@@ -2840,7 +2840,7 @@ export default {
     )
 
     onMounted(() => {
-      fetchData()
+      // fetchData() 由 watch(immediate:true) 触发，无需重复调用
 
       // 监听 App.vue 弹窗按钮事件
       const handlePopupBattle = () => {

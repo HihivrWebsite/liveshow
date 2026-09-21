@@ -1456,10 +1456,16 @@ async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Vec<Anchor> {
         false // 如果没有指定月份，则为当前数据，不缓存
     };
 
-    // 如果是过去月份的数据，尝试从缓存获取
-    if is_past_month {
-        if let Some(cached_entry) = get_cache_entry(&cache_key).await {
+    // 尝试从缓存获取（过去月份永久缓存，当前月份5分钟TTL）
+    if let Some(cached_entry) = get_cache_entry(&cache_key).await {
+        if is_past_month {
             println!("从缓存获取数据: {}", cache_key);
+            return cached_entry.data;
+        }
+        // 当前月份：5分钟内有效
+        let ttl = std::time::Duration::from_secs(300);
+        if cached_entry.timestamp.elapsed().unwrap_or(ttl) < ttl {
+            println!("从缓存获取当前月份数据(5min TTL): {}", cache_key);
             return cached_entry.data;
         }
     }
@@ -1511,8 +1517,8 @@ async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Vec<Anchor> {
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    // 如果是过去月份的数据，将其缓存
-    if is_past_month {
+    // 缓存数据（过去月份永久，当前月份5分钟TTL）
+    if is_past_month || month.is_none() {
         // 估算数据大小（简单估算，实际项目中可能需要更精确的估算）
         let size_estimate = serde_json::to_string(&all_data).unwrap_or_default().len();
 
