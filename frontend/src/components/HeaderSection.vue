@@ -66,8 +66,12 @@
           <button @click="followCreator" class="action-btn secondary-glowing">
             关注花礼harei喵，关注花礼harei谢谢喵
           </button>
-          <a href="https://ifdian.net/a/qianqiuzy" target="_blank" rel="noopener noreferrer" class="action-btn sponsor-btn">
-            赞助开发猫
+        </div>
+        <div class="sponsor-section">
+          <a href="https://ifdian.net/a/qianqiuzy" target="_blank" rel="noopener noreferrer" class="sponsor-btn-main">
+            <span class="sponsor-sparkle">✨</span>
+            赞助开发猫 点击跳转赞助页面
+            <span class="sponsor-sparkle">✨</span>
           </a>
         </div>
       </div>
@@ -488,25 +492,70 @@ export default {
 }
 
 .action-btn.secondary-glowing {
-  background: linear-gradient(45deg, #f9729a, #f75982); /* 改为新颜色 */
+  background: linear-gradient(45deg, #f9729a, #f75982);
   color: white;
-  font-size: 0.9rem; /* 缩小0.5倍 */
-  padding: 10px 20px; /* 缩小内边距 */
-  animation: secondary-shine 2s infinite; /* 添加闪光动画 */
-}
-
-.sponsor-btn {
-  display: inline-block;
-  text-decoration: none;
-  background: linear-gradient(45deg, #FFC633, #FFA500);
-  color: #333;
   font-size: 0.9rem;
   padding: 10px 20px;
-  animation: sponsor-glow 2s infinite;
+  animation: secondary-shine 2s infinite;
 }
 
-.sponsor-btn:hover {
-  background: linear-gradient(45deg, #FFD700, #FF8C00);
+/* 赞助按钮独立区域 */
+.sponsor-section {
+  margin-top: 15px;
+  text-align: center;
+}
+
+.sponsor-btn-main {
+  display: inline-block;
+  text-decoration: none;
+  background: linear-gradient(135deg, #FF1744, #FF6D00, #FFD600, #FF6D00, #FF1744);
+  background-size: 300% 300%;
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: bold;
+  padding: 14px 40px;
+  border-radius: 50px;
+  animation: sponsor-flash 1.5s ease-in-out infinite, sponsor-gradient 3s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  letter-spacing: 2px;
+}
+
+.sponsor-btn-main:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 40px rgba(255, 23, 68, 0.8), 0 0 80px rgba(255, 109, 0, 0.4);
+}
+
+/* 撒花粒子效果 */
+.sponsor-btn-main::before,
+.sponsor-btn-main::after {
+  content: '🎉🎊✨🌟💫🔥';
+  position: absolute;
+  font-size: 20px;
+  animation: confetti-fall 2s linear infinite;
+  pointer-events: none;
+  white-space: nowrap;
+  top: -30px;
+}
+
+.sponsor-btn-main::before {
+  left: -10px;
+  animation-delay: 0s;
+}
+
+.sponsor-btn-main::after {
+  right: -10px;
+  animation-delay: 1s;
+  content: '💖💝🎁🌟✨🎊';
+}
+
+.sponsor-sparkle {
+  display: inline-block;
+  animation: sparkle-spin 1s ease-in-out infinite alternate;
+  font-size: 1.3em;
 }
 
 .action-btn:hover {
@@ -530,14 +579,52 @@ export default {
   }
 }
 
-/* 赞助按钮呼吸光效 */
-@keyframes sponsor-glow {
+/* 赞助按钮闪烁动画 */
+@keyframes sponsor-flash {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(255, 165, 0, 0.4);
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(255, 23, 68, 0.6), 0 0 40px rgba(255, 109, 0, 0.4), 0 0 60px rgba(255, 214, 0, 0.2);
+  }
+  25% {
+    opacity: 0.85;
+    box-shadow: 0 0 30px rgba(255, 23, 68, 0.8), 0 0 60px rgba(255, 109, 0, 0.6), 0 0 90px rgba(255, 214, 0, 0.3);
   }
   50% {
-    box-shadow: 0 0 25px rgba(255, 165, 0, 0.7);
+    opacity: 1;
+    box-shadow: 0 0 40px rgba(255, 214, 0, 0.8), 0 0 80px rgba(255, 23, 68, 0.5), 0 0 120px rgba(255, 109, 0, 0.3);
   }
+  75% {
+    opacity: 0.9;
+    box-shadow: 0 0 25px rgba(255, 109, 0, 0.7), 0 0 50px rgba(255, 214, 0, 0.5), 0 0 75px rgba(255, 23, 68, 0.3);
+  }
+}
+
+@keyframes sponsor-gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-20px) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(60px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes sparkle-spin {
+  0% { transform: scale(1) rotate(-10deg); }
+  100% { transform: scale(1.3) rotate(10deg); }
 }
 
 /* 闪光动画 */
