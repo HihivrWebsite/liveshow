@@ -66,6 +66,9 @@
           <button @click="followCreator" class="action-btn secondary-glowing">
             关注花礼harei喵，关注花礼harei谢谢喵
           </button>
+          <a href="https://ifdian.net/a/qianqiuzy" target="_blank" rel="noopener noreferrer" class="action-btn sponsor-btn">
+            赞助开发猫
+          </a>
         </div>
       </div>
     </div>
@@ -492,6 +495,20 @@ export default {
   animation: secondary-shine 2s infinite; /* 添加闪光动画 */
 }
 
+.sponsor-btn {
+  display: inline-block;
+  text-decoration: none;
+  background: linear-gradient(45deg, #FFC633, #FFA500);
+  color: #333;
+  font-size: 0.9rem;
+  padding: 10px 20px;
+  animation: sponsor-glow 2s infinite;
+}
+
+.sponsor-btn:hover {
+  background: linear-gradient(45deg, #FFD700, #FF8C00);
+}
+
 .action-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -510,6 +527,16 @@ export default {
   100% {
     background-position: 0% 50%;
     box-shadow: 0 0 15px #f9729a;
+  }
+}
+
+/* 赞助按钮呼吸光效 */
+@keyframes sponsor-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(255, 165, 0, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255, 165, 0, 0.7);
   }
 }
 
