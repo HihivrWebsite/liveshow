@@ -464,7 +464,14 @@
             { label: '舰长收入', value: formatCurrency(anchor.guard), type: 'currency' },
             { label: 'SC收入', value: formatCurrency(anchor.super_chat), type: 'currency' },
             { label: '总营收', value: formatCurrency(calculateTotalRevenue(anchor)), type: 'currency' },
-            { label: '即时同接', value: anchor.current_concurrency !== null ? formatNumber(anchor.current_concurrency) : '未开播', type: anchor.current_concurrency !== null ? 'number' : 'text' }
+            { label: '即时同接', value: anchor.current_concurrency !== null ? formatNumber(anchor.current_concurrency) : '未开播', type: anchor.current_concurrency !== null ? 'number' : 'text' },
+            ...(anchor.danmaku_total != null ? [
+              { label: '总弹幕', value: formatNumber(anchor.danmaku_total), type: 'number' },
+              { label: '普通弹幕', value: formatNumber(anchor.danmaku_normal || 0), type: 'number' },
+              { label: '舰长弹幕', value: formatNumber(anchor.danmaku_captain || 0), type: 'number' },
+              { label: '提督弹幕', value: formatNumber(anchor.danmaku_admiral || 0), type: 'number' },
+              { label: '总督弹幕', value: formatNumber(anchor.danmaku_governor || 0), type: 'number' }
+            ] : [])
           ]"
           :whale-data="anchor.top1 != null ? { top1: anchor.top1, top5: anchor.top5, top10: anchor.top10, top1_percent: anchor.top1_percent } : null"
           :action-button="{ text: '查看详细数据', className: 'view-btn' }"
@@ -623,6 +630,13 @@ export default {
         { label: 'SC收入', value: formatCurrency(anchor.super_chat) },
         { label: '总营收', value: formatCurrency(calculateTotalRevenue(anchor)) },
         { label: '即时同接', value: anchor.current_concurrency !== null ? formatNumber(anchor.current_concurrency) : '未开播' },
+        ...(anchor.danmaku_total != null ? [
+          { label: '总弹幕', value: formatNumber(anchor.danmaku_total) },
+          { label: '普通弹幕', value: formatNumber(anchor.danmaku_normal || 0) },
+          { label: '舰长弹幕', value: formatNumber(anchor.danmaku_captain || 0) },
+          { label: '提督弹幕', value: formatNumber(anchor.danmaku_admiral || 0) },
+          { label: '总督弹幕', value: formatNumber(anchor.danmaku_governor || 0) }
+        ] : []),
         ...(anchor.top1 != null ? [
           { label: 'Top1金主', value: (anchor.top1 * 100).toFixed(2) + '%' },
           { label: 'Top5金主', value: (anchor.top5 * 100).toFixed(2) + '%' },

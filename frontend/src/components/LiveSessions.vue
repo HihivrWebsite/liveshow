@@ -184,6 +184,12 @@
               value: formatNumber(session.danmaku_count != null ? session.danmaku_count : 0),
               type: 'number'
             },
+            ...(session.captain_danmaku_count != null ? [
+              { label: '舰长弹幕', value: formatNumber(session.captain_danmaku_count || 0), type: 'number' },
+              { label: '提督弹幕', value: formatNumber(session.governor_danmaku_count || 0), type: 'number' },
+              { label: '总督弹幕', value: formatNumber(session.admiral_danmaku_count || 0), type: 'number' },
+              { label: '普通弹幕', value: formatNumber(session.normal_danmaku_count || 0), type: 'number' }
+            ] : []),
             {
               label: '礼物收入',
               value: formatCurrency(session.gift) + '<br>(' + calculatePercentage(session.gift, calculateTotalRevenue(session)) + '%)',
@@ -432,6 +438,10 @@ export default {
       const avgConcurrencyData = []  // 平均同接
       const maxConcurrencyData = []  // 最高同接
       const newFansCountData = []    // 新增粉丝数 (从后端 API 计算)
+      const captainDanmakuData = []
+      const admiralDanmakuData = []
+      const governorDanmakuData = []
+      const normalDanmakuData = []
 
       console.log('开始处理会话数据，共', sessions.value.length, '个会话') // 添加调试日志
       sessions.value.forEach((session, index) => {
@@ -469,6 +479,10 @@ export default {
         avgConcurrencyData.push(avgConcurrency)
         maxConcurrencyData.push(maxConcurrency)
         newFansCountData.push(newFansCount)
+        captainDanmakuData.push(session.captain_danmaku_count != null ? Number(session.captain_danmaku_count) : 0)
+        admiralDanmakuData.push(session.admiral_danmaku_count != null ? Number(session.admiral_danmaku_count) : 0)
+        governorDanmakuData.push(session.governor_danmaku_count != null ? Number(session.governor_danmaku_count) : 0)
+        normalDanmakuData.push(session.normal_danmaku_count != null ? Number(session.normal_danmaku_count) : 0)
         console.log(`会话${index+1}处理完成，数据:`, {
           durationMinutes,
           gift,
@@ -663,7 +677,51 @@ export default {
               pointHoverRadius: 8,
               tension: 0.4,
               pointStyle: 'rect'  // 矩形
-            }
+            },
+            ...(captainDanmakuData.some(v => v > 0) ? [{
+              label: '舰长弹幕',
+              data: captainDanmakuData,
+              borderColor: '#e74c3c',
+              backgroundColor: 'rgba(231, 76, 60, 0.1)',
+              yAxisID: 'y1',
+              fill: false,
+              pointRadius: 3,
+              tension: 0.4,
+              pointStyle: 'triangle'
+            }] : []),
+            ...(admiralDanmakuData.some(v => v > 0) ? [{
+              label: '提督弹幕',
+              data: admiralDanmakuData,
+              borderColor: '#9b59b6',
+              backgroundColor: 'rgba(155, 89, 182, 0.1)',
+              yAxisID: 'y1',
+              fill: false,
+              pointRadius: 3,
+              tension: 0.4,
+              pointStyle: 'rect'
+            }] : []),
+            ...(governorDanmakuData.some(v => v > 0) ? [{
+              label: '总督弹幕',
+              data: governorDanmakuData,
+              borderColor: '#f39c12',
+              backgroundColor: 'rgba(243, 156, 18, 0.1)',
+              yAxisID: 'y1',
+              fill: false,
+              pointRadius: 3,
+              tension: 0.4,
+              pointStyle: 'rectRot'
+            }] : []),
+            ...(normalDanmakuData.some(v => v > 0) ? [{
+              label: '普通弹幕',
+              data: normalDanmakuData,
+              borderColor: '#95a5a6',
+              backgroundColor: 'rgba(149, 165, 166, 0.1)',
+              yAxisID: 'y1',
+              fill: false,
+              pointRadius: 3,
+              tension: 0.4,
+              pointStyle: 'circle'
+            }] : [])
           ]
         },
         options: {

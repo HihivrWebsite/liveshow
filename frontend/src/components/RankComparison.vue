@@ -129,6 +129,10 @@ export default {
         newGuard1: '新增舰长',
         newFans: '新增粉丝团',
         danmaku: '弹幕数',
+        captainDanmaku: '舰长弹幕',
+        admiralDanmaku: '提督弹幕',
+        governorDanmaku: '总督弹幕',
+        normalDanmaku: '普通弹幕',
         avgConcurrency: '平均同接',
         maxConcurrency: '最高同接',
         newFansCount: '新增粉丝数'
@@ -316,6 +320,10 @@ export default {
         case 'newGuard1': return (parseInt(session.end_guard_1) || 0) - (parseInt(session.start_guard_1) || 0)
         case 'newFans': return (parseInt(session.end_fans_count) || 0) - (parseInt(session.start_fans_count) || 0)
         case 'danmaku': return parseInt(session.danmaku_count) || 0
+        case 'captainDanmaku': return parseInt(session.captain_danmaku_count) || 0
+        case 'admiralDanmaku': return parseInt(session.admiral_danmaku_count) || 0
+        case 'governorDanmaku': return parseInt(session.governor_danmaku_count) || 0
+        case 'normalDanmaku': return parseInt(session.normal_danmaku_count) || 0
         case 'avgConcurrency': return parseFloat(session.avg_concurrency) || 0
         case 'maxConcurrency': return parseInt(session.max_concurrency) || 0
         case 'newFansCount': return parseInt(session.new_fans_count) || 0

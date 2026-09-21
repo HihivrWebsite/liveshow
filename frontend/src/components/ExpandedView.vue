@@ -195,6 +195,12 @@ export default {
           { label: '舰长数量', value: item.guard_num || 0 },
           { label: 'SC数量', value: item.sc_num || 0 },
           { label: '弹幕数', value: formatNumber(item.danmaku_count || 0), type: 'number' },
+          ...(item.captain_danmaku_count != null ? [
+            { label: '舰长弹幕', value: formatNumber(item.captain_danmaku_count || 0), type: 'number' },
+            { label: '提督弹幕', value: formatNumber(item.governor_danmaku_count || 0), type: 'number' },
+            { label: '总督弹幕', value: formatNumber(item.admiral_danmaku_count || 0), type: 'number' },
+            { label: '普通弹幕', value: formatNumber(item.normal_danmaku_count || 0), type: 'number' }
+          ] : []),
           { label: '礼物收入', value: formatCurrency(item.gift_income || 0), type: 'currency' },
           { label: '舰长收入', value: formatCurrency(item.guard_income || 0), type: 'currency' },
           { label: 'SC收入', value: formatCurrency(item.sc_income || 0), type: 'currency' },

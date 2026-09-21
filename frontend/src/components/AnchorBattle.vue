@@ -38,6 +38,10 @@
           <option value="newGuard1">⚓ 新增舰长</option>
           <option value="newFans">👥 新增粉丝团</option>
           <option value="danmaku">💭 弹幕数</option>
+          <option value="captainDanmaku">🔱 舰长弹幕</option>
+          <option value="admiralDanmaku">🎖️ 提督弹幕</option>
+          <option value="governorDanmaku">👑 总督弹幕</option>
+          <option value="normalDanmaku">💬 普通弹幕</option>
           <option value="avgConcurrency">📊 平均同接</option>
           <option value="maxConcurrency">📈 最高同接</option>
           <option value="newFansCount">🆕 新增粉丝数</option>
@@ -82,6 +86,10 @@
           <option value="newGuard1">⚓ 新增舰长</option>
           <option value="newFans">👥 新增粉丝团</option>
           <option value="danmaku">💭 弹幕数</option>
+          <option value="captainDanmaku">🔱 舰长弹幕</option>
+          <option value="admiralDanmaku">🎖️ 提督弹幕</option>
+          <option value="governorDanmaku">👑 总督弹幕</option>
+          <option value="normalDanmaku">💬 普通弹幕</option>
           <option value="avgConcurrency">📊 平均同接</option>
           <option value="maxConcurrency">📈 最高同接</option>
           <option value="newFansCount">🆕 新增粉丝数</option>
@@ -236,6 +244,10 @@ export default {
         newGuard1: '新增舰长',
         newFans: '新增粉丝团',
         danmaku: '弹幕数',
+        captainDanmaku: '舰长弹幕',
+        admiralDanmaku: '提督弹幕',
+        governorDanmaku: '总督弹幕',
+        normalDanmaku: '普通弹幕',
         avgConcurrency: '平均同接',
         maxConcurrency: '最高同接',
         newFansCount: '新增粉丝数'
@@ -687,6 +699,10 @@ export default {
         newGuard1: () => (session.end_guard_1 || 0) - (session.start_guard_1 || 0),
         newFans: () => (session.end_fans_count || 0) - (session.start_fans_count || 0),
         danmaku: () => session.danmaku_count || 0,
+        captainDanmaku: () => session.captain_danmaku_count || 0,
+        admiralDanmaku: () => session.admiral_danmaku_count || 0,
+        governorDanmaku: () => session.governor_danmaku_count || 0,
+        normalDanmaku: () => session.normal_danmaku_count || 0,
         avgConcurrency: () => session.avg_concurrency || 0,
         maxConcurrency: () => session.max_concurrency || 0,
         newFansCount: () => session.new_fans_count !== undefined ? session.new_fans_count : 0
