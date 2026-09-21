@@ -940,6 +940,11 @@ pub struct Anchor {
     pub top5: Option<f64>,
     pub top10: Option<f64>,
     pub top1_percent: Option<f64>,
+    pub danmaku_total: Option<i64>,
+    pub danmaku_captain: Option<i64>,
+    pub danmaku_admiral: Option<i64>,
+    pub danmaku_governor: Option<i64>,
+    pub danmaku_normal: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -956,6 +961,10 @@ pub struct LiveSession {
     pub start_fans_count: i64,
     pub end_fans_count: i64,
     pub danmaku_count: i64,
+    pub captain_danmaku_count: Option<i64>,
+    pub admiral_danmaku_count: Option<i64>,
+    pub governor_danmaku_count: Option<i64>,
+    pub normal_danmaku_count: Option<i64>,
     pub gift: f64,
     pub guard: f64,
     pub super_chat: f64,
@@ -1713,6 +1722,13 @@ async fn fetch_external_api(
             let top10 = whale.and_then(|w| w.get("top10")).and_then(|v| v.as_f64());
             let top1_percent = whale.and_then(|w| w.get("top1_percent")).and_then(|v| v.as_f64());
 
+            let danmaku = item.get("danmaku");
+            let danmaku_total = danmaku.and_then(|d| d.get("total")).and_then(|v| v.as_i64());
+            let danmaku_captain = danmaku.and_then(|d| d.get("captain")).and_then(|v| v.as_i64());
+            let danmaku_admiral = danmaku.and_then(|d| d.get("admiral")).and_then(|v| v.as_i64());
+            let danmaku_governor = danmaku.and_then(|d| d.get("governor")).and_then(|v| v.as_i64());
+            let danmaku_normal = danmaku.and_then(|d| d.get("normal")).and_then(|v| v.as_i64());
+
             anchors.push(Anchor {
                 anchor_name,
                 attention,
@@ -1737,6 +1753,11 @@ async fn fetch_external_api(
                 top5,
                 top10,
                 top1_percent,
+                danmaku_total,
+                danmaku_captain,
+                danmaku_admiral,
+                danmaku_governor,
+                danmaku_normal,
             });
         }
     }
@@ -1899,6 +1920,10 @@ async fn fetch_live_session_from_api(
         let start_fans_count = safe_parse_to_i64(item.get("start_fans_count"));
         let end_fans_count = safe_parse_to_i64(item.get("end_fans_count"));
         let danmaku_count = safe_parse_to_i64(item.get("danmaku_count"));
+        let captain_danmaku_count = item.get("captain_danmaku_count").and_then(|v| v.as_i64());
+        let admiral_danmaku_count = item.get("admiral_danmaku_count").and_then(|v| v.as_i64());
+        let governor_danmaku_count = item.get("governor_danmaku_count").and_then(|v| v.as_i64());
+        let normal_danmaku_count = item.get("normal_danmaku_count").and_then(|v| v.as_i64());
         let gift = safe_parse_to_f64(item.get("gift"));
         let guard = safe_parse_to_f64(item.get("guard"));
         let super_chat = safe_parse_to_f64(item.get("super_chat"));
@@ -1930,6 +1955,10 @@ async fn fetch_live_session_from_api(
             start_fans_count,
             end_fans_count,
             danmaku_count,
+            captain_danmaku_count,
+            admiral_danmaku_count,
+            governor_danmaku_count,
+            normal_danmaku_count,
             gift,
             guard,
             super_chat,
