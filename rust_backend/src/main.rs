@@ -914,6 +914,17 @@ fn safe_parse_optional_i64(value: Option<&serde_json::Value>) -> Option<i64> {
     }
 }
 
+// 安全格式化月份标题，避免短字符串 panic
+fn format_month_title(month: &str) -> String {
+    if month.len() >= 6 {
+        format!("{}年{}月直播数据", &month[..4], &month[4..])
+    } else if month.len() >= 4 {
+        format!("{}年直播数据", &month[..4])
+    } else {
+        format!("{}月直播数据", month)
+    }
+}
+
 // ==================== 数据模型定义 ====================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Anchor {
@@ -1243,7 +1254,7 @@ async fn get_live_sessions(
             room_id,
             queried_user: "未知主播".to_string(),
             union,
-            title: format!("{}年{}月直播数据", &month[..4], &month[4..]),
+            title: format_month_title(&month),
             refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         }));
     }
@@ -1283,7 +1294,7 @@ async fn get_live_sessions(
         room_id,
         queried_user,
         union,
-        title: format!("{}年{}月直播数据", &month[..4], &month[4..]),
+        title: format_month_title(&month),
         refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     }))
 }
@@ -2056,7 +2067,7 @@ async fn get_live_sessions_with_fans(
             room_id,
             queried_user: "未知主播".to_string(),
             union,
-            title: format!("{}年{}月直播数据", &month[..4], &month[4..]),
+            title: format_month_title(&month),
             refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         }));
     }
@@ -2098,7 +2109,7 @@ async fn get_live_sessions_with_fans(
         room_id,
         queried_user,
         union,
-        title: format!("{}年{}月直播数据", &month[..4], &month[4..]),
+        title: format_month_title(&month),
         refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     }))
 }
