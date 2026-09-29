@@ -13,6 +13,7 @@
 rust_backend/
 ├── src/
 │   ├── main.rs              # 主程序（路由、业务逻辑、缓存）
+│   ├── gift_response_cache.rs # Gift 10秒 HTTP 响应缓存
 │   ├── main_optimized.rs    # 优化版主程序
 │   └── middleware.rs        # 中间件
 ├── cache_data/              # 缓存数据目录
@@ -93,10 +94,16 @@ struct SuperChat {
 | GET /gift | get_anchors | 获取主播列表 |
 | GET /gift/by_month | get_anchors_by_month | 按月份获取 |
 | GET /gift/live_sessions | get_live_sessions | 直播会话详情 |
+| GET /gift/live_sessions_with_fans | get_live_sessions_with_fans | 含粉丝计算的直播会话 |
 | GET /gift/attention | get_attention_data | 粉丝数快照 |
 | GET /gift/sc | get_sc_history | SC历史 |
+| GET /gift/avatar | get_avatar | 主播头像 URL |
+| GET /gift/avatar_proxy | get_avatar_proxy | 头像代理图片 |
+| GET /gift/avatars/batch | get_avatars_batch | 批量头像 |
+| GET /gift/fans_overlap | get_fans_overlap | 粉丝重合度 |
 | GET /assets/*** | ServeDir | 静态资源 |
 | GET /cache/stats | 缓存统计 | 缓存命中率 |
+| POST /cache/clear | 清除缓存 | 参数有效时同时清 Gift 短缓存 |
 
 ## 业务逻辑
 
@@ -113,6 +120,36 @@ struct SuperChat {
 - `get_attention_cache_data()` — 获取 attention 缓存数据
 - `is_past_month(month)` — 判断是否为历史月份
 - `is_cache_valid(timestamp, current_time)` — 判断缓存是否有效
+- `GiftResponseCache` — 10 个 `/gift*` 路由最外层 HTTP 响应缓存
+
+### Gift 10 秒响应缓存
+
+`gift_response_cache.rs` 只负责 HTTP 响应层，不替代 handler 内部锚点、Attention、LiveSessions 和头像缓存：
+
+- 固定 TTL 10 秒，使用单调时钟；完整缓存状态码、端到端头和原始字节。
+- 缓存键为 `GET|规范路径|规范查询`：唯一参数名排序、重复参数名保持原顺序、保留原值和未知参数；不按业务字段归并，超过 4096 字节绕过。
+- 每键 single-flight：直查缓存、获取锁、二次直查、执行 handler、写缓存；leader 取消时自动释放锁。
+- 有界 LRU 上限为 512 条、64 MiB，单响应 16 MiB；不满足读取条件的响应绕过。
+- 缓存成功和错误响应，上游错误最多延迟 10 秒恢复可见。
+- 响应追加 `X-Gift-Cache: HIT|MISS|COALESCED`。
+- 缓存层位于全局 Compression 内侧，命中结果仍可按请求进行 gzip 或 identity 压缩。
+- 有效 `POST /cache/clear` 清空该层并递增 generation，阻止慢请求写回清理前结果；无效调用维持 `ok: false`，不清该层。
+- `/cache/stats` 在 `gift_response_cache` 对象中输出 TTL、命中、合并命中、miss、过期、淘汰、绕过、缓冲错误、条目、字节、在途键和命中率。
+
+`gift_response_cache.misses` 仅统计执行 handler 的次数，不等于远程 API 调用数。
+
+### 响应缓存测试要求
+
+修改缓存或路由后至少执行：
+
+```bash
+cd rust_backend
+cargo fmt --check
+cargo check
+cargo test
+```
+
+单元测试必须覆盖：键隔离、10 秒过期、错误缓存、二进制响应、同键 50 路并发单飞、leader 取消释放锁、LRU 容量淘汰、clear generation 失效、`gzip`/`identity` 压缩兼容、绕过条件和统计计数。运行时还要对全部 10 个 `/gift*` 路由验证首命中、重复命中、过期、并发、有效/无效 clear 和原 `/cache/stats` 字段。
 
 ## 编译与运行
 

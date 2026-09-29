@@ -2,6 +2,20 @@
 
 ## 版本历史
 
+### v4.7.16 — 2026-09-29
+
+#### 新增
+- 10 个 `GET /gift*` 路由新增 10 秒 HTTP 响应缓存
+- 同缓存键冷启动并发增加 single-flight 合并，避免同一远程查询同时大量执行
+- 缓存响应增加 `X-Gift-Cache: HIT|MISS|COALESCED` 诊断头
+- `/cache/stats` 新增 `gift_response_cache` 统计对象
+
+#### 变更
+- 成功和错误响应均缓存 10 秒，上游错误最多延迟 10 秒恢复可见
+- 有效 `POST /cache/clear` 同时清空短缓存并递增 generation，无效调用保持原有行为
+- 前端和后端版本从 `4.7.15` 升级至 `4.7.16`
+- 同步 `frontend/package-lock.json` 与 `rust_backend/Cargo.lock`
+
 ### v4.7.15 — 2026-09-29
 
 #### 新增

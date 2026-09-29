@@ -16,6 +16,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+mod gift_response_cache;
+
+use crate::gift_response_cache::{
+    clear_gift_response_cache, gift_response_cache_middleware, gift_response_cache_stats,
+    GiftResponseCacheStats,
+};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 use tokio::time::timeout;
@@ -1144,8 +1150,8 @@ async fn main() {
         ])
         .max_age(Duration::from_secs(86400)); // 24小时缓存预检请求
 
-    // 构建Axum应用程序路由器
-    let app = Router::new()
+    // GET /gift* 路由共享同一层10秒HTTP响应缓存。
+    let gift_router = Router::new()
         .route("/gift", get(get_anchors))
         .route("/gift/by_month", get(get_anchors_by_month))
         .route("/gift/live_sessions", get(get_live_sessions))
@@ -1158,7 +1164,11 @@ async fn main() {
         .route("/gift/avatar", get(get_avatar))
         .route("/gift/avatar_proxy", get(get_avatar_proxy))
         .route("/gift/avatars/batch", get(get_avatars_batch))
-        .route("/gift/fans_overlap", get(get_fans_overlap))
+        .route("/gift/fans_overlap", get(get_fans_overlap));
+
+    // 构建Axum应用程序路由器；缓存先挂载为最内层，日志、压缩和CORS随后包裹在外侧。
+    let app = Router::new()
+        .merge(gift_router)
         .route("/cache/stats", get(get_cache_stats_endpoint))
         .route("/cache/clear", post(clear_cache_endpoint))
         .nest_service(
@@ -1170,6 +1180,7 @@ async fn main() {
         .route("/favicon.ico", get(favicon))
         .fallback(index_handler)
         // 添加中间件
+        .layer(axum::middleware::from_fn(gift_response_cache_middleware))
         .layer(TraceLayer::new_for_http()) // 请求跟踪
         .layer(CompressionLayer::new()) // 响应压缩
         .layer(cors_layer) // CORS
@@ -1573,6 +1584,9 @@ struct CacheStatsResponse {
     // Attention缓存统计
     attention_entries: usize,     // Attention缓存条目数
     live_sessions_entries: usize, // LiveSessions缓存条目数
+
+    // GET /gift* 最外层10秒HTTP响应缓存统计
+    gift_response_cache: GiftResponseCacheStats,
 }
 
 // 计算大小格式字符串（字节转MB）
@@ -1642,6 +1656,7 @@ async fn get_cache_stats_endpoint() -> Result<Json<CacheStatsResponse>, StatusCo
         max_size_mb,
         attention_entries,
         live_sessions_entries,
+        gift_response_cache: gift_response_cache_stats(),
     }))
 }
 
@@ -1656,6 +1671,7 @@ async fn clear_cache_endpoint(Query(query): Query<ClearCacheQuery>) -> Json<serd
         clear_live_sessions_cache_for_month(room_id, month).await;
         clear_attention_cache_for_month(room_id, month).await;
         clear_avatar_cache(room_id).await;
+        clear_gift_response_cache();
         Json(serde_json::json!({"ok": true, "message": format!("已清除 {} {} 的缓存", room_id, month)}))
     } else {
         Json(serde_json::json!({"ok": false, "message": "需要 room_id 和 month 参数"}))

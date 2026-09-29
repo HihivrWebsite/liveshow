@@ -7,7 +7,37 @@
 
 ## 缓存层次
 
-### 1. 后端内存缓存（主要）
+### 1. Gift HTTP 响应缓存（最外层，10 秒）
+
+`GET /gift*` 的 10 个路由由统一的路径过滤缓存中间件覆盖。缓存中间件最先挂载为内层，随后外层 Trace、Compression 和 CORS，因此保存的是 handler 已生成的完整响应，外层压缩仍可对命中结果生效。
+
+**覆盖路由**：
+
+- `GET /gift`
+- `GET /gift/by_month`
+- `GET /gift/live_sessions`
+- `GET /gift/live_sessions_with_fans`
+- `GET /gift/sc`
+- `GET /gift/attention`
+- `GET /gift/avatar`
+- `GET /gift/avatar_proxy`
+- `GET /gift/avatars/batch`
+- `GET /gift/fans_overlap`
+
+**核心规则**：
+
+- 固定 TTL 10 秒，使用单调时钟；成功响应和错误响应均缓存。
+- 缓存状态码、端到端响应头和原始字节，支持 JSON、错误文本、JPEG 和批量头像响应。
+- 按 `GET|规范路径|规范查询` 生成键：唯一参数名排序并保留原值，重复参数名保留原顺序，未知参数保留，不按业务字段归并；键超过 4096 字节绕过。
+- 每键执行“缓存直查 → 获取单飞锁 → 二次缓存直查 → handler → 写缓存”，同键冷启动只执行一次 handler。
+- leader future 被取消时单飞锁自动释放；等待者可接管或读取复用结果。
+- 有界 LRU 上限为 512 条、64 MiB、单响应 16 MiB。
+- `no-store`、非空 `Vary`、缺少可用长度（`Content-Length` 或精确 body size hint）、读取失败或超限响应绕过缓存。
+- 重建响应时移除帧头和长度头，保留业务响应头，并追加 `X-Gift-Cache: HIT|MISS|COALESCED`。
+
+该层不改变 handler 内部缓存，也不增加全局出站限流。有效 `POST /cache/clear` 会清空本层并递增 generation，使清理前启动的慢请求不能把旧结果写回。
+
+### 2. 后端内存缓存（handler 内）
 
 使用 LRU（Least Recently Used）算法管理，5GB 上限。
 
@@ -23,7 +53,7 @@ livesessions_{room_id}_{month}       # 直播会话
 attention_{union}_{room_id}_{month}  # 粉丝数快照
 ```
 
-### 2. 前端 localStorage 缓存（辅助）
+### 3. 前端 localStorage 缓存（辅助）
 
 ```javascript
 {
@@ -121,6 +151,7 @@ fn should_refresh_now() -> bool {
 1. **用户手动刷新/补全数据按钮** → 清除当月缓存
 2. **系统启动** → 所有内存缓存清空
 3. **月份切换** → 上月数据进入永久缓存
+4. **有效 `POST /cache/clear`** → 清除 10 秒 Gift 响应缓存并递增 generation；无参数或参数无效时维持 `ok: false`，不清该层
 
 ## 监控指标
 
@@ -132,9 +163,25 @@ fn should_refresh_now() -> bool {
   "anchor_cache_misses": 56,
   "attention_cache_hits": 5678,
   "attention_cache_misses": 12,
-  "hit_rate": "99.8%"
+  "hit_rate": "99.8%",
+  "gift_response_cache": {
+    "ttl_seconds": 10,
+    "hits": 100,
+    "coalesced_hits": 12,
+    "misses": 50,
+    "expired": 4,
+    "evictions": 0,
+    "bypasses": 1,
+    "buffer_errors": 0,
+    "entries": 48,
+    "bytes": 1048576,
+    "inflight_keys": 0,
+    "hit_rate": "0.667"
+  }
 }
 ```
+
+`gift_response_cache.misses` 只统计实际执行 handler 的次数，不宣称等于远程 API 调用次数；handler 内部原有缓存仍可能减少远程调用。
 
 ## 日志符号说明
 

@@ -464,6 +464,8 @@ checksum = "00828ba6fd27b45a448e57dbfe84f1029d4c9f26b368157e9a448a5f49a2ec2a"
 dependencies = [
  "brotli",
  "compression-core",
+ "flate2",
+ "memchr",
 ]
 
 [[package]]
@@ -1265,12 +1267,13 @@ checksum = "6373607a59f0be73a39b6fe456b8192fcc3585f602af20751600e974dd455e77"
 
 [[package]]
 name = "liveshow-backend"
-version = "4.7.15"
+version = "4.7.16"
 dependencies = [
  "axum",
  "base64 0.22.1",
  "cachemap2",
  "chrono",
+ "futures-util",
  "http 1.4.0",
  "image",
  "lazy_static",

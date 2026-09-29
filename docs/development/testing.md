@@ -63,6 +63,8 @@
 
 ### 4. 缓存测试
 
+#### 4.1 既有底层缓存
+
 ```bash
 # 第一次请求（缓存未命中）
 curl "http://localhost:2992/gift/attention?room_id=1713546334&month=202604&union=VirtuaReal"
@@ -73,6 +75,76 @@ curl "http://localhost:2992/gift/attention?room_id=1713546334&month=202604&union
 # 查看缓存统计
 curl "http://localhost:2992/cache/stats"
 ```
+
+#### 4.2 Gift 10 秒响应缓存
+
+先执行静态检查，任何一步失败立即停止并报告：
+
+```bash
+cd rust_backend
+cargo fmt --check
+cargo check
+cargo test
+```
+
+使用完整服务进行运行时验证：
+
+```bash
+AUTO_UPDATE=false bash start.sh
+```
+
+对 10 个 `/gift*` 路由逐个检查首次、重复和过期请求：
+
+```bash
+# 首次应为 MISS；10 秒内重复应为 HIT；超过 10 秒再次请求应为 MISS
+curl -i "http://localhost:2992/gift?filter=all"
+sleep 1
+curl -i "http://localhost:2992/gift?filter=all"
+sleep 10
+curl -i "http://localhost:2992/gift?filter=all"
+```
+
+覆盖路由：
+
+```text
+/gift
+/gift/by_month
+/gift/live_sessions
+/gift/live_sessions_with_fans
+/gift/sc
+/gift/attention
+/gift/avatar
+/gift/avatar_proxy
+/gift/avatars/batch
+/gift/fans_overlap
+```
+
+必测场景：
+
+1. **同键并发**：mock handler 记录执行次数，50 个完全相同请求冷启动并发只执行一次；一个 `leader` 加其余等待者，响应字节一致，诊断头出现 `MISS` 和 `COALESCED`。
+2. **10 秒过期**：TTL 内命中，等待 10 秒后执行 handler 并再次 `MISS`。
+3. **键隔离**：`room_id`、`month`、`filter`、`union` 或未知参数不同绝不串键；唯一参数名换序可归并，重复参数名换序不归并。
+4. **响应类型**：200 JSON、400、500、JPEG 和批量头像均保留状态码、正文与 `Content-Type`；错误响应 10 秒内同样命中。
+5. **压缩兼容**：分别发送 `Accept-Encoding: gzip` 与 `identity`，均可正确解码，证明缓存位于 Compression 内侧。
+6. **单飞取消**：取消 leader future 后锁自动释放，等待者能够接管或完成，不悬挂。
+7. **容量与绕过**：验证 512 条和 64 MiB LRU 淘汰、单响应 16 MiB 上限，以及 `no-store`、非空 `Vary`、缺少可用长度（`Content-Length` 或精确 body size hint）的响应不写入。
+8. **诊断统计**：`GET /cache/stats` 包含 `gift_response_cache` 的 TTL、命中、合并命中、miss、过期、淘汰、绕过、缓冲错误、条目、字节、在途键和命中率；`misses` 不得解释为远程 API 调用数。
+
+清除与 generation 验证：
+
+```bash
+# 首次填充短缓存
+curl -i "http://localhost:2992/gift/attention?room_id=1713546334&month=202604&union=VirtuaReal"
+
+# 有效清除后下一次必须 MISS，且慢请求完成后不能把旧结果写回
+curl -i -X POST "http://localhost:2992/cache/clear?room_id=1713546334&month=202604"
+curl -i "http://localhost:2992/gift/attention?room_id=1713546334&month=202604&union=VirtuaReal"
+
+# 无参数/无效参数应保持 ok:false，且不清短缓存
+curl -i -X POST "http://localhost:2992/cache/clear"
+```
+
+回归首页筛选、月份切换、直播会话、SC、头像、粉丝重合度以及 `/cache/stats` 原有字段。当前计划要求任一测试失败即停止并等待用户确认，不得自动继续修复。
 
 ### 5. 性能测试
 

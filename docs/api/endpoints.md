@@ -6,6 +6,33 @@
 - **协议**: HTTP/RESTful
 - **数据格式**: JSON
 
+### Gift 接口通用 10 秒响应缓存
+
+下列 10 个 `GET` 路由共用一层位于压缩中间件内侧的 10 秒内存响应缓存：
+
+- `/gift`
+- `/gift/by_month`
+- `/gift/live_sessions`
+- `/gift/live_sessions_with_fans`
+- `/gift/sc`
+- `/gift/attention`
+- `/gift/avatar`
+- `/gift/avatar_proxy`
+- `/gift/avatars/batch`
+- `/gift/fans_overlap`
+
+该行为不新增 API 路径，也不改变业务请求参数和响应体：
+
+- 10 秒内完全相同的规范请求复用完整状态码、端到端响应头和原始响应体。
+- 同一缓存键的冷启动并发只执行一次 handler，其余请求等待后复用结果。
+- 成功和错误响应都会缓存 10 秒；错误可能在上游恢复后最多延迟 10 秒可见。
+- 响应包含 `X-Gift-Cache: HIT|MISS|COALESCED`：
+  - `MISS`：执行 handler。
+  - `HIT`：读取有效缓存。
+  - `COALESCED`：等待同键单飞结果。
+- 缓存键为 `GET|规范路径|规范查询`。唯一参数名排序、重复参数名保持原顺序、原值与未知参数均保留；不按业务字段归并，键超过 4096 字节则绕过。
+- 单响应最大 16 MiB，整层上限 512 条和 64 MiB；`no-store`、非空 `Vary`、缺少可用长度（`Content-Length` 或精确 body size hint）、读取失败或超限的响应绕过缓存。
+
 ---
 
 ## 1. 获取主播列表
@@ -365,9 +392,29 @@ GET /cache/stats
   "anchor_cache_misses": 56,
   "attention_cache_hits": 5678,
   "attention_cache_misses": 12,
-  "hit_rate": "99.8%"
+  "hit_rate": "99.8%",
+  "gift_response_cache": {
+    "ttl_seconds": 10,
+    "hits": 100,
+    "coalesced_hits": 12,
+    "misses": 50,
+    "expired": 4,
+    "evictions": 0,
+    "bypasses": 1,
+    "buffer_errors": 0,
+    "entries": 48,
+    "bytes": 1048576,
+    "inflight_keys": 0,
+    "hit_rate": "0.667"
+  }
 }
 ```
+
+`gift_response_cache.misses` 表示执行 handler 的次数，不等同于远程 API 调用数；handler 内部既有缓存可能进一步减少远程调用。
+
+### 缓存清除对响应缓存的影响
+
+有效调用 `POST /cache/clear?room_id=...&month=...` 会清空 Gift 10 秒响应缓存并递增 generation。清除期间已经启动的慢请求不能把清除前结果写回。无参数或参数无效时，接口维持既有的 `ok: false` 行为，不清除该短缓存。
 
 ---
 
