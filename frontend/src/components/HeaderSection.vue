@@ -54,6 +54,14 @@
           <button @click="goToMainSite" class="action-btn primary">
             进入向阳Hihi粉丝站主站<br>为成为向阳人而骄傲
           </button>
+          <a
+            href="https://space.bilibili.com/85996232"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="follow-yioo-btn"
+          >
+            关注咿喔ioo_谢谢喵
+          </a>
           <button @click="showGuide = true" class="action-btn guide-btn">
             📖 功能指南
           </button>
@@ -86,6 +94,16 @@
       </div>
       <div class="guide-content">
         <p class="guide-welcome">欢迎使用维阿PSP斗虫榜！以下是网站所有功能的介绍和使用方法。</p>
+        <div class="guide-follow-action">
+          <a
+            href="https://space.bilibili.com/85996232"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="follow-yioo-btn"
+          >
+            关注咿喔ioo_谢谢喵
+          </a>
+        </div>
 
         <h3>一、核心功能</h3>
         <div class="guide-item guide-highlight">
@@ -499,6 +517,92 @@ export default {
   animation: secondary-shine 2s infinite;
 }
 
+/* 咿喔ioo关注入口：指定红色作为六色色板的需求例外 */
+.follow-yioo-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 16px 38px;
+  overflow: hidden;
+  border: 2px solid #F6B100;
+  border-radius: 999px;
+  background: #B22222;
+  color: #FFF3D0;
+  font-size: 1.35rem;
+  font-weight: bold;
+  line-height: 1.35;
+  letter-spacing: 1px;
+  text-align: center;
+  text-decoration: none;
+  text-shadow: 0 0 8px #FFF3D0;
+  box-shadow:
+    0 0 12px rgba(246, 177, 0, 0.55),
+    0 0 28px rgba(255, 107, 157, 0.35);
+  animation: follow-yioo-glow 1.6s ease-in-out infinite;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    filter 0.25s ease;
+}
+
+.main-site-group .follow-yioo-btn {
+  padding: 18px 42px;
+  font-size: 1.5rem;
+}
+
+.follow-yioo-btn::before {
+  content: "";
+  position: absolute;
+  inset: -70% -90%;
+  z-index: 1;
+  background: linear-gradient(
+    110deg,
+    transparent 38%,
+    rgba(255, 243, 208, 0.95) 50%,
+    transparent 62%
+  );
+  background-size: 250% 100%;
+  background-position: 180% 0;
+  pointer-events: none;
+  animation: follow-yioo-sweep 2.1s ease-in-out infinite;
+}
+
+.follow-yioo-btn::after {
+  content: "✦";
+  position: absolute;
+  top: 4px;
+  right: 14px;
+  z-index: 2;
+  color: #FFF3D0;
+  font-size: 1.45rem;
+  line-height: 1;
+  pointer-events: none;
+  text-shadow:
+    0 0 6px #F6B100,
+    0 0 14px #FF6B9D;
+  animation: follow-yioo-sparkle 0.9s ease-in-out infinite alternate;
+}
+
+.follow-yioo-btn:hover {
+  transform: translateY(-3px) scale(1.04);
+  filter: brightness(1.12);
+  box-shadow:
+    0 0 20px #F6B100,
+    0 0 44px rgba(255, 107, 157, 0.75),
+    0 0 64px rgba(178, 34, 34, 0.65);
+}
+
+.follow-yioo-btn:focus-visible {
+  outline: 3px solid #FFF3D0;
+  outline-offset: 4px;
+  box-shadow:
+    0 0 0 7px #F6B100,
+    0 0 26px rgba(255, 107, 157, 0.8);
+}
+
 /* 赞助按钮独立区域 */
 .sponsor-section {
   margin-top: 15px;
@@ -643,6 +747,48 @@ export default {
   }
 }
 
+@keyframes follow-yioo-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 12px rgba(246, 177, 0, 0.55),
+      0 0 28px rgba(255, 107, 157, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 22px #F6B100,
+      0 0 48px rgba(255, 107, 157, 0.7),
+      0 0 72px rgba(178, 34, 34, 0.55);
+  }
+}
+
+@keyframes follow-yioo-sweep {
+  0% {
+    background-position: 180% 0;
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.9;
+  }
+  75% {
+    opacity: 0.9;
+  }
+  100% {
+    background-position: -80% 0;
+    opacity: 0;
+  }
+}
+
+@keyframes follow-yioo-sparkle {
+  0% {
+    transform: scale(0.75) rotate(-18deg);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.35) rotate(18deg);
+    opacity: 1;
+  }
+}
+
 /* 响应式设计 */
 @media (max-width: 1024px) {
   .header-content {
@@ -664,6 +810,12 @@ export default {
   .action-btn.primary {
     font-size: 1.5rem;
     padding: 15px 30px;
+  }
+
+  .follow-yioo-btn,
+  .main-site-group .follow-yioo-btn {
+    padding: 15px 30px;
+    font-size: 1.25rem;
   }
 
   .creator-text-large {
@@ -718,6 +870,14 @@ export default {
     padding: 12px 24px;
   }
 
+  .follow-yioo-btn,
+  .main-site-group .follow-yioo-btn {
+    width: 100%;
+    max-width: 320px;
+    padding: 14px 24px;
+    font-size: 1.1rem;
+  }
+
   .creator-info {
     text-align: center;
   }
@@ -752,6 +912,13 @@ export default {
     padding: 10px 20px;
   }
 
+  .follow-yioo-btn,
+  .main-site-group .follow-yioo-btn {
+    max-width: 100%;
+    padding: 12px 18px;
+    font-size: 1rem;
+  }
+
   .creator-text-large {
     font-size: 0.8rem;
   }
@@ -769,6 +936,13 @@ export default {
   .action-btn.primary {
     font-size: 0.9rem;
     padding: 8px 16px;
+  }
+
+  .follow-yioo-btn,
+  .main-site-group .follow-yioo-btn {
+    padding: 11px 14px;
+    font-size: 0.9rem;
+    letter-spacing: 0;
   }
 
   .creator-text-large {
@@ -859,7 +1033,12 @@ export default {
   color: #f9729a;
   font-size: 1.1rem;
   font-weight: bold;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
+}
+
+.guide-follow-action {
+  margin-bottom: 16px;
+  text-align: center;
 }
 
 .guide-content h3 {
@@ -952,5 +1131,19 @@ export default {
 .guide-ok-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .follow-yioo-btn,
+  .follow-yioo-btn::before,
+  .follow-yioo-btn::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .follow-yioo-btn::before {
+    background-position: 50% 0;
+    opacity: 0.35;
+  }
 }
 </style>
