@@ -810,67 +810,18 @@ export default {
       }
     },
 
-    // 刷新/补全数据
+    // Refresh the entire selected range after invalidating all server layers.
     async refreshData() {
-      console.log('=== 开始刷新/补全数据 ===')
-
-      const cacheKey = this.getCacheKey()
-      this.dataCache.delete(cacheKey)
-
       this.isRefreshing = true
-      let hasPartialFailure = false
-      const failedAnchors = []
-
       try {
-        const missingAnchors = []
-
-        this.selectedAnchors.forEach((anchor, index) => {
-          if (!this.sessionsData[index] || this.sessionsData[index].length < 10) {
-            missingAnchors.push({ anchor, index })
-          }
-        })
-
-        if (missingAnchors.length === 0) {
-          console.log('没有缺失数据，重新获取所有数据')
-          await this.fetchBattleData()
-        } else {
-          console.log(`发现 ${missingAnchors.length} 个主播数据需要补全，开始刷新`)
-          for (const { anchor, index } of missingAnchors) {
-            this.currentRefreshingAnchor = anchor
-            console.log(`正在获取 ${anchor.anchor_name} 的数据...`)
-            await this.fetchSingleAnchorData(anchor, index)
-
-            if (!this.sessionsData[index] || this.sessionsData[index].length === 0) {
-              failedAnchors.push(anchor.anchor_name)
-              hasPartialFailure = true
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 1500))
-          }
-          this.currentRefreshingAnchor = null
-
-          this.sessions = this.sessionsData.flat().sort((a, b) =>
-            (a.start_time || '').localeCompare(b.start_time || '')
-          )
-
-          this.dataCache.set(cacheKey, {
-            sessions: this.sessions,
-            sessionsData: this.sessionsData,
-            timestamp: Date.now(),
-            expiry: 2 * 60 * 60 * 1000
-          })
-        }
-
-        await this.renderBattleChart()
-
-        if (hasPartialFailure) {
-          alert(`数据刷新完成，但以下主播数据仍然缺失：${failedAnchors.join(', ')}\n\n可能是 API 持续超时，请稍后再试或检查网络连接。`)
-        } else {
-          alert('数据刷新完成！')
-        }
+        await anchorAPI.clearLiveSessionsForRange(
+          this.selectedAnchors, getMonthRange(this.startDate, this.endDate)
+        )
+        this.dataCache.clear()
+        await this.fetchBattleData()
       } catch (err) {
         console.error('刷新数据失败:', err)
-        alert('刷新数据失败：' + err.message)
+        alert('刷新失败：' + (err.message || '请稍后重试'))
       } finally {
         this.isRefreshing = false
       }

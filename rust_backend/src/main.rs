@@ -6,7 +6,6 @@ use axum::{
     Json, Router,
 };
 use chrono::NaiveDateTime;
-use lru::LruCache;
 use reqwest::Client;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -17,11 +16,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 mod gift_response_cache;
+mod upstream_cache;
+use upstream_cache::{Endpoint, Key, Source, UpstreamCache};
 
 use crate::gift_response_cache::{
     clear_gift_response_cache, gift_response_cache_middleware, gift_response_cache_stats,
     GiftResponseCacheStats,
 };
+use base64::Engine;
+use image::ImageFormat;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 use tokio::time::timeout;
@@ -29,36 +32,8 @@ use tower_http::{
     compression::CompressionLayer, cors::CorsLayer, services::ServeDir, trace::TraceLayer,
 };
 use tracing_subscriber;
-use image::ImageFormat;
-use base64::Engine;
 
 // ==================== 缓存相关定义 ====================
-
-// 缓存条目结构，包含数据和大小估算
-#[derive(Clone)]
-#[allow(dead_code)]
-struct CacheEntry {
-    data: Vec<Anchor>,
-    size_estimate: usize,             // 大小估算（字节）
-    timestamp: std::time::SystemTime, // 缓存时间戳
-}
-
-// Attention数据缓存条目 - 存储某个月份的所有日期的关注数快照
-#[derive(Clone, Debug)]
-#[allow(dead_code)]
-struct AttentionCacheEntry {
-    data: serde_json::Value, // 原始JSON数据 {"YYYYMMDD": count, ...}
-    timestamp: std::time::SystemTime,
-    is_past_month: bool, // 是否为上月及更早数据
-}
-
-// LiveSessions数据缓存条目
-#[derive(Clone, Debug)]
-struct LiveSessionsCacheEntry {
-    data: Vec<LiveSession>,
-    timestamp: std::time::SystemTime,
-    is_past_month: bool,
-}
 
 #[derive(Clone)]
 struct AvatarCacheEntry {
@@ -67,58 +42,20 @@ struct AvatarCacheEntry {
     fetched_at: std::time::SystemTime,
 }
 
-// 全局Attention缓存管理器
-lazy_static::lazy_static! {
-    static ref ATTENTION_CACHE: Arc<RwLock<HashMap<String, AttentionCacheEntry>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-}
-
-// 全局LiveSessions缓存管理器
-lazy_static::lazy_static! {
-    static ref LIVE_SESSIONS_CACHE: Arc<RwLock<HashMap<String, LiveSessionsCacheEntry>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-}
-
 // 全局主播头像缓存（48小时刷新）
 lazy_static::lazy_static! {
     static ref AVATAR_CACHE: Arc<RwLock<HashMap<String, AvatarCacheEntry>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
-// ==================== 缓存JSON持久化函数 ====================
-
-/// 计算数据大小（字节数）
-fn estimate_json_size(json: &serde_json::Value) -> usize {
-    serde_json::to_string(json).unwrap_or_default().len()
+lazy_static::lazy_static! {
+    static ref UPSTREAM_CACHE: UpstreamCache = UpstreamCache::new("cache_data/upstream_v1".into());
 }
 
-/// 将缓存保存为JSON文件
-async fn save_cache_to_file(
+async fn save_avatar_to_file(
     key: &str,
-    data: &serde_json::Value,
-    is_past_month: bool,
+    image_bytes: &[u8],
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let dir = if is_past_month {
-        "cache_data/previous_months"
-    } else {
-        "cache_data/current_month"
-    };
-
-    // 创建目录
-    tokio::fs::create_dir_all(dir).await?;
-
-    let file_path = format!("{}/{}.json", dir, key);
-    let json_str = serde_json::to_string_pretty(data)?;
-
-    let mut file = tokio::fs::File::create(&file_path).await?;
-    file.write_all(json_str.as_bytes()).await?;
-    file.flush().await?;
-
-    println!("💾 [缓存持久化] 已保存JSON文件 - {}", file_path);
-    Ok(())
-}
-
-async fn save_avatar_to_file(key: &str, image_bytes: &[u8]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tokio::fs::create_dir_all("cache_data/avatars").await?;
     let file_path = format!("cache_data/avatars/{}.jpg", key);
     let mut file = tokio::fs::File::create(&file_path).await?;
@@ -138,109 +75,6 @@ async fn load_avatar_from_file(key: &str) -> Option<Vec<u8>> {
     }
 }
 
-/// 从JSON文件加载缓存
-async fn load_cache_from_file(key: &str, is_past_month: bool) -> Option<serde_json::Value> {
-    let dir = if is_past_month {
-        "cache_data/previous_months"
-    } else {
-        "cache_data/current_month"
-    };
-
-    let file_path = format!("{}/{}.json", dir, key);
-
-    // 检查文件是否存在
-    let metadata = match tokio::fs::metadata(&file_path).await {
-        Ok(meta) => meta,
-        Err(_) => return None,
-    };
-
-    // 对于当前月，检查缓存是否过期
-    if !is_past_month {
-        let modified_time = metadata.modified();
-        if let Ok(modified) = modified_time {
-            if !is_cache_valid(modified) {
-                // 缓存过期，删除文件
-                if let Err(e) = tokio::fs::remove_file(&file_path).await {
-                    eprintln!("❌ [缓存清理] 删除过期缓存文件失败 - {}: {}", file_path, e);
-                } else {
-                    println!("🗑️ [缓存清理] 删除过期缓存文件 - {}", file_path);
-                }
-                return None;
-            }
-        }
-    }
-
-    match tokio::fs::read_to_string(&file_path).await {
-        Ok(content) => match serde_json::from_str(&content) {
-            Ok(data) => {
-                println!("📂 [缓存加载] 从磁盘加载 - {}", file_path);
-                Some(data)
-            }
-            Err(e) => {
-                eprintln!("❌ [缓存加载] JSON解析失败 - {}: {}", file_path, e);
-                None
-            }
-        },
-        Err(_) => None,
-    }
-}
-
-async fn count_cache_files_by_prefix(prefix: &str) -> usize {
-    let mut total = 0;
-    for dir in ["cache_data/current_month", "cache_data/previous_months"] {
-        if let Ok(mut entries) = tokio::fs::read_dir(dir).await {
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                if let Ok(file_name) = entry.file_name().into_string() {
-                    if file_name.starts_with(prefix) && file_name.ends_with(".json") {
-                        total += 1;
-                    }
-                }
-            }
-        }
-    }
-    total
-}
-
-async fn sum_cache_file_sizes_by_prefix(prefix: &str) -> usize {
-    let mut total = 0;
-    for dir in ["cache_data/current_month", "cache_data/previous_months"] {
-        if let Ok(mut entries) = tokio::fs::read_dir(dir).await {
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                if let Ok(file_name) = entry.file_name().into_string() {
-                    if file_name.starts_with(prefix) && file_name.ends_with(".json") {
-                        if let Ok(metadata) = entry.metadata().await {
-                            total += metadata.len() as usize;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    total
-}
-
-// ==================== Attention缓存管理器 ====================
-
-/// 判断是否为上月数据
-fn is_past_month(month: &str) -> bool {
-    let current_month = chrono::Local::now().format("%Y%m").to_string();
-    month < current_month.as_str()
-}
-
-/// 判断当月缓存是否有效（当前月缓存每日凌晨1:30刷新一次）
-fn is_cache_valid(cached_timestamp: std::time::SystemTime) -> bool {
-    let cached_dt: chrono::DateTime<chrono::Local> = chrono::DateTime::from(cached_timestamp);
-    let now = chrono::Local::now();
-    let today_refresh = now.date_naive().and_hms_opt(1, 30, 0).unwrap();
-    let next_refresh = if cached_dt.naive_local() < today_refresh {
-        today_refresh
-    } else {
-        today_refresh + chrono::Duration::days(1)
-    };
-
-    now.naive_local() < next_refresh
-}
-
 fn is_avatar_cache_valid(fetched_at: std::time::SystemTime) -> bool {
     match std::time::SystemTime::now().duration_since(fetched_at) {
         Ok(duration) => duration.as_secs() < 48 * 3600,
@@ -252,11 +86,16 @@ fn compress_avatar(image_bytes: &[u8]) -> Option<Vec<u8>> {
     let img = image::load_from_memory(image_bytes).ok()?;
     let resized = img.resize(40, 40, image::imageops::FilterType::Lanczos3);
     let mut buf = Vec::new();
-    resized.write_to(&mut std::io::Cursor::new(&mut buf), ImageFormat::Jpeg).ok()?;
+    resized
+        .write_to(&mut std::io::Cursor::new(&mut buf), ImageFormat::Jpeg)
+        .ok()?;
     Some(buf)
 }
 
-async fn save_compressed_avatar(room_id: &str, bytes: &[u8]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+async fn save_compressed_avatar(
+    room_id: &str,
+    bytes: &[u8],
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tokio::fs::create_dir_all("cache_data/avatars_compressed").await?;
     let path = format!("cache_data/avatars_compressed/{}.jpg", room_id);
     tokio::fs::write(&path, bytes).await?;
@@ -264,10 +103,12 @@ async fn save_compressed_avatar(room_id: &str, bytes: &[u8]) -> Result<(), Box<d
 }
 
 async fn download_image(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
-    let resp = HTTP_CLIENT.get(url)
+    let resp = HTTP_CLIENT
+        .get(url)
         .header("Referer", "https://www.bilibili.com")
         .header("User-Agent", "Mozilla/5.0")
-        .send().await?;
+        .send()
+        .await?;
     Ok(resp.bytes().await?.to_vec())
 }
 
@@ -281,19 +122,28 @@ async fn get_face_url_from_bilibili(room_id: &str) -> Option<String> {
         }
     }
 
-    let api_url = format!("https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid={}", room_id);
-    let resp = HTTP_CLIENT.get(&api_url)
+    let api_url = format!(
+        "https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid={}",
+        room_id
+    );
+    let resp = HTTP_CLIENT
+        .get(&api_url)
         .header("User-Agent", "Mozilla/5.0")
-        .send().await.ok()?;
+        .send()
+        .await
+        .ok()?;
     let json: serde_json::Value = resp.json().await.ok()?;
     let face = json.get("data")?.get("info")?.get("face")?.as_str()?;
     Some(face.to_string())
 }
 
-async fn fetch_all_anchors_for_avatars() -> Result<Vec<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
+async fn fetch_all_anchors_for_avatars(
+) -> Result<Vec<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
     let mut anchors = Vec::new();
 
-    if let Ok(vr_anchors) = fetch_anchor_data_by_url("https://vr.qianqiuzy.cn/gift").await {
+    if let Ok(vr_anchors) =
+        fetch_anchor_data_by_url("https://vr.qianqiuzy.cn/gift", "avatars").await
+    {
         for anchor in vr_anchors {
             let room_id = anchor.room_id.to_string();
             let face_url = get_face_url_from_bilibili(&room_id).await;
@@ -303,7 +153,9 @@ async fn fetch_all_anchors_for_avatars() -> Result<Vec<(String, String)>, Box<dy
         }
     }
 
-    if let Ok(psp_anchors) = fetch_anchor_data_by_url("https://psp.qianqiuzy.cn/gift").await {
+    if let Ok(psp_anchors) =
+        fetch_anchor_data_by_url("https://psp.qianqiuzy.cn/gift", "avatars").await
+    {
         for anchor in psp_anchors {
             let room_id = anchor.room_id.to_string();
             let face_url = get_face_url_from_bilibili(&room_id).await;
@@ -333,12 +185,23 @@ async fn batch_download_avatars() {
         ("uid_454673997".to_string(), "PSPlive".to_string()),
     ];
     for (key, name) in &guild_uids {
-        let api_url = format!("https://api.bilibili.com/x/web-interface/card?mid={}", key.replace("uid_", ""));
-        if let Ok(resp) = HTTP_CLIENT.get(&api_url)
+        let api_url = format!(
+            "https://api.bilibili.com/x/web-interface/card?mid={}",
+            key.replace("uid_", "")
+        );
+        if let Ok(resp) = HTTP_CLIENT
+            .get(&api_url)
             .header("User-Agent", "Mozilla/5.0")
-            .send().await {
+            .send()
+            .await
+        {
             if let Ok(json) = resp.json::<serde_json::Value>().await {
-                if let Some(face) = json.get("data").and_then(|d| d.get("card")).and_then(|c| c.get("face")).and_then(|f| f.as_str()) {
+                if let Some(face) = json
+                    .get("data")
+                    .and_then(|d| d.get("card"))
+                    .and_then(|c| c.get("face"))
+                    .and_then(|f| f.as_str())
+                {
                     anchors.push((key.clone(), face.to_string()));
                     println!("✅ [工会头像] {} -> {}", name, face);
                 }
@@ -351,21 +214,22 @@ async fn batch_download_avatars() {
 
     for (room_id, face_url) in anchors {
         match download_image(&face_url).await {
-            Ok(bytes) => {
-                match compress_avatar(&bytes) {
-                    Some(compressed) => {
-                        let _ = save_compressed_avatar(&room_id, &compressed).await;
-                        let mut cache = AVATAR_CACHE.write().await;
-                        cache.insert(room_id.clone(), AvatarCacheEntry {
+            Ok(bytes) => match compress_avatar(&bytes) {
+                Some(compressed) => {
+                    let _ = save_compressed_avatar(&room_id, &compressed).await;
+                    let mut cache = AVATAR_CACHE.write().await;
+                    cache.insert(
+                        room_id.clone(),
+                        AvatarCacheEntry {
                             face_url: face_url.clone(),
                             image_bytes: Some(compressed),
                             fetched_at: std::time::SystemTime::now(),
-                        });
-                        success += 1;
-                    }
-                    None => fail += 1,
+                        },
+                    );
+                    success += 1;
                 }
-            }
+                None => fail += 1,
+            },
             Err(_) => fail += 1,
         }
 
@@ -376,409 +240,23 @@ async fn batch_download_avatars() {
 }
 
 /// 批量获取单月份所有日期的attention数据
-async fn fetch_attention_month_data(
-    client: &Client,
-    base_url: &str,
-    room_id: &str,
-    month: &str,
-) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
-    let api_url = format!(
-        "{}/gift/attention?room_id={}&month={}",
-        base_url, room_id, month
-    );
-    println!("批量获取attention数据: {}", api_url);
-
-    let response = timeout(
-        Duration::from_secs(30), // 增加超时时间
-        client
-            .get(&api_url)
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            )
-            .header("Accept", "application/json")
-            .send(),
-    )
-    .await??;
-
-    let json_text = timeout(Duration::from_secs(10), response.text()).await??;
-    let json_value: serde_json::Value = serde_json::from_str(&json_text)?;
-    Ok(json_value)
-}
-
-/// 获取attention缓存数据，如果缓存无效则刷新
 async fn get_attention_cache_data(
     client: &Client,
     room_id: &str,
     month: &str,
     union: &str,
-) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
-    let cache_key = format!("attention_{}_{}_{}", union, room_id, month);
-    let current_time = std::time::SystemTime::now();
-    let is_past = is_past_month(month);
-
-    // 检查内存缓存
-    {
-        let cache = ATTENTION_CACHE.read().await;
-        if let Some(entry) = cache.get(&cache_key) {
-            // 历史数据永久有效
-            if is_past {
-                println!(
-                    "🎯 [缓存命中-内存] 历史数据 - key={} (上月数据永久有效)",
-                    cache_key
-                );
-                return Ok(entry.data.clone());
-            }
-
-            // 当月数据检查是否有效
-            if is_cache_valid(entry.timestamp) {
-                let size = estimate_json_size(&entry.data);
-                println!(
-                    "🎯 [缓存命中-内存] 当月数据 - key={} (有效至次日1:30) - 大小: {} bytes",
-                    cache_key, size
-                );
-                return Ok(entry.data.clone());
-            }
-
-            println!(
-                "🔄 [缓存需刷新] 当月数据过期 - key={} (已过当日1:30，刷新缓存)",
-                cache_key
-            );
-        }
-    }
-
-    // 尝试从磁盘加载缓存
-    if let Some(loaded_data) = load_cache_from_file(&cache_key, is_past).await {
-        let size = estimate_json_size(&loaded_data);
-        println!(
-            "📂 [缓存命中-磁盘] 从文件加载 - key={} - 大小: {} bytes",
-            cache_key, size
-        );
-
-        let file_timestamp = {
-            let dir = if is_past { "cache_data/previous_months" } else { "cache_data/current_month" };
-            let file_path = format!("{}/{}.json", dir, cache_key);
-            tokio::fs::metadata(&file_path).await
-                .ok()
-                .and_then(|m| m.modified().ok())
-                .unwrap_or(current_time)
-        };
-
-        {
-            let mut cache = ATTENTION_CACHE.write().await;
-            cache.insert(
-                cache_key.clone(),
-                AttentionCacheEntry {
-                    data: loaded_data.clone(),
-                    timestamp: file_timestamp,
-                    is_past_month: is_past,
-                },
-            );
-        }
-
-        return Ok(loaded_data);
-    }
-
-    println!("📡 [缓存未命中] 需要调用外部API - key={}", cache_key);
-
-    // 需要获取新数据
-    println!(
-        "🌐 [API调用开始] 向外部服务获取数据 - room_id={}, month={}, union={}",
-        room_id, month, union
-    );
-    let base_url = if union == "VirtuaReal" || union.starts_with("vr") {
-        "https://vr.qianqiuzy.cn"
-    } else {
-        "https://psp.qianqiuzy.cn"
-    };
-
-    let data = fetch_attention_month_data(client, &base_url, room_id, month).await?;
-    let size = estimate_json_size(&data);
-
-    println!(
-        "✅ [API调用成功] 获取数据完成 - room_id={}, month={} - 大小: {} bytes",
-        room_id, month, size
-    );
-
-    // 保存到磁盘
-    if let Err(e) = save_cache_to_file(&cache_key, &data, is_past).await {
-        eprintln!("⚠️  [持久化失败] 无法保存JSON文件 - {}: {}", cache_key, e);
-    }
-
-    // 更新内存缓存
-    {
-        let mut cache = ATTENTION_CACHE.write().await;
-        cache.insert(
-            cache_key.clone(),
-            AttentionCacheEntry {
-                data: data.clone(),
-                timestamp: current_time,
-                is_past_month: is_past,
-            },
-        );
-        println!(
-            "💾 [缓存保存-内存] 成功保存到内存 - key={} (过期策略: {})",
-            cache_key,
-            if is_past {
-                "永久"
-            } else {
-                "每日1:30刷新"
-            }
-        );
-    }
-
-    Ok(data)
-}
-
-// 全局缓存，使用LRU策略，限制为5GB (5 * 1024 * 1024 * 1024 bytes)
-const MAX_CACHE_SIZE: usize = 5 * 1024 * 1024 * 1024; // 5GB
-
-// 全局缓存实例
-lazy_static::lazy_static! {
-    static ref GLOBAL_CACHE: Arc<RwLock<CacheManager>> = Arc::new(RwLock::new(CacheManager::new()));
-}
-
-// 缓存管理器
-struct CacheManager {
-    cache: LruCache<String, CacheEntry>,
-    current_size: usize,
-    hit_count: AtomicUsize,
-    miss_count: AtomicUsize,
-}
-
-impl CacheManager {
-    fn new() -> Self {
-        // 限制缓存条目数量，配合大小限制
-        let max_entries = 1000; // 合理的条目数量限制
-        let capacity = std::num::NonZeroUsize::new(max_entries).unwrap();
-        CacheManager {
-            cache: LruCache::new(capacity),
-            current_size: 0,
-            hit_count: AtomicUsize::new(0),
-            miss_count: AtomicUsize::new(0),
-        }
-    }
-
-    fn get(&mut self, key: &str) -> Option<&CacheEntry> {
-        if let Some(entry) = self.cache.get(key) {
-            self.hit_count.fetch_add(1, Ordering::Relaxed);
-            Some(entry)
-        } else {
-            self.miss_count.fetch_add(1, Ordering::Relaxed);
-            None
-        }
-    }
-
-    fn put(&mut self, key: String, entry: CacheEntry) -> bool {
-        // 检查是否会超出大小限制
-        if self.current_size + entry.size_estimate > MAX_CACHE_SIZE {
-            // 如果超出限制，先清理一些旧条目
-            self.evict_old_entries(entry.size_estimate);
-        }
-
-        // 检查是否仍然超出限制
-        if entry.size_estimate <= MAX_CACHE_SIZE {
-            // 移除旧条目（如果存在）并更新大小
-            let old_entry_size = if let Some(old_entry) = self.cache.put(key, entry.clone()) {
-                old_entry.size_estimate
-            } else {
-                0
-            };
-
-            // 更新当前缓存大小
-            self.current_size = self.current_size.saturating_sub(old_entry_size);
-            self.current_size += entry.size_estimate;
-            true
-        } else {
-            false // 单个条目就超过了大小限制
-        }
-    }
-
-    fn evict_old_entries(&mut self, new_entry_size: usize) {
-        // 清理旧条目直到有足够的空间
-        while self.current_size + new_entry_size > MAX_CACHE_SIZE {
-            if let Some((_key, entry)) = self.cache.pop_lru() {
-                self.current_size = self.current_size.saturating_sub(entry.size_estimate);
-                if self.cache.len() == 0 {
-                    break; // 如果缓存为空，跳出循环
-                }
-            } else {
-                break; // 没有更多条目可以清除
-            }
-        }
-    }
-
-    fn get_current_size(&self) -> usize {
-        self.current_size
-    }
-
-    fn get_entry_count(&self) -> usize {
-        self.cache.len()
-    }
-
-    fn get_hit_count(&self) -> usize {
-        self.hit_count.load(Ordering::Relaxed)
-    }
-
-    fn get_miss_count(&self) -> usize {
-        self.miss_count.load(Ordering::Relaxed)
-    }
-
-    fn get_hit_rate(&self) -> f64 {
-        let hits = self.hit_count.load(Ordering::Relaxed);
-        let misses = self.miss_count.load(Ordering::Relaxed);
-        let total_requests = hits + misses;
-        if total_requests == 0 {
-            0.0
-        } else {
-            hits as f64 / total_requests as f64
-        }
-    }
-}
-
-// 获取缓存实例的函数
-async fn get_cache_entry(key: &str) -> Option<CacheEntry> {
-    let mut cache = GLOBAL_CACHE.write().await;
-    if let Some(entry) = cache.get(key) {
-        Some(entry.clone())
-    } else {
-        None
-    }
-}
-
-async fn put_cache_entry(key: String, entry: CacheEntry) -> bool {
-    GLOBAL_CACHE.write().await.put(key, entry)
-}
-
-async fn get_cache_stats() -> (usize, usize) {
-    let cache = GLOBAL_CACHE.read().await;
-    (cache.get_current_size(), cache.get_entry_count())
-}
-
-// 获取缓存命中率统计
-async fn get_cache_hit_stats() -> (usize, usize, f64) {
-    let cache = GLOBAL_CACHE.read().await;
-    let hits = cache.get_hit_count();
-    let misses = cache.get_miss_count();
-    let hit_rate = cache.get_hit_rate();
-    (hits, misses, hit_rate)
-}
-
-// ==================== LiveSessions缓存管理 ====================
-
-/// 获取LiveSessions缓存数据
-async fn get_live_sessions_cache(
-    room_id: &str,
-    _union: &str,
-    month: &str,
-) -> Option<Vec<LiveSession>> {
-    let cache_key = format!("livesessions_{}_{}", room_id, month);
-    let cache = LIVE_SESSIONS_CACHE.read().await;
-
-    if let Some(entry) = cache.get(&cache_key) {
-        // 检查缓存有效性：过去月份永久有效，当前月每日1:30刷新
-        if entry.is_past_month || is_cache_valid(entry.timestamp) {
-            println!("✅ LiveSessions缓存命中: {}", cache_key);
-            return Some(entry.data.clone());
-        }
-        println!("⏰ LiveSessions缓存过期，需要重新获取");
-    }
-    None
-}
-
-/// 存储LiveSessions缓存数据
-async fn put_live_sessions_cache(room_id: &str, _union: &str, month: &str, data: Vec<LiveSession>) {
-    let cache_key = format!("livesessions_{}_{}", room_id, month);
-    let is_past = is_past_month(month);
-
-    // 保存到磁盘
-    let json_data = serde_json::to_value(&data).unwrap_or(serde_json::Value::Null);
-    if let Err(e) = save_cache_to_file(&cache_key, &json_data, is_past).await {
-        eprintln!(
-            "⚠️  [LiveSessions持久化失败] 无法保存JSON文件 - {}: {}",
-            cache_key, e
-        );
-    }
-
-    let mut cache = LIVE_SESSIONS_CACHE.write().await;
-    cache.insert(
-        cache_key.clone(),
-        LiveSessionsCacheEntry {
-            data,
-            timestamp: std::time::SystemTime::now(),
-            is_past_month: is_past,
-        },
-    );
-
-    println!(
-        "💾 LiveSessions缓存已保存: {} (过去月份: {})",
-        cache_key, is_past
-    );
-}
-
-/// 清除指定主播月份的LiveSessions缓存（用户手动刷新时调用）
-async fn clear_live_sessions_cache_for_month(room_id: &str, month: &str) {
-    let mut cache = LIVE_SESSIONS_CACHE.write().await;
-    let exact_key = format!("livesessions_{}_{}", room_id, month);
-    cache.retain(|key, _| key != &exact_key);
-    println!("🗑️ 已清除主播 {} 月份 {} 的 LiveSessions 缓存", room_id, month);
-}
-
-async fn clear_attention_cache_for_month(room_id: &str, month: &str) {
-    let mut cache = ATTENTION_CACHE.write().await;
-    let suffix = format!("_{}_{}", room_id, month);
-    cache.retain(|key, _| !key.ends_with(&suffix));
-    println!("🗑️ 已清除主播 {} 月份 {} 的 Attention 缓存", room_id, month);
+) -> Result<serde_json::Value, upstream_cache::Error> {
+    let key = Key::new(
+        Source::from_union(union),
+        Endpoint::Attention,
+        Some(room_id),
+        month,
+    )?;
+    UPSTREAM_CACHE.get(client, key, "attention").await
 }
 
 async fn clear_avatar_cache(room_id: &str) {
-    let mut cache = AVATAR_CACHE.write().await;
-    cache.remove(room_id);
-    println!("🗑️ 已清除主播 {} 的头像缓存", room_id);
-}
-
-async fn cleanup_old_cache_entries() {
-    let current_month = chrono::Local::now().format("%Y%m").to_string();
-    let current_year: i32 = current_month[..4].parse().unwrap_or(0);
-    let current_mon: i32 = current_month[4..6].parse().unwrap_or(0);
-
-    let (cutoff_year, cutoff_mon) = if current_mon > 3 {
-        (current_year, current_mon - 3)
-    } else {
-        (current_year - 1, current_mon + 9)
-    };
-    let cutoff = format!("{:04}{:02}", cutoff_year, cutoff_mon);
-
-    {
-        let mut cache = ATTENTION_CACHE.write().await;
-        let before = cache.len();
-        cache.retain(|key, _| {
-            if let Some(month_str) = key.split('_').last() {
-                month_str >= cutoff.as_str()
-            } else {
-                true
-            }
-        });
-        let after = cache.len();
-        if before != after {
-            println!("🧹 Attention 缓存清理: {} -> {} 条目", before, after);
-        }
-    }
-    {
-        let mut cache = LIVE_SESSIONS_CACHE.write().await;
-        let before = cache.len();
-        cache.retain(|key, _| {
-            if let Some(month_str) = key.split('_').last() {
-                month_str >= cutoff.as_str()
-            } else {
-                true
-            }
-        });
-        let after = cache.len();
-        if before != after {
-            println!("🧹 LiveSessions 缓存清理: {} -> {} 条目", before, after);
-        }
-    }
+    AVATAR_CACHE.write().await.remove(room_id);
 }
 
 // 计算两个时间字符串之间的持续时间（分钟）
@@ -1119,11 +597,16 @@ static REQUEST_COUNT: AtomicUsize = AtomicUsize::new(0);
 async fn main() {
     // 初始化日志系统
     tracing_subscriber::fmt::init();
+    lazy_static::initialize(&UPSTREAM_CACHE);
 
     // 创建共享数据存储
     let shared_data: SharedData = Arc::new(RwLock::new(HashMap::new()));
 
-    cleanup_old_cache_entries().await;
+    tracing::info!(
+        version = env!("CARGO_PKG_VERSION"),
+        pid = std::process::id(),
+        "liveshow backend started"
+    );
 
     // 创建安全的CORS中间件层
     let cors_layer = CorsLayer::new()
@@ -1141,7 +624,11 @@ async fn main() {
                 .parse::<axum::http::HeaderValue>()
                 .unwrap(),
         ])
-        .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::OPTIONS])
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::OPTIONS,
+        ])
         .allow_headers([
             axum::http::header::CONTENT_TYPE,
             axum::http::header::AUTHORIZATION,
@@ -1192,7 +679,8 @@ async fn main() {
 
     tokio::spawn(async {
         batch_download_avatars().await;
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(48 * 3600));
+        let period = Duration::from_secs(48 * 3600);
+        let mut interval = tokio::time::interval_at(tokio::time::Instant::now() + period, period);
         loop {
             interval.tick().await;
             batch_download_avatars().await;
@@ -1210,7 +698,7 @@ async fn get_anchors(
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
 
     let filter = query.filter.unwrap_or_else(|| "all".to_string());
-    let anchors = fetch_anchor_data(&filter, None).await;
+    let anchors = fetch_anchor_data(&filter, None).await?;
 
     Ok(Json(ApiResponse {
         anchors,
@@ -1228,10 +716,10 @@ async fn get_anchors_by_month(
 
     let month = query
         .month
-        .unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
+        .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
     let filter = query.filter.unwrap_or_else(|| "all".to_string());
 
-    let anchors = fetch_anchor_data(&filter, Some(&month)).await;
+    let anchors = fetch_anchor_data(&filter, Some(&month)).await?;
 
     Ok(Json(ByMonthResponse {
         anchors,
@@ -1270,13 +758,21 @@ async fn get_live_sessions(
         }));
     }
 
-    let base_api_url = if union == "PSPlive" {
+    Key::new(
+        Source::from_union(&union),
+        Endpoint::Sessions,
+        Some(&room_id),
+        &month,
+    )
+    .map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let base_api_url = if Source::from_union(&union) == Source::Psp {
         "https://psp.qianqiuzy.cn/gift"
     } else {
         "https://vr.qianqiuzy.cn/gift"
     };
 
-    let all_data = match fetch_anchor_data_by_url(base_api_url).await {
+    let all_data = match fetch_anchor_data_by_url(base_api_url, "session_name").await {
         Ok(data) => {
             let mut data_with_union = data;
             for item in &mut data_with_union {
@@ -1298,7 +794,7 @@ async fn get_live_sessions(
 
     println!("👤 主播: {}", queried_user);
 
-    let sessions = fetch_live_session_data(&HTTP_CLIENT, &room_id, &union, &month).await;
+    let sessions = fetch_live_session_data(&HTTP_CLIENT, &room_id, &union, &month).await?;
 
     Ok(Json(LiveSessionResponse {
         sessions,
@@ -1331,61 +827,17 @@ async fn get_sc_history(
         ));
     }
 
-    let base_url = if query.union.as_deref().unwrap_or("VirtuaReal") == "PSPlive" {
-        "https://psp.qianqiuzy.cn"
-    } else {
-        "https://vr.qianqiuzy.cn"
-    };
-
-    let api_url = format!("{}/gift/sc?room_id={}", base_url, room_id);
-
-    // 使用全局HTTP客户端
-    let response = timeout(
-        Duration::from_secs(15),
-        HTTP_CLIENT
-            .get(&api_url)
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            )
-            .header("Accept", "application/json")
-            .send(),
+    let key = Key::new(
+        Source::from_union(query.union.as_deref().unwrap_or("VirtuaReal")),
+        Endpoint::Sc,
+        Some(&room_id),
+        &chrono::Local::now().format("%Y%m").to_string(),
     )
-    .await
-    .map_err(|_| (StatusCode::REQUEST_TIMEOUT, "Request timeout".to_string()))?;
-
-    let response = response.map_err(|e| {
-        eprintln!("API请求失败: {}, URL: {}", e, api_url);
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("API请求失败: {}", e),
-        )
-    })?;
-
-    if !response.status().is_success() {
-        eprintln!("API响应错误: {} for URL: {}", response.status(), api_url);
-        return Err((StatusCode::BAD_GATEWAY, "上游API响应错误".to_string()));
-    }
-
-    let json_text = timeout(Duration::from_secs(10), response.text())
+    .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid room_id".to_owned()))?;
+    let raw_data = UPSTREAM_CACHE
+        .uncached(&HTTP_CLIENT, key, "sc")
         .await
-        .map_err(|_| (StatusCode::REQUEST_TIMEOUT, "Response timeout".to_string()))?;
-
-    let json_text = json_text.map_err(|e| {
-        eprintln!("读取响应体失败: {}, URL: {}", e, api_url);
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("读取响应体失败: {}", e),
-        )
-    })?;
-
-    let raw_data: serde_json::Value = serde_json::from_str(&json_text).map_err(|e| {
-        eprintln!("JSON解析失败: {}, 响应内容: {:.200}", e, &json_text);
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("JSON解析失败: {}", e),
-        )
-    })?;
+        .map_err(|_| (StatusCode::BAD_GATEWAY, "上游SC接口请求失败".to_owned()))?;
 
     let mut sc_list = Vec::new();
 
@@ -1457,116 +909,55 @@ async fn get_sc_history(
 
     Ok(Json(SCResponse {
         room_id: room_id.parse::<u64>().unwrap_or(0),
-        month: chrono::Utc::now().format("%Y%m").to_string(),
+        month: chrono::Local::now().format("%Y%m").to_string(),
         list: sc_list,
     }))
 }
 
-async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Vec<Anchor> {
-    // 生成缓存键
-    let cache_key = format!("{}_{}", filter, month.unwrap_or("current"));
-
-    // 检查是否为过去月份的数据
-    let is_past_month = if let Some(requested_month) = month {
-        // 获取当前月份
-        let current_date = chrono::Utc::now();
-        let current_month = current_date.format("%Y%m").to_string();
-
-        // 比较请求的月份是否早于当前月份
-        requested_month < current_month.as_str()
-    } else {
-        false // 如果没有指定月份，则为当前数据，不缓存
-    };
-
-    // 尝试从缓存获取（过去月份永久缓存，当前月份5分钟TTL）
-    if let Some(cached_entry) = get_cache_entry(&cache_key).await {
-        if is_past_month {
-            println!("从缓存获取数据: {}", cache_key);
-            return cached_entry.data;
-        }
-        // 当前月份：5分钟内有效
-        let ttl = std::time::Duration::from_secs(300);
-        if cached_entry.timestamp.elapsed().unwrap_or(ttl) < ttl {
-            println!("从缓存获取当前月份数据(5min TTL): {}", cache_key);
-            return cached_entry.data;
-        }
+async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Result<Vec<Anchor>, StatusCode> {
+    if let Some(month) = month {
+        upstream_cache::normalize_month(month).ok_or(StatusCode::BAD_REQUEST)?;
     }
-
     let mut all_data = Vec::new();
-
-    if filter == "all" || filter == "vr" {
-        let vr_api_url = if let Some(m) = month {
-            format!("https://vr.qianqiuzy.cn/gift/by_month?month={}", m)
-        } else {
-            "https://vr.qianqiuzy.cn/gift".to_string()
-        };
-
-        if let Ok(mut vr_data) = fetch_external_api(&HTTP_CLIENT, &vr_api_url).await {
-            for item in &mut vr_data {
-                item.union = "VirtuaReal".to_string();
-            }
-            all_data.extend(vr_data);
+    for (name, base) in [
+        ("vr", "https://vr.qianqiuzy.cn/gift"),
+        ("psp", "https://psp.qianqiuzy.cn/gift"),
+    ] {
+        if filter != "all" && filter != name {
+            continue;
         }
-    }
-
-    if filter == "all" || filter == "psp" {
-        let psp_api_url = if let Some(m) = month {
-            format!("https://psp.qianqiuzy.cn/gift/by_month?month={}", m)
-        } else {
-            "https://psp.qianqiuzy.cn/gift".to_string()
-        };
-
-        if let Ok(mut psp_data) = fetch_external_api(&HTTP_CLIENT, &psp_api_url).await {
-            for item in &mut psp_data {
-                item.union = "PSPlive".to_string();
+        let url = month
+            .map(|month| format!("{base}/by_month?month={month}"))
+            .unwrap_or_else(|| base.to_owned());
+        let mut data = fetch_anchor_data_by_url(&url, "anchor_list")
+            .await
+            .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        for item in &mut data {
+            item.union = if name == "vr" {
+                "VirtuaReal"
+            } else {
+                "PSPlive"
             }
-            all_data.extend(psp_data);
+            .to_owned();
         }
+        all_data.extend(data);
     }
-
-    // 使用更高效的计算方法
     all_data.iter_mut().for_each(|item| {
         let gift = Decimal::from_str(&item.gift.to_string()).unwrap_or(Decimal::zero());
         let guard = Decimal::from_str(&item.guard.to_string()).unwrap_or(Decimal::zero());
-        let super_chat = Decimal::from_str(&item.super_chat.to_string()).unwrap_or(Decimal::zero());
-        item.total_revenue = (gift + guard + super_chat).to_f64().unwrap_or(0.0);
+        let sc = Decimal::from_str(&item.super_chat.to_string()).unwrap_or(Decimal::zero());
+        item.total_revenue = (gift + guard + sc).to_f64().unwrap_or(0.0);
     });
-
-    // 使用更高效的排序算法
     all_data.sort_by(|a, b| {
         b.total_revenue
             .partial_cmp(&a.total_revenue)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-
-    // 缓存数据（过去月份永久，当前月份5分钟TTL）
-    if is_past_month || month.is_none() {
-        // 估算数据大小（简单估算，实际项目中可能需要更精确的估算）
-        let size_estimate = serde_json::to_string(&all_data).unwrap_or_default().len();
-
-        let cache_entry = CacheEntry {
-            data: all_data.clone(),
-            size_estimate,
-            timestamp: std::time::SystemTime::now(),
-        };
-
-        let success = put_cache_entry(cache_key.clone(), cache_entry).await;
-        if success {
-            let (current_size, entry_count) = get_cache_stats().await;
-            println!(
-                "数据已缓存: {}, 当前缓存大小: {} bytes, 条目数: {}, 缓存键: {}",
-                success, current_size, entry_count, cache_key
-            );
-        } else {
-            println!("缓存失败，数据可能过大");
-        }
-    }
-
-    all_data
+    Ok(all_data)
 }
 
 // 缓存统计信息响应结构 - 增强版，包含更详细的信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize)]
 struct CacheStatsResponse {
     // 缓存命中率统计
     hits: usize,                 // 缓存命中次数
@@ -1587,6 +978,7 @@ struct CacheStatsResponse {
 
     // GET /gift* 最外层10秒HTTP响应缓存统计
     gift_response_cache: GiftResponseCacheStats,
+    upstream_cache: upstream_cache::Stats,
 }
 
 // 计算大小格式字符串（字节转MB）
@@ -1597,52 +989,23 @@ fn format_size_mb(bytes: usize) -> String {
 
 // 获取缓存统计信息的API端点 - 增强版
 async fn get_cache_stats_endpoint() -> Result<Json<CacheStatsResponse>, StatusCode> {
-    let (hits, misses, hit_rate) = get_cache_hit_stats().await;
-    let (memory_size, memory_entry_count) = get_cache_stats().await;
-
-    // 获取Attention缓存条目数
-    let memory_attention_entries = {
-        let cache = ATTENTION_CACHE.read().await;
-        cache.len()
-    };
-
-    // 获取LiveSessions缓存条目数
-    let memory_live_sessions_entries = {
-        let cache = LIVE_SESSIONS_CACHE.read().await;
-        cache.len()
-    };
-
-    let disk_attention_entries = count_cache_files_by_prefix("attention_").await;
-    let disk_live_sessions_entries = count_cache_files_by_prefix("livesessions_").await;
-    let disk_size = sum_cache_file_sizes_by_prefix("attention_").await
-        + sum_cache_file_sizes_by_prefix("livesessions_").await;
-
-    let attention_entries = if disk_attention_entries > 0 {
-        disk_attention_entries
+    let upstream_cache = UPSTREAM_CACHE.stats();
+    let hits = (upstream_cache.totals.hits
+        + upstream_cache.totals.disk_hits
+        + upstream_cache.totals.coalesced_hits) as usize;
+    let misses = upstream_cache.totals.upstream_requests as usize;
+    let hit_rate = if hits + misses == 0 {
+        0.0
     } else {
-        memory_attention_entries
+        hits as f64 / (hits + misses) as f64
     };
-    let live_sessions_entries = if disk_live_sessions_entries > 0 {
-        disk_live_sessions_entries
-    } else {
-        memory_live_sessions_entries
-    };
-
-    let current_size = if disk_size > memory_size {
-        disk_size
-    } else {
-        memory_size
-    };
-
-    let entry_count = if disk_attention_entries + disk_live_sessions_entries > memory_entry_count {
-        disk_attention_entries + disk_live_sessions_entries
-    } else {
-        memory_entry_count
-    };
-
     let hit_rate_percentage = format!("{:.2}%", hit_rate * 100.0);
+    let current_size = upstream_cache.bytes;
     let current_size_mb = format_size_mb(current_size);
-    let max_size_mb = format_size_mb(MAX_CACHE_SIZE);
+    let max_size_mb = format_size_mb(upstream_cache.max_bytes);
+    let attention_entries = upstream_cache.attention_entries;
+    let live_sessions_entries = upstream_cache.live_sessions_entries;
+    let entry_count = upstream_cache.entries;
 
     Ok(Json(CacheStatsResponse {
         hits,
@@ -1652,11 +1015,12 @@ async fn get_cache_stats_endpoint() -> Result<Json<CacheStatsResponse>, StatusCo
         current_size,
         current_size_mb,
         entry_count,
-        max_size: MAX_CACHE_SIZE,
+        max_size: upstream_cache.max_bytes,
         max_size_mb,
         attention_entries,
         live_sessions_entries,
         gift_response_cache: gift_response_cache_stats(),
+        upstream_cache,
     }))
 }
 
@@ -1664,47 +1028,72 @@ async fn get_cache_stats_endpoint() -> Result<Json<CacheStatsResponse>, StatusCo
 struct ClearCacheQuery {
     room_id: Option<String>,
     month: Option<String>,
+    union: Option<String>,
 }
 
-async fn clear_cache_endpoint(Query(query): Query<ClearCacheQuery>) -> Json<serde_json::Value> {
-    if let (Some(room_id), Some(month)) = (&query.room_id, &query.month) {
-        clear_live_sessions_cache_for_month(room_id, month).await;
-        clear_attention_cache_for_month(room_id, month).await;
-        clear_avatar_cache(room_id).await;
-        clear_gift_response_cache();
-        Json(serde_json::json!({"ok": true, "message": format!("已清除 {} {} 的缓存", room_id, month)}))
-    } else {
-        Json(serde_json::json!({"ok": false, "message": "需要 room_id 和 month 参数"}))
+async fn clear_cache_endpoint(
+    Query(query): Query<ClearCacheQuery>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let (Some(room), Some(month)) = (query.room_id, query.month) else {
+        return Ok(Json(
+            serde_json::json!({"ok": false, "message": "需要 room_id 和 month 参数"}),
+        ));
+    };
+    let room = match room.parse::<u64>() {
+        Ok(id) if id > 0 && id.to_string() == room => id.to_string(),
+        _ => {
+            return Ok(Json(
+                serde_json::json!({"ok": false, "message": "room_id 必须为正整数"}),
+            ))
+        }
+    };
+    if upstream_cache::normalize_month(&month).is_none() {
+        return Ok(Json(
+            serde_json::json!({"ok": false, "message": "month 必须为有效 YYYYMM"}),
+        ));
     }
+    let sources = query
+        .union
+        .as_deref()
+        .map(|union| vec![Source::from_union(union)])
+        .unwrap_or_else(|| vec![Source::Vr, Source::Psp]);
+    UPSTREAM_CACHE
+        .clear(&sources, &room, &month)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    clear_avatar_cache(&room).await;
+    clear_gift_response_cache();
+    Ok(Json(
+        serde_json::json!({"ok": true, "message": format!("已清除 {} {} 的内存、磁盘及响应缓存", room, month)}),
+    ))
 }
 
 async fn fetch_anchor_data_by_url(
     url: &str,
-) -> Result<Vec<Anchor>, Box<dyn std::error::Error + Send + Sync>> {
-    let data = fetch_external_api(&HTTP_CLIENT, url).await?;
-    Ok(data)
+    caller: &str,
+) -> Result<Vec<Anchor>, upstream_cache::Error> {
+    let source = if url.starts_with("https://psp.qianqiuzy.cn/") {
+        Source::Psp
+    } else {
+        Source::Vr
+    };
+    let parsed = reqwest::Url::parse(url)?;
+    let endpoint = if parsed.path() == "/gift/by_month" {
+        Endpoint::Month
+    } else {
+        Endpoint::Gift
+    };
+    let month = parsed
+        .query_pairs()
+        .find(|(key, _)| key == "month")
+        .map(|(_, value)| value.into_owned())
+        .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
+    let key = Key::new(source, endpoint, None, &month)?;
+    let raw_data = UPSTREAM_CACHE.get(&HTTP_CLIENT, key, caller).await?;
+    Ok(parse_anchor_data(raw_data))
 }
 
-async fn fetch_external_api(
-    client: &Client,
-    api_url: &str,
-) -> Result<Vec<Anchor>, Box<dyn std::error::Error + Send + Sync>> {
-    let response = timeout(
-        Duration::from_secs(10),
-        client
-            .get(api_url)
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            )
-            .send(),
-    )
-    .await??;
-
-    let json_text = timeout(Duration::from_secs(10), response.text()).await??;
-
-    let raw_data: serde_json::Value = serde_json::from_str(&json_text)?;
-
+fn parse_anchor_data(raw_data: serde_json::Value) -> Vec<Anchor> {
     let mut anchors = Vec::new();
 
     if let serde_json::Value::Array(items) = raw_data {
@@ -1735,7 +1124,7 @@ async fn fetch_external_api(
             let month = item
                 .get("month")
                 .and_then(|v| v.as_str())
-                .unwrap_or(&chrono::Utc::now().format("%Y%m").to_string())
+                .unwrap_or(&chrono::Local::now().format("%Y%m").to_string())
                 .to_string();
             let room_id = item.get("room_id").and_then(|v| v.as_u64()).unwrap_or(0);
             let status = parse_to_i64(item.get("status"));
@@ -1753,14 +1142,26 @@ async fn fetch_external_api(
             let top1 = whale.and_then(|w| w.get("top1")).and_then(|v| v.as_f64());
             let top5 = whale.and_then(|w| w.get("top5")).and_then(|v| v.as_f64());
             let top10 = whale.and_then(|w| w.get("top10")).and_then(|v| v.as_f64());
-            let top1_percent = whale.and_then(|w| w.get("top1_percent")).and_then(|v| v.as_f64());
+            let top1_percent = whale
+                .and_then(|w| w.get("top1_percent"))
+                .and_then(|v| v.as_f64());
 
             let danmaku = item.get("danmaku");
-            let danmaku_total = danmaku.and_then(|d| d.get("total")).and_then(|v| v.as_i64());
-            let danmaku_captain = danmaku.and_then(|d| d.get("captain")).and_then(|v| v.as_i64());
-            let danmaku_admiral = danmaku.and_then(|d| d.get("admiral")).and_then(|v| v.as_i64());
-            let danmaku_governor = danmaku.and_then(|d| d.get("governor")).and_then(|v| v.as_i64());
-            let danmaku_normal = danmaku.and_then(|d| d.get("normal")).and_then(|v| v.as_i64());
+            let danmaku_total = danmaku
+                .and_then(|d| d.get("total"))
+                .and_then(|v| v.as_i64());
+            let danmaku_captain = danmaku
+                .and_then(|d| d.get("captain"))
+                .and_then(|v| v.as_i64());
+            let danmaku_admiral = danmaku
+                .and_then(|d| d.get("admiral"))
+                .and_then(|v| v.as_i64());
+            let danmaku_governor = danmaku
+                .and_then(|d| d.get("governor"))
+                .and_then(|v| v.as_i64());
+            let danmaku_normal = danmaku
+                .and_then(|d| d.get("normal"))
+                .and_then(|v| v.as_i64());
 
             anchors.push(Anchor {
                 anchor_name,
@@ -1795,7 +1196,7 @@ async fn fetch_external_api(
         }
     }
 
-    Ok(anchors)
+    anchors
 }
 
 async fn fetch_live_session_data(
@@ -1803,7 +1204,7 @@ async fn fetch_live_session_data(
     room_id: &str,
     union: &str,
     month: &str,
-) -> Vec<LiveSession> {
+) -> Result<Vec<LiveSession>, StatusCode> {
     fetch_live_session_data_with_fans_calc(client, room_id, union, month).await
 }
 
@@ -1812,111 +1213,24 @@ async fn fetch_live_session_data_with_fans_calc(
     room_id: &str,
     union: &str,
     month: &str,
-) -> Vec<LiveSession> {
-    let cache_key = format!("livesessions_{}_{}", room_id, month);
-    let is_past = is_past_month(month);
-
-    // 首先检查内存缓存
-    if let Some(cached_sessions) = get_live_sessions_cache(room_id, union, month).await {
-        println!(
-            "🎯 [缓存命中-内存] LiveSessions数据 - room_id={}, month={}, union={} (缓存条目数: {})",
-            room_id,
-            month,
-            union,
-            cached_sessions.len()
-        );
-
-        let sessions = cached_sessions;
-
-        return sessions;
-    }
-
-    // 尝试从磁盘加载缓存
-    if let Some(loaded_data) = load_cache_from_file(&cache_key, is_past).await {
-        if let Ok(sessions) = serde_json::from_value::<Vec<LiveSession>>(loaded_data.clone()) {
-            println!(
-                "📂 [缓存命中-磁盘] 从文件加载LiveSessions - room_id={}, month={}, union={} (条目数: {})",
-                room_id, month, union, sessions.len()
-            );
-
-            let file_timestamp = {
-                let dir = if is_past { "cache_data/previous_months" } else { "cache_data/current_month" };
-                let file_path = format!("{}/{}.json", dir, cache_key);
-                tokio::fs::metadata(&file_path).await
-                    .ok()
-                    .and_then(|m| m.modified().ok())
-                    .unwrap_or(std::time::SystemTime::now())
-            };
-
-            let mut cache = LIVE_SESSIONS_CACHE.write().await;
-            cache.insert(
-                cache_key.clone(),
-                LiveSessionsCacheEntry {
-                    data: sessions.clone(),
-                    timestamp: file_timestamp,
-                    is_past_month: is_past,
-                },
-            );
-
-            return sessions;
-        }
-    }
-
-    // 缓存未命中，从API获取
-    let base_url = if union == "VirtuaReal" || union.starts_with("vr") {
-        "https://vr.qianqiuzy.cn"
-    } else {
-        "https://psp.qianqiuzy.cn"
-    };
-
-    let api_url = format!(
-        "{}/gift/live_sessions?room_id={}&month={}",
-        base_url, room_id, month
-    );
-
-    println!(
-        "📡 [缓存未命中] 需要调用外部API获取LiveSessions - room_id={}, month={}, union={}",
-        room_id, month, union
-    );
-    println!("🌐 [API调用] Fetching live sessions from: {}", api_url);
-
-    let sessions = match fetch_live_session_from_api(client, &api_url).await {
-        Ok(sessions) => {
-            println!("✅ [API调用成功] 获取到 {} 个直播会话", sessions.len());
-            sessions
-        }
-        Err(e) => {
-            println!("❌ [API调用失败] 获取直播会话失败: {}", e);
-            vec![]
-        }
-    };
-
-    // 保存到缓存
-    if !sessions.is_empty() {
-        put_live_sessions_cache(room_id, union, month, sessions.clone()).await;
-    }
-
-    sessions
+) -> Result<Vec<LiveSession>, StatusCode> {
+    let key = Key::new(
+        Source::from_union(union),
+        Endpoint::Sessions,
+        Some(room_id),
+        month,
+    )
+    .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let raw_data = UPSTREAM_CACHE
+        .get(client, key, "live_sessions")
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+    parse_live_session_data(raw_data).map_err(|_| StatusCode::BAD_GATEWAY)
 }
 
-async fn fetch_live_session_from_api(
-    client: &Client,
-    api_url: &str,
-) -> Result<Vec<LiveSession>, Box<dyn std::error::Error + Send + Sync>> {
-    // 不显示详细的API调用日志，只在缓存未命中时显示
-    let response = timeout(
-        Duration::from_secs(15),
-        client.get(api_url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-            .header("Accept", "application/json")
-            .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-            .send()
-    ).await??;
-
-    let json_text = timeout(Duration::from_secs(10), response.text()).await??;
-
-    let raw_data: serde_json::Value = serde_json::from_str(&json_text)?;
-
+fn parse_live_session_data(
+    raw_data: serde_json::Value,
+) -> Result<Vec<LiveSession>, upstream_cache::Error> {
     let sessions_array = if let Some(array) = raw_data.get("sessions").and_then(|v| v.as_array()) {
         array
     } else {
@@ -2030,7 +1344,7 @@ async fn get_attention_data(
 
     let month = query
         .month
-        .unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
+        .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
 
     let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
 
@@ -2040,6 +1354,13 @@ async fn get_attention_data(
     );
 
     // 使用缓存机制获取数据
+    Key::new(
+        Source::from_union(&union),
+        Endpoint::Attention,
+        Some(&room_id),
+        &month,
+    )
+    .map_err(|_| StatusCode::BAD_REQUEST)?;
     match get_attention_cache_data(&HTTP_CLIENT, &room_id, &month, &union).await {
         Ok(data) => {
             println!(
@@ -2070,7 +1391,7 @@ async fn get_live_sessions_with_fans(
     let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
     let month = query
         .month
-        .unwrap_or_else(|| chrono::Utc::now().format("%Y%m").to_string());
+        .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
 
     println!(
         "📊 [/gift/live_sessions_with_fans] room_id={}, union={}, month={}",
@@ -2088,13 +1409,21 @@ async fn get_live_sessions_with_fans(
         }));
     }
 
-    let base_api_url = if union == "PSPlive" {
+    Key::new(
+        Source::from_union(&union),
+        Endpoint::Sessions,
+        Some(&room_id),
+        &month,
+    )
+    .map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let base_api_url = if Source::from_union(&union) == Source::Psp {
         "https://psp.qianqiuzy.cn/gift"
     } else {
         "https://vr.qianqiuzy.cn/gift"
     };
 
-    let all_data = match fetch_anchor_data_by_url(base_api_url).await {
+    let all_data = match fetch_anchor_data_by_url(base_api_url, "session_name").await {
         Ok(data) => {
             let mut data_with_union = data;
             for item in &mut data_with_union {
@@ -2118,7 +1447,7 @@ async fn get_live_sessions_with_fans(
 
     // 使用完整计算模式
     let sessions =
-        fetch_live_session_data_with_fans_calc(&HTTP_CLIENT, &room_id, &union, &month).await;
+        fetch_live_session_data_with_fans_calc(&HTTP_CLIENT, &room_id, &union, &month).await?;
 
     Ok(Json(LiveSessionResponse {
         sessions,
@@ -2130,15 +1459,15 @@ async fn get_live_sessions_with_fans(
     }))
 }
 
-async fn get_avatar(
-    Query(query): Query<AvatarQuery>,
-) -> Result<Json<AvatarResponse>, StatusCode> {
+async fn get_avatar(Query(query): Query<AvatarQuery>) -> Result<Json<AvatarResponse>, StatusCode> {
     let room_id_str = match query.room_id {
         Some(id) => id,
         None => return Err(StatusCode::BAD_REQUEST),
     };
 
-    if !room_id_str.chars().all(|c| c.is_ascii_digit()) || room_id_str.parse::<u64>().unwrap_or(0) == 0 {
+    if !room_id_str.chars().all(|c| c.is_ascii_digit())
+        || room_id_str.parse::<u64>().unwrap_or(0) == 0
+    {
         return Err(StatusCode::BAD_REQUEST);
     }
 
@@ -2163,10 +1492,15 @@ async fn get_avatar(
         Duration::from_secs(10),
         HTTP_CLIENT
             .get(&api_url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
             .header("Accept", "application/json")
             .send(),
-    ).await {
+    )
+    .await
+    {
         Ok(Ok(resp)) => resp,
         _ => return Err(StatusCode::BAD_GATEWAY),
     };
@@ -2191,11 +1525,14 @@ async fn get_avatar(
 
     if !face.is_empty() {
         let mut cache = AVATAR_CACHE.write().await;
-        cache.insert(room_id_str.clone(), AvatarCacheEntry {
-            face_url: face.clone(),
-            image_bytes: None,
-            fetched_at: std::time::SystemTime::now(),
-        });
+        cache.insert(
+            room_id_str.clone(),
+            AvatarCacheEntry {
+                face_url: face.clone(),
+                image_bytes: None,
+                fetched_at: std::time::SystemTime::now(),
+            },
+        );
     }
 
     Ok(Json(AvatarResponse {
@@ -2214,25 +1551,28 @@ async fn get_avatar_proxy(
         let cache_key = format!("uid_{}", uid);
         let cached = {
             let cache = AVATAR_CACHE.read().await;
-            cache.get(&cache_key)
+            cache
+                .get(&cache_key)
                 .filter(|entry| is_avatar_cache_valid(entry.fetched_at))
                 .map(|entry| entry.face_url.clone())
         };
         let face_url = match cached {
             Some(url) => url,
             None => {
-                let api_url = format!(
-                    "https://api.bilibili.com/x/web-interface/card?mid={}",
-                    uid
-                );
+                let api_url = format!("https://api.bilibili.com/x/web-interface/card?mid={}", uid);
                 let response = match timeout(
                     Duration::from_secs(10),
                     HTTP_CLIENT
                         .get(&api_url)
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .header(
+                            "User-Agent",
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        )
                         .header("Accept", "application/json")
                         .send(),
-                ).await {
+                )
+                .await
+                {
                     Ok(Ok(resp)) => resp,
                     _ => return Err(StatusCode::BAD_GATEWAY),
                 };
@@ -2256,23 +1596,28 @@ async fn get_avatar_proxy(
                 }
                 {
                     let mut cache = AVATAR_CACHE.write().await;
-                    cache.insert(cache_key.clone(), AvatarCacheEntry {
-                        face_url: face.clone(),
-                        image_bytes: None,
-                        fetched_at: std::time::SystemTime::now(),
-                    });
+                    cache.insert(
+                        cache_key.clone(),
+                        AvatarCacheEntry {
+                            face_url: face.clone(),
+                            image_bytes: None,
+                            fetched_at: std::time::SystemTime::now(),
+                        },
+                    );
                 }
                 face
             }
         };
         (cache_key, face_url)
     } else if let Some(room_id) = &query.room_id {
-        if !room_id.chars().all(|c| c.is_ascii_digit()) || room_id.parse::<u64>().unwrap_or(0) == 0 {
+        if !room_id.chars().all(|c| c.is_ascii_digit()) || room_id.parse::<u64>().unwrap_or(0) == 0
+        {
             return Err(StatusCode::BAD_REQUEST);
         }
         let cached = {
             let cache = AVATAR_CACHE.read().await;
-            cache.get(room_id)
+            cache
+                .get(room_id)
                 .filter(|entry| is_avatar_cache_valid(entry.fetched_at))
                 .map(|entry| entry.face_url.clone())
         };
@@ -2287,10 +1632,15 @@ async fn get_avatar_proxy(
                     Duration::from_secs(10),
                     HTTP_CLIENT
                         .get(&api_url)
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .header(
+                            "User-Agent",
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        )
                         .header("Accept", "application/json")
                         .send(),
-                ).await {
+                )
+                .await
+                {
                     Ok(Ok(resp)) => resp,
                     _ => return Err(StatusCode::BAD_GATEWAY),
                 };
@@ -2314,11 +1664,14 @@ async fn get_avatar_proxy(
                 }
                 {
                     let mut cache = AVATAR_CACHE.write().await;
-                    cache.insert(room_id.clone(), AvatarCacheEntry {
-                        face_url: face.clone(),
-                        image_bytes: None,
-                        fetched_at: std::time::SystemTime::now(),
-                    });
+                    cache.insert(
+                        room_id.clone(),
+                        AvatarCacheEntry {
+                            face_url: face.clone(),
+                            image_bytes: None,
+                            fetched_at: std::time::SystemTime::now(),
+                        },
+                    );
                 }
                 face
             }
@@ -2330,7 +1683,8 @@ async fn get_avatar_proxy(
 
     let cached_image = {
         let cache = AVATAR_CACHE.read().await;
-        cache.get(&_cache_key)
+        cache
+            .get(&_cache_key)
             .filter(|entry| is_avatar_cache_valid(entry.fetched_at))
             .and_then(|entry| entry.image_bytes.clone())
     };
@@ -2348,11 +1702,14 @@ async fn get_avatar_proxy(
     let disk_image = load_avatar_from_file(&_cache_key).await;
     if let Some(bytes) = disk_image {
         let mut cache = AVATAR_CACHE.write().await;
-        cache.insert(_cache_key.clone(), AvatarCacheEntry {
-            face_url: face_url.clone(),
-            image_bytes: Some(bytes.clone()),
-            fetched_at: std::time::SystemTime::now(),
-        });
+        cache.insert(
+            _cache_key.clone(),
+            AvatarCacheEntry {
+                face_url: face_url.clone(),
+                image_bytes: Some(bytes.clone()),
+                fetched_at: std::time::SystemTime::now(),
+            },
+        );
         return Ok((
             [
                 (header::CONTENT_TYPE, "image/jpeg".to_string()),
@@ -2366,10 +1723,15 @@ async fn get_avatar_proxy(
         Duration::from_secs(10),
         HTTP_CLIENT
             .get(&face_url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
             .header("Referer", "https://www.bilibili.com")
             .send(),
-    ).await {
+    )
+    .await
+    {
         Ok(Ok(resp)) => resp,
         _ => return Err(StatusCode::BAD_GATEWAY),
     };
@@ -2410,7 +1772,10 @@ async fn get_avatars_batch() -> Json<serde_json::Value> {
     for (key, entry) in cache.iter() {
         if let Some(ref bytes) = entry.image_bytes {
             let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
-            avatars.insert(key.clone(), serde_json::Value::String(format!("data:image/jpeg;base64,{}", b64)));
+            avatars.insert(
+                key.clone(),
+                serde_json::Value::String(format!("data:image/jpeg;base64,{}", b64)),
+            );
         }
     }
 
@@ -2422,22 +1787,14 @@ async fn get_avatars_batch() -> Json<serde_json::Value> {
 
 async fn serve_logo1() -> impl IntoResponse {
     match std::fs::read("../rust_backend/dist/logo1.png") {
-        Ok(data) => (
-            [(header::CONTENT_TYPE, "image/png".to_string())],
-            data,
-        )
-            .into_response(),
+        Ok(data) => ([(header::CONTENT_TYPE, "image/png".to_string())], data).into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
 
 async fn serve_logo2() -> impl IntoResponse {
     match std::fs::read("../rust_backend/dist/logo2.png") {
-        Ok(data) => (
-            [(header::CONTENT_TYPE, "image/png".to_string())],
-            data,
-        )
-            .into_response(),
+        Ok(data) => ([(header::CONTENT_TYPE, "image/png".to_string())], data).into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }
@@ -2447,7 +1804,10 @@ async fn index_handler() -> Html<String> {
         Ok(content) => Html(content),
         Err(e) => {
             eprintln!("警告: 无法读取 index.html: {}", e);
-            Html(format!("<h1>500 - 页面未找到</h1><p>index.html 不存在: {}</p>", e))
+            Html(format!(
+                "<h1>500 - 页面未找到</h1><p>index.html 不存在: {}</p>",
+                e
+            ))
         }
     }
 }
@@ -2524,11 +1884,7 @@ async fn get_fans_overlap(
         let url = format!("https://fans.harei.cn/fans?room_id={}", room_id);
         let rid = room_id.clone();
         join_set.spawn(async move {
-            let resp = HTTP_CLIENT
-                .get(&url)
-                .header("User-Agent", ua)
-                .send()
-                .await;
+            let resp = HTTP_CLIENT.get(&url).header("User-Agent", ua).send().await;
             match resp {
                 Ok(r) => {
                     let json: Result<serde_json::Value, _> = r.json().await;
@@ -2565,7 +1921,10 @@ async fn get_fans_overlap(
 
     // 生成所有 C(n,2) 配对并计算重合度（仅使用有数据的房间）
     let mut pairs = Vec::new();
-    let valid_ids: Vec<&String> = room_ids.iter().filter(|id| fans_cache.contains_key(id.as_str())).collect();
+    let valid_ids: Vec<&String> = room_ids
+        .iter()
+        .filter(|id| fans_cache.contains_key(id.as_str()))
+        .collect();
     for i in 0..valid_ids.len() {
         for j in (i + 1)..valid_ids.len() {
             let a_id = valid_ids[i];
@@ -2577,7 +1936,10 @@ async fn get_fans_overlap(
         }
     }
 
-    let skipped: Vec<&String> = room_ids.iter().filter(|id| !fans_cache.contains_key(id.as_str())).collect();
+    let skipped: Vec<&String> = room_ids
+        .iter()
+        .filter(|id| !fans_cache.contains_key(id.as_str()))
+        .collect();
     Ok(Json(serde_json::json!({
         "success": true,
         "pairs": pairs,
@@ -2720,4 +2082,60 @@ fn compute_pair_overlap(
         "b_guard": b_guard,
         "shared_guard": shared_guard,
     })
+}
+
+#[cfg(test)]
+mod cache_api_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn invalid_refresh_and_month_do_not_invalidate_or_contact_upstream() {
+        let before = UPSTREAM_CACHE.stats();
+        for (room, month) in [("../escape", "202610"), ("1", "202613"), ("0", "202610")] {
+            let result = clear_cache_endpoint(Query(ClearCacheQuery {
+                room_id: Some(room.into()),
+                month: Some(month.into()),
+                union: None,
+            }))
+            .await
+            .unwrap();
+            assert_eq!(result.0["ok"], false);
+        }
+        let result = get_attention_data(Query(AttentionQuery {
+            room_id: Some("1".into()),
+            month: Some("202613".into()),
+            union: None,
+        }))
+        .await;
+        assert!(matches!(result, Err(StatusCode::BAD_REQUEST)));
+        let after = UPSTREAM_CACHE.stats();
+        assert_eq!(before.invalidations, after.invalidations);
+        assert_eq!(
+            before.totals.upstream_requests,
+            after.totals.upstream_requests
+        );
+    }
+
+    #[tokio::test]
+    async fn stats_keep_numeric_compatibility_fields_and_expose_real_source_metrics() {
+        let stats = serde_json::to_value(get_cache_stats_endpoint().await.unwrap().0).unwrap();
+        for field in [
+            "hits",
+            "misses",
+            "current_size",
+            "entry_count",
+            "max_size",
+            "attention_entries",
+            "live_sessions_entries",
+        ] {
+            assert!(stats[field].is_u64(), "{field}");
+        }
+        assert!(stats["hit_rate"].is_number());
+        assert!(stats["gift_response_cache"].is_object());
+        assert_eq!(
+            stats["upstream_cache"]["version"],
+            env!("CARGO_PKG_VERSION")
+        );
+        assert!(stats["upstream_cache"]["totals"]["upstream_requests"].is_u64());
+    }
 }

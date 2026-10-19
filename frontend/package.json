@@ -1,11 +1,12 @@
 {
   "name": "liveshow-frontend",
-  "version": "4.7.16",
+  "version": "4.7.17",
   "private": true,
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:cache": "node --test tests/cache-refresh.test.mjs"
   },
   "dependencies": {
     "axios": "^1.6.0",
