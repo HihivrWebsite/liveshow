@@ -14,6 +14,7 @@ rust_backend/
 ├── src/
 │   ├── main.rs              # 主程序（路由、业务逻辑、缓存）
 │   ├── gift_response_cache.rs # Gift 10秒 HTTP 响应缓存
+│   ├── upstream_cache.rs     # VR/PSP共享源数据缓存、持久化及回源指标
 │   ├── main_optimized.rs    # 优化版主程序
 │   └── middleware.rs        # 中间件
 ├── cache_data/              # 缓存数据目录
@@ -110,16 +111,16 @@ struct SuperChat {
 ### 数据获取
 
 - `fetch_anchor_data(filter, month)` — 获取主播数据
-- `fetch_anchor_data_by_url(url)` — 根据URL获取数据
-- `fetch_external_api(client, api_url)` — 从外部API获取
+- `fetch_anchor_data_by_url(url, caller)` — 从共享源缓存读取主播数据
+- `UpstreamCache::get(client, key, caller)` — 同键合并、磁盘读取及上游请求
 - `fetch_live_session_data(room_id, union, month)` — 直播会话数据
 - `fetch_sc_history` — SC历史数据
 
 ### 缓存管理
 
 - `get_attention_cache_data()` — 获取 attention 缓存数据
-- `is_past_month(month)` — 判断是否为历史月份
-- `is_cache_valid(timestamp, current_time)` — 判断缓存是否有效
+- `upstream_cache::Key` — 数据源、接口、房间及月份规范化与有效期
+- `UpstreamCache::clear()` — 并发安全地清除内存与磁盘，详情见[共享缓存说明](../features/upstream-cache.md)
 - `GiftResponseCache` — 10 个 `/gift*` 路由最外层 HTTP 响应缓存
 
 ### Gift 10 秒响应缓存

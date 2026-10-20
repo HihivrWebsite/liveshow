@@ -388,11 +388,33 @@ GET /cache/stats
 
 ```json
 {
-  "anchor_cache_hits": 1234,
-  "anchor_cache_misses": 56,
-  "attention_cache_hits": 5678,
-  "attention_cache_misses": 12,
-  "hit_rate": "99.8%",
+  "hits": 1234,
+  "misses": 56,
+  "hit_rate": 0.9566,
+  "hit_rate_percentage": "95.66%",
+  "current_size": 1048576,
+  "current_size_mb": "1.00 MB",
+  "max_size": 134217728,
+  "max_size_mb": "128.00 MB",
+  "entry_count": 48,
+  "attention_entries": 10,
+  "live_sessions_entries": 20,
+  "upstream_cache": {
+    "version": "4.7.17",
+    "pid": 1234,
+    "started_at": "2026-10-20T10:00:00+08:00",
+    "totals": {
+      "hits": 1200,
+      "disk_hits": 20,
+      "coalesced_hits": 14,
+      "upstream_requests": 56,
+      "upstream_errors": 1,
+      "empty_responses": 3,
+      "disk_errors": 0
+    },
+    "by_endpoint": {},
+    "by_caller": {}
+  },
   "gift_response_cache": {
     "ttl_seconds": 10,
     "hits": 100,
@@ -412,9 +434,13 @@ GET /cache/stats
 
 `gift_response_cache.misses` 表示执行 handler 的次数，不等同于远程 API 调用数；handler 内部既有缓存可能进一步减少远程调用。
 
+实际回源统计使用 `upstream_cache.totals.upstream_requests`，并可按 `by_endpoint` 和 `by_caller` 拆分。源缓存及原顶层字段的统计口径见[共享上游缓存说明](../features/upstream-cache.md)。示例中的 `upstream_cache` 省略了容量和失效字段。
+
 ### 缓存清除对响应缓存的影响
 
 有效调用 `POST /cache/clear?room_id=...&month=...` 会清空 Gift 10 秒响应缓存并递增 generation。清除期间已经启动的慢请求不能把清除前结果写回。无参数或参数无效时，接口维持既有的 `ok: false` 行为，不清除该短缓存。
+
+同时清理该房间及月份的场次、Attention 内存与磁盘缓存、对应月榜单及当前主播列表源缓存。可选 `union=VirtuaReal|PSPlive` 限定来源，不传则清理两个来源。房间号必须为正整数，月份必须为有效 `YYYYMM`；磁盘清理失败返回 500，客户端必须确认 `ok:true` 后再刷新。
 
 ---
 

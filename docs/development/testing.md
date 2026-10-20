@@ -78,7 +78,7 @@ curl "http://localhost:2992/cache/stats"
 
 #### 4.2 Gift 10 秒响应缓存
 
-先执行静态检查，任何一步失败立即停止并报告：
+执行静态检查和回归测试，失败时定位并修复任务范围内的问题后重跑：
 
 ```bash
 cd rust_backend
@@ -144,7 +144,15 @@ curl -i "http://localhost:2992/gift/attention?room_id=1713546334&month=202604&un
 curl -i -X POST "http://localhost:2992/cache/clear"
 ```
 
-回归首页筛选、月份切换、直播会话、SC、头像、粉丝重合度以及 `/cache/stats` 原有字段。当前计划要求任一测试失败即停止并等待用户确认，不得自动继续修复。
+回归首页筛选、月份切换、直播会话、SC、头像、粉丝重合度以及 `/cache/stats` 原有字段。
+
+#### 4.3 共享上游缓存与真实刷新
+
+在 `rust_backend` 执行 `cargo test --locked`；在 `frontend` 执行 `npm run test:cache` 和 `npm run build`。前端缓存测试使用 Node 22+，不需要连接生产接口。
+
+新增回归覆盖：不同调用入口及筛选共享源缓存、显式当月缓存、VR/PSP 隔离、成功空结果落盘与过期、上游失败不污染缓存、历史 24 小时到期、每日 01:30 失效后旧条目不复活、同键并发/取消、LRU、内存和磁盘清理以及清理时的在途请求。HTTP 测试只连接随机回环端口，检查状态码及调用方请求头。
+
+前端测试直接执行两个 Vue 组件的刷新方法，验证先清服务器再请求、范围去重与串行执行、服务端拒绝时保留本地数据。源指标及上线采样步骤见[共享缓存说明](../features/upstream-cache.md)。
 
 ### 5. 性能测试
 

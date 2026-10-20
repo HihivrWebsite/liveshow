@@ -299,7 +299,7 @@ export default {
         cacheEntryCount.value = stats.entry_count !== undefined ? String(stats.entry_count) : 'N/A'
         attentionEntries.value = stats.attention_entries !== undefined ? String(stats.attention_entries) : 'N/A'
         liveSessionsEntries.value = stats.live_sessions_entries !== undefined ? String(stats.live_sessions_entries) : 'N/A'
-        cacheStatus.value = '历史月永久缓存，当前月每日1:30刷新'
+        cacheStatus.value = '榜单共享缓存5分钟，历史数据24小时，当前月场次每日1:30更新'
       } catch (error) {
         console.error('获取缓存统计信息失败:', error)
         cacheStatus.value = '缓存统计获取失败'

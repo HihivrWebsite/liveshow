@@ -84,6 +84,28 @@ export const anchorAPI = {
     return apiClient.get('/cache/stats')
   },
 
+  // Invalidate server memory, disk and HTTP caches before requesting fresh data.
+  clearCache: async (roomId, month, union = 'VirtuaReal') => {
+    const response = await apiClient.post('/cache/clear', null, {
+      params: { room_id: roomId, month, union }
+    })
+    if (!response.ok) throw new Error(response.message || '清除缓存失败')
+    return response
+  },
+
+  clearLiveSessionsForRange: async (anchors, months) => {
+    const seen = new Set()
+    for (const anchor of anchors) {
+      const union = anchor.union || 'VirtuaReal'
+      for (const month of months) {
+        const key = `${union}:${anchor.room_id}:${month}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        await anchorAPI.clearCache(anchor.room_id, month, union)
+      }
+    }
+  },
+
   // 获取包含粉丝计算的直播会话（完整模式）
   getLiveSessionsWithFans: (roomId, union, month) => {
     const params = new URLSearchParams()

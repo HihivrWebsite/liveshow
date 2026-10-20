@@ -470,9 +470,13 @@ export default {
     async refreshData() {
       this.isRefreshing = true
       try {
-        const cacheKey = this.getCacheKey()
-        this.dataCache.delete(cacheKey)
+        await anchorAPI.clearLiveSessionsForRange(
+          this.selectedAnchors, getMonthRange(this.startDate, this.endDate)
+        )
+        this.dataCache.clear()
         await this.fetchBattleData()
+      } catch (err) {
+        alert('刷新失败：' + (err.message || '请稍后重试'))
       } finally {
         this.isRefreshing = false
       }
