@@ -329,21 +329,51 @@ GET /gift/avatar_proxy
 
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
-| room_id | string | 是 | 直播间ID |
+| room_id | string | 否* | 直播间ID |
+| uid | string | 否* | Bilibili UID，与 room_id 二选一 |
 
 ### 响应
 
-- Content-Type: image/jpeg
+- Content-Type: image/webp
 - Cache-Control: max-age=86400（浏览器缓存24小时）
-- 响应体：头像图片二进制数据
+- 响应体：40×40、严格小于 100 KiB 的 WebP 头像二进制数据
 
 ### 说明
 
-- 代理 Bilibili CDN 头像请求，解决防盗链问题
+- 优先从 `cache_data/avatars_compressed/manifest.json` 及有效 WebP 文件直接返回
+- 清单缺失、文件损坏或首次请求时，后端代理 Bilibili CDN 原图并压缩为 WebP
 - 后端请求时设置 `Referer: https://www.bilibili.com/`
-- 头像 URL 缓存 48 小时自动刷新（主播可能更换头像）
-- 浏览器缓存 24 小时，比后端 48h 短以确保及时更新
-- 请求失败返回 HTTP 404
+- 每次进程启动及以后每 4 小时强制检查远端更新；更新优先使用 ETag、Last-Modified 和 304
+- face URL 内存查询仍为 48 小时，但定时刷新不复用该旧 URL
+- 参数无效返回 400；远端不存在返回 404；下载或压缩失败返回 502
+
+---
+
+## 5.2 批量头像
+
+### 请求
+
+```
+GET /gift/avatars/batch
+```
+
+### 响应
+
+```json
+{
+  "avatars": {
+    "1713546334": "data:image/webp;base64,UklGR...",
+    "uid_413748120": "data:image/webp;base64,UklGR..."
+  },
+  "count": 2
+}
+```
+
+### 说明
+
+- 数据从 WebP 清单恢复，不等待启动批量刷新任务完成。
+- 所有值为 WebP base64 data URL；前端 `defaultAvatars.js` 保留旧 JPEG 作为离线回退。
+- 本接口仍在 10 秒 Gift HTTP 响应缓存内，清单刚变化时相同请求可能最长延迟 10 秒可见。
 
 ---
 

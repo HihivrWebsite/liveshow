@@ -1,16 +1,28 @@
-import DEFAULT_AVATARS from './defaultAvatars'
+import DEFAULT_AVATARS from './defaultAvatars.js'
 
 let avatarStore = { ...DEFAULT_AVATARS }
+let refreshPromise = null
 
-// 服务器获取功能已禁用，仅使用嵌入的默认头像
-// export function fetchAllAvatars() {
-//   fetch('/gift/avatars/batch')
-//     .then(resp => resp.json())
-//     .then(data => {
-//       if (data.avatars) Object.assign(avatarStore, data.avatars)
-//     })
-//     .catch(() => {})
-// }
+// 默认头像始终作为离线回退；在线批量刷新只覆盖同键的最新 WebP data URL。
+export function fetchAllAvatars() {
+  if (refreshPromise) return refreshPromise
+  refreshPromise = fetch('/gift/avatars/batch')
+    .then(resp => {
+      if (!resp.ok) throw new Error(`avatar batch HTTP ${resp.status}`)
+      return resp.json()
+    })
+    .then(data => {
+      if (data && data.avatars && typeof data.avatars === 'object') {
+        Object.assign(avatarStore, data.avatars)
+      }
+      return avatarStore
+    })
+    .catch(() => avatarStore)
+    .finally(() => {
+      refreshPromise = null
+    })
+  return refreshPromise
+}
 
 export function getAvatarSync(roomId) {
   return avatarStore[String(roomId)] || ''

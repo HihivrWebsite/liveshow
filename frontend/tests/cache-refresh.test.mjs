@@ -4,9 +4,40 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import apiClient, { anchorAPI } from '../src/api/index.js'
 import { getMonthRange } from '../src/utils/monthUtils.js'
+import DEFAULT_AVATARS from '../src/utils/defaultAvatars.js'
 
 const require = createRequire(import.meta.url)
 const { parse } = require('@vue/compiler-sfc')
+
+test('online avatar batch overlays the offline JPEG defaults with WebP data URLs', async () => {
+  const { fetchAllAvatars, getAvatarSync } = await import('../src/utils/avatarCache.js')
+  const key = Object.keys(DEFAULT_AVATARS)[0]
+  const fallback = getAvatarSync(key)
+  assert.match(fallback, /^data:image\/jpeg;base64,/)
+
+  const previousFetch = globalThis.fetch
+  let calls = 0
+  globalThis.fetch = async url => {
+    calls++
+    assert.equal(url, '/gift/avatars/batch')
+    return {
+      ok: true,
+      async json() {
+        return { avatars: { [key]: 'data:image/webp;base64,UklGRg==' }, count: 1 }
+      }
+    }
+  }
+  try {
+    const first = fetchAllAvatars()
+    const second = fetchAllAvatars()
+    assert.equal(first, second)
+    await Promise.all([first, second])
+  } finally {
+    globalThis.fetch = previousFetch
+  }
+  assert.equal(calls, 1)
+  assert.equal(getAvatarSync(key), 'data:image/webp;base64,UklGRg==')
+})
 
 test('range invalidation is serial, deduplicated and includes source identity', async () => {
   const requests = []

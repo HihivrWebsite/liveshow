@@ -39,6 +39,7 @@ graph TB
         logic[业务逻辑 - 数据处理]
         models[数据模型 - 类型定义]
         cache[CacheManager - 智能缓存]
+        avatar[AvatarStore - WebP头像清单]
     end
 
     subgraph ExternalAPI ["外部数据源"]
@@ -68,6 +69,7 @@ graph TB
 
     api --> Backend
     Backend --> cache
+    Backend --> avatar
     Backend --> ExternalAPI
 ```
 
@@ -105,6 +107,7 @@ liveshow/
 └── rust_backend/                    # Rust后端项目
     ├── src/
     │   ├── main.rs                  # 主程序
+        │   ├── avatar_cache.rs          # 头像 WebP 清单与原子缓存
     │   ├── main_optimized.rs        # 优化版主程序
     │   └── middleware.rs            # 中间件
     ├── cache_data/                  # 缓存数据目录

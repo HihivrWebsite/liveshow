@@ -9,23 +9,26 @@ use chrono::NaiveDateTime;
 use reqwest::Client;
 use rust_decimal::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+mod avatar_cache;
 mod gift_response_cache;
 mod upstream_cache;
 use upstream_cache::{Endpoint, Key, Source, UpstreamCache};
+
+use avatar_cache::{
+    AvatarCacheResult, AvatarStore, ConditionalHeaders, RefreshOutcome, RemoteAvatarResponse,
+};
 
 use crate::gift_response_cache::{
     clear_gift_response_cache, gift_response_cache_middleware, gift_response_cache_stats,
     GiftResponseCacheStats,
 };
 use base64::Engine;
-use image::ImageFormat;
-use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 use tokio::time::timeout;
 use tower_http::{
@@ -42,7 +45,7 @@ struct AvatarCacheEntry {
     fetched_at: std::time::SystemTime,
 }
 
-// 全局主播头像缓存（48小时刷新）
+// 全局 face URL 缓存（48 小时），压缩 WebP 的唯一索引是 avatar_cache 清单。
 lazy_static::lazy_static! {
     static ref AVATAR_CACHE: Arc<RwLock<HashMap<String, AvatarCacheEntry>>> =
         Arc::new(RwLock::new(HashMap::new()));
@@ -52,27 +55,10 @@ lazy_static::lazy_static! {
     static ref UPSTREAM_CACHE: UpstreamCache = UpstreamCache::new("cache_data/upstream_v1".into());
 }
 
-async fn save_avatar_to_file(
-    key: &str,
-    image_bytes: &[u8],
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    tokio::fs::create_dir_all("cache_data/avatars").await?;
-    let file_path = format!("cache_data/avatars/{}.jpg", key);
-    let mut file = tokio::fs::File::create(&file_path).await?;
-    file.write_all(image_bytes).await?;
-    file.flush().await?;
-    Ok(())
-}
-
-async fn load_avatar_from_file(key: &str) -> Option<Vec<u8>> {
-    let file_path = format!("cache_data/avatars/{}.jpg", key);
-    match tokio::fs::read(&file_path).await {
-        Ok(data) => {
-            println!("📂 [头像缓存加载] 从磁盘加载 - {}", file_path);
-            Some(data)
-        }
-        Err(_) => None,
-    }
+lazy_static::lazy_static! {
+    static ref AVATAR_STORE: AvatarStore =
+        AvatarStore::open("cache_data/avatars_compressed")
+            .expect("failed to open compressed avatar manifest");
 }
 
 fn is_avatar_cache_valid(fetched_at: std::time::SystemTime) -> bool {
@@ -82,38 +68,8 @@ fn is_avatar_cache_valid(fetched_at: std::time::SystemTime) -> bool {
     }
 }
 
-fn compress_avatar(image_bytes: &[u8]) -> Option<Vec<u8>> {
-    let img = image::load_from_memory(image_bytes).ok()?;
-    let resized = img.resize(40, 40, image::imageops::FilterType::Lanczos3);
-    let mut buf = Vec::new();
-    resized
-        .write_to(&mut std::io::Cursor::new(&mut buf), ImageFormat::Jpeg)
-        .ok()?;
-    Some(buf)
-}
-
-async fn save_compressed_avatar(
-    room_id: &str,
-    bytes: &[u8],
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    tokio::fs::create_dir_all("cache_data/avatars_compressed").await?;
-    let path = format!("cache_data/avatars_compressed/{}.jpg", room_id);
-    tokio::fs::write(&path, bytes).await?;
-    Ok(())
-}
-
-async fn download_image(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
-    let resp = HTTP_CLIENT
-        .get(url)
-        .header("Referer", "https://www.bilibili.com")
-        .header("User-Agent", "Mozilla/5.0")
-        .send()
-        .await?;
-    Ok(resp.bytes().await?.to_vec())
-}
-
-async fn get_face_url_from_bilibili(room_id: &str) -> Option<String> {
-    {
+async fn get_face_url_from_bilibili(room_id: &str, force_refresh: bool) -> Option<String> {
+    if !force_refresh {
         let cache = AVATAR_CACHE.read().await;
         if let Some(entry) = cache.get(room_id) {
             if is_avatar_cache_valid(entry.fetched_at) {
@@ -134,10 +90,24 @@ async fn get_face_url_from_bilibili(room_id: &str) -> Option<String> {
         .ok()?;
     let json: serde_json::Value = resp.json().await.ok()?;
     let face = json.get("data")?.get("info")?.get("face")?.as_str()?;
-    Some(face.to_string())
+    let face = face.to_string();
+    let mut cache = AVATAR_CACHE.write().await;
+    let image_bytes = cache
+        .get(room_id)
+        .and_then(|entry| entry.image_bytes.clone());
+    cache.insert(
+        room_id.to_string(),
+        AvatarCacheEntry {
+            face_url: face.clone(),
+            image_bytes,
+            fetched_at: std::time::SystemTime::now(),
+        },
+    );
+    Some(face)
 }
 
 async fn fetch_all_anchors_for_avatars(
+    force_refresh: bool,
 ) -> Result<Vec<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
     let mut anchors = Vec::new();
 
@@ -146,7 +116,7 @@ async fn fetch_all_anchors_for_avatars(
     {
         for anchor in vr_anchors {
             let room_id = anchor.room_id.to_string();
-            let face_url = get_face_url_from_bilibili(&room_id).await;
+            let face_url = get_face_url_from_bilibili(&room_id, force_refresh).await;
             if let Some(url) = face_url {
                 anchors.push((room_id, url));
             }
@@ -158,7 +128,7 @@ async fn fetch_all_anchors_for_avatars(
     {
         for anchor in psp_anchors {
             let room_id = anchor.room_id.to_string();
-            let face_url = get_face_url_from_bilibili(&room_id).await;
+            let face_url = get_face_url_from_bilibili(&room_id, force_refresh).await;
             if let Some(url) = face_url {
                 anchors.push((room_id, url));
             }
@@ -168,14 +138,106 @@ async fn fetch_all_anchors_for_avatars(
     Ok(anchors)
 }
 
+async fn force_refresh_face_url_for_cache_key(key: &str) -> Option<String> {
+    if let Some(uid) = key.strip_prefix("uid_") {
+        if !uid.chars().all(|character| character.is_ascii_digit()) {
+            return None;
+        }
+        let api_url = format!("https://api.bilibili.com/x/web-interface/card?mid={}", uid);
+        let response = HTTP_CLIENT
+            .get(&api_url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            )
+            .header("Accept", "application/json")
+            .send()
+            .await
+            .ok()?;
+        let raw_data: serde_json::Value = response.json().await.ok()?;
+        let face = raw_data
+            .get("data")
+            .and_then(|data| data.get("card"))
+            .and_then(|card| card.get("face"))
+            .and_then(|face| face.as_str())?;
+        if face.is_empty() {
+            return None;
+        }
+        Some(face.to_string())
+    } else if key.chars().all(|character| character.is_ascii_digit()) {
+        get_face_url_from_bilibili(key, true).await
+    } else {
+        None
+    }
+}
+
+async fn fetch_remote_avatar_response(
+    face_url: &str,
+    conditional: ConditionalHeaders,
+) -> AvatarCacheResult<RemoteAvatarResponse> {
+    let mut request = HTTP_CLIENT
+        .get(face_url)
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        )
+        .header("Referer", "https://www.bilibili.com")
+        .header("Accept", "image/webp,image/*;q=0.8,*/*;q=0.5");
+    if let Some(etag) = conditional.etag {
+        request = request.header(reqwest::header::IF_NONE_MATCH, etag);
+    }
+    if let Some(last_modified) = conditional.last_modified {
+        request = request.header(reqwest::header::IF_MODIFIED_SINCE, last_modified);
+    }
+
+    let response = timeout(Duration::from_secs(10), request.send())
+        .await
+        .map_err(|_| "remote avatar request timed out".to_string())?
+        .map_err(|error| error.to_string())?;
+    let status = response.status().as_u16();
+    let etag = response
+        .headers()
+        .get(reqwest::header::ETAG)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
+    let last_modified = response
+        .headers()
+        .get(reqwest::header::LAST_MODIFIED)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string);
+
+    if status == 304 {
+        return Ok(RemoteAvatarResponse {
+            status,
+            etag,
+            last_modified,
+            body: None,
+        });
+    }
+    if !(200..300).contains(&status) {
+        return Err(format!("remote avatar returned HTTP {status}").into());
+    }
+    let body = timeout(Duration::from_secs(10), response.bytes())
+        .await
+        .map_err(|_| "remote avatar body timed out".to_string())?
+        .map_err(|error| error.to_string())?
+        .to_vec();
+    Ok(RemoteAvatarResponse {
+        status,
+        etag,
+        last_modified,
+        body: Some(body),
+    })
+}
+
 async fn batch_download_avatars() {
     println!("🔄 [头像批量更新] 开始...");
 
-    let mut anchors = match fetch_all_anchors_for_avatars().await {
+    let mut anchors = match fetch_all_anchors_for_avatars(true).await {
         Ok(a) => a,
         Err(e) => {
             eprintln!("❌ [头像批量更新] 获取主播列表失败: {}", e);
-            return;
+            Vec::new()
         }
     };
 
@@ -209,34 +271,46 @@ async fn batch_download_avatars() {
         }
     }
 
-    let mut success = 0;
+    let manifest_keys = AVATAR_STORE.entries().await;
+    for key in manifest_keys.keys() {
+        if anchors.iter().any(|(anchor_key, _)| anchor_key == key) {
+            continue;
+        }
+        // 即使主播列表短时失败，也逐键强制重新请求 face URL，
+        // 不复用旧的 48 小时 AVATAR_CACHE URL。
+        if let Some(face_url) = force_refresh_face_url_for_cache_key(key).await {
+            anchors.push((key.clone(), face_url));
+        }
+    }
+
+    let mut updated = 0;
+    let mut unchanged = 0;
+    let mut not_modified = 0;
     let mut fail = 0;
 
-    for (room_id, face_url) in anchors {
-        match download_image(&face_url).await {
-            Ok(bytes) => match compress_avatar(&bytes) {
-                Some(compressed) => {
-                    let _ = save_compressed_avatar(&room_id, &compressed).await;
-                    let mut cache = AVATAR_CACHE.write().await;
-                    cache.insert(
-                        room_id.clone(),
-                        AvatarCacheEntry {
-                            face_url: face_url.clone(),
-                            image_bytes: Some(compressed),
-                            fetched_at: std::time::SystemTime::now(),
-                        },
-                    );
-                    success += 1;
-                }
-                None => fail += 1,
-            },
-            Err(_) => fail += 1,
+    for (cache_key, face_url) in anchors {
+        let outcome = AVATAR_STORE
+            .refresh_from_remote(&cache_key, &face_url, |conditional| {
+                fetch_remote_avatar_response(&face_url, conditional)
+            })
+            .await;
+        match outcome {
+            Ok(RefreshOutcome::Updated) => updated += 1,
+            Ok(RefreshOutcome::Unchanged) => unchanged += 1,
+            Ok(RefreshOutcome::NotModified) => not_modified += 1,
+            Err(error) => {
+                fail += 1;
+                eprintln!("❌ [头像更新失败] {}: {}", cache_key, error);
+            }
         }
 
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
 
-    println!("✅ [头像批量更新] 完成: 成功 {}, 失败 {}", success, fail);
+    println!(
+        "✅ [头像批量更新] 完成: 更新 {}, 字节不变 {}, 304 {}, 失败 {}",
+        updated, unchanged, not_modified, fail
+    );
 }
 
 /// 批量获取单月份所有日期的attention数据
@@ -598,6 +672,9 @@ async fn main() {
     // 初始化日志系统
     tracing_subscriber::fmt::init();
     lazy_static::initialize(&UPSTREAM_CACHE);
+    // 启动时先完成旧 JPEG → WebP 清单迁移，使批量接口在首个刷新任务完成前
+    // 就能从 manifest 恢复数据，而不是返回空列表。
+    lazy_static::initialize(&AVATAR_STORE);
 
     // 创建共享数据存储
     let shared_data: SharedData = Arc::new(RwLock::new(HashMap::new()));
@@ -677,9 +754,9 @@ async fn main() {
     println!("Server running on http://0.0.0.0:2992");
 
     tokio::spawn(async {
-        batch_download_avatars().await;
-        let period = Duration::from_secs(48 * 3600);
+        let period = Duration::from_secs(4 * 3600);
         let mut interval = tokio::time::interval_at(tokio::time::Instant::now() + period, period);
+        batch_download_avatars().await;
         loop {
             interval.tick().await;
             batch_download_avatars().await;
@@ -1543,11 +1620,25 @@ async fn get_avatar(Query(query): Query<AvatarQuery>) -> Result<Json<AvatarRespo
 async fn get_avatar_proxy(
     Query(query): Query<AvatarQuery>,
 ) -> Result<([(header::HeaderName, String); 2], Vec<u8>), StatusCode> {
+    avatar_proxy_from_store(query, &AVATAR_STORE).await
+}
+
+async fn avatar_proxy_from_store(
+    query: AvatarQuery,
+    store: &AvatarStore,
+) -> Result<([(header::HeaderName, String); 2], Vec<u8>), StatusCode> {
     let (_cache_key, face_url) = if let Some(uid) = &query.uid {
         if !uid.chars().all(|c| c.is_ascii_digit()) || uid.parse::<u64>().unwrap_or(0) == 0 {
             return Err(StatusCode::BAD_REQUEST);
         }
         let cache_key = format!("uid_{}", uid);
+        if let Some(bytes) = store
+            .get(&cache_key)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        {
+            return Ok(compressed_avatar_response(bytes));
+        }
         let cached = {
             let cache = AVATAR_CACHE.read().await;
             cache
@@ -1612,6 +1703,13 @@ async fn get_avatar_proxy(
         if !room_id.chars().all(|c| c.is_ascii_digit()) || room_id.parse::<u64>().unwrap_or(0) == 0
         {
             return Err(StatusCode::BAD_REQUEST);
+        }
+        if let Some(bytes) = store
+            .get(room_id)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        {
+            return Ok(compressed_avatar_response(bytes));
         }
         let cached = {
             let cache = AVATAR_CACHE.read().await;
@@ -1680,108 +1778,56 @@ async fn get_avatar_proxy(
         return Err(StatusCode::BAD_REQUEST);
     };
 
-    let cached_image = {
-        let cache = AVATAR_CACHE.read().await;
-        cache
-            .get(&_cache_key)
-            .filter(|entry| is_avatar_cache_valid(entry.fetched_at))
-            .and_then(|entry| entry.image_bytes.clone())
-    };
-
-    if let Some(bytes) = cached_image {
-        return Ok((
-            [
-                (header::CONTENT_TYPE, "image/jpeg".to_string()),
-                (header::CACHE_CONTROL, "max-age=86400".to_string()),
-            ],
-            bytes,
-        ));
-    }
-
-    let disk_image = load_avatar_from_file(&_cache_key).await;
-    if let Some(bytes) = disk_image {
-        let mut cache = AVATAR_CACHE.write().await;
-        cache.insert(
-            _cache_key.clone(),
-            AvatarCacheEntry {
-                face_url: face_url.clone(),
-                image_bytes: Some(bytes.clone()),
-                fetched_at: std::time::SystemTime::now(),
-            },
-        );
-        return Ok((
-            [
-                (header::CONTENT_TYPE, "image/jpeg".to_string()),
-                (header::CACHE_CONTROL, "max-age=86400".to_string()),
-            ],
-            bytes,
-        ));
-    }
-
-    let response = match timeout(
-        Duration::from_secs(10),
-        HTTP_CLIENT
-            .get(&face_url)
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            )
-            .header("Referer", "https://www.bilibili.com")
-            .send(),
-    )
-    .await
-    {
-        Ok(Ok(resp)) => resp,
-        _ => return Err(StatusCode::BAD_GATEWAY),
-    };
-
-    if !response.status().is_success() {
-        return Err(StatusCode::NOT_FOUND);
-    }
-
-    let image_bytes = match timeout(Duration::from_secs(10), response.bytes()).await {
-        Ok(Ok(bytes)) => bytes.to_vec(),
-        _ => return Err(StatusCode::BAD_GATEWAY),
-    };
-
-    {
-        let mut cache = AVATAR_CACHE.write().await;
-        if let Some(entry) = cache.get_mut(&_cache_key) {
-            entry.image_bytes = Some(image_bytes.clone());
-        }
-    }
-
-    if let Err(e) = save_avatar_to_file(&_cache_key, &image_bytes).await {
-        eprintln!("⚠️ [头像磁盘缓存失败] {}", e);
-    }
-
-    Ok((
-        [
-            (header::CONTENT_TYPE, "image/jpeg".to_string()),
-            (header::CACHE_CONTROL, "max-age=86400".to_string()),
-        ],
-        image_bytes,
-    ))
+    let _outcome = store
+        .refresh_from_remote(&_cache_key, &face_url, |conditional| {
+            fetch_remote_avatar_response(&face_url, conditional)
+        })
+        .await
+        .map_err(|error| {
+            eprintln!("❌ [头像代理下载压缩失败] {}: {}", _cache_key, error);
+            StatusCode::BAD_GATEWAY
+        })?;
+    let bytes = store
+        .get(&_cache_key)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::BAD_GATEWAY)?;
+    Ok(compressed_avatar_response(bytes))
 }
 
 async fn get_avatars_batch() -> Json<serde_json::Value> {
-    let cache = AVATAR_CACHE.read().await;
-    let mut avatars = serde_json::Map::new();
-
-    for (key, entry) in cache.iter() {
-        if let Some(ref bytes) = entry.image_bytes {
-            let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
-            avatars.insert(
-                key.clone(),
-                serde_json::Value::String(format!("data:image/jpeg;base64,{}", b64)),
-            );
+    let compressed = match AVATAR_STORE.snapshot().await {
+        Ok(compressed) => compressed,
+        Err(error) => {
+            eprintln!("❌ [头像批量清单读取失败] {}", error);
+            BTreeMap::new()
         }
-    }
+    };
+    let avatars = compressed
+        .into_iter()
+        .map(|(key, bytes)| {
+            let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+            (
+                key,
+                serde_json::Value::String(format!("data:image/webp;base64,{}", b64)),
+            )
+        })
+        .collect::<serde_json::Map<_, _>>();
 
     Json(serde_json::json!({
         "avatars": avatars,
         "count": avatars.len()
     }))
+}
+
+fn compressed_avatar_response(bytes: Vec<u8>) -> ([(header::HeaderName, String); 2], Vec<u8>) {
+    (
+        [
+            (header::CONTENT_TYPE, "image/webp".to_string()),
+            (header::CACHE_CONTROL, "max-age=86400".to_string()),
+        ],
+        bytes,
+    )
 }
 
 async fn serve_logo1() -> impl IntoResponse {
@@ -2079,6 +2125,40 @@ fn compute_pair_overlap(
 #[cfg(test)]
 mod cache_api_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn avatar_proxy_manifest_hit_returns_webp_mime() {
+        let directory = std::env::temp_dir().join(format!(
+            "liveshow-avatar-proxy-test-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&directory).unwrap();
+        let store = AvatarStore::open(&directory).unwrap();
+        let mut png = Vec::new();
+        image::RgbaImage::new(40, 40)
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        let webp = avatar_cache::compress_avatar(&png).unwrap();
+        store.put_local("123", &webp, None).await.unwrap();
+
+        let (headers, bytes) = avatar_proxy_from_store(
+            AvatarQuery {
+                room_id: Some("123".into()),
+                uid: None,
+            },
+            &store,
+        )
+        .await
+        .unwrap();
+        assert_eq!(headers[0].0, header::CONTENT_TYPE);
+        assert_eq!(headers[0].1, "image/webp");
+        assert_eq!(headers[1].0, header::CACHE_CONTROL);
+        assert_eq!(headers[1].1, "max-age=86400");
+        assert_eq!(bytes, webp);
+        avatar_cache::validate_webp(&bytes).unwrap();
+        drop(store);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
 
     #[tokio::test]
     async fn invalid_refresh_and_month_do_not_invalidate_or_contact_upstream() {

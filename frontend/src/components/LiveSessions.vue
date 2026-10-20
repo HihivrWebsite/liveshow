@@ -135,6 +135,7 @@
           card-type="session"
           :rank="index + 1"
           :title="session.title"
+          :avatar-url="anchorAvatar"
           :subtitle="''"
           :fields="[
             {

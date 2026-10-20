@@ -99,8 +99,8 @@ struct SuperChat {
 | GET /gift/attention | get_attention_data | 粉丝数快照 |
 | GET /gift/sc | get_sc_history | SC历史 |
 | GET /gift/avatar | get_avatar | 主播头像 URL |
-| GET /gift/avatar_proxy | get_avatar_proxy | 头像代理图片 |
-| GET /gift/avatars/batch | get_avatars_batch | 批量头像 |
+| GET /gift/avatar_proxy | get_avatar_proxy | 清单优先的 WebP 头像代理 |
+| GET /gift/avatars/batch | get_avatars_batch | 从清单恢复批量 WebP |
 | GET /gift/fans_overlap | get_fans_overlap | 粉丝重合度 |
 | GET /assets/*** | ServeDir | 静态资源 |
 | GET /cache/stats | 缓存统计 | 缓存命中率 |
@@ -115,6 +115,8 @@ struct SuperChat {
 - `UpstreamCache::get(client, key, caller)` — 同键合并、磁盘读取及上游请求
 - `fetch_live_session_data(room_id, union, month)` — 直播会话数据
 - `fetch_sc_history` — SC历史数据
+- `fetch_remote_avatar_response(face_url, conditional)` — 带 ETag/Last-Modified 条件的头像下载
+- `batch_download_avatars()` — 启动立即执行、以后每 4 小时强制刷新
 
 ### 缓存管理
 
@@ -122,6 +124,9 @@ struct SuperChat {
 - `upstream_cache::Key` — 数据源、接口、房间及月份规范化与有效期
 - `UpstreamCache::clear()` — 并发安全地清除内存与磁盘，详情见[共享缓存说明](../features/upstream-cache.md)
 - `GiftResponseCache` — 10 个 `/gift*` 路由最外层 HTTP 响应缓存
+- `avatar_cache::AvatarStore` — WebP 清单、40×40 压缩、严格大小/格式校验、原子替换及 JPEG 迁移
+
+详细接口和故障边界见[头像 WebP 清单缓存](../features/avatar-webp-cache.md)。
 
 ### Gift 10 秒响应缓存
 

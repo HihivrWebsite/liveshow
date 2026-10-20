@@ -154,6 +154,32 @@ curl -i -X POST "http://localhost:2992/cache/clear"
 
 前端测试直接执行两个 Vue 组件的刷新方法，验证先清服务器再请求、范围去重与串行执行、服务端拒绝时保留本地数据。源指标及上线采样步骤见[共享缓存说明](../features/upstream-cache.md)。
 
+#### 4.4 头像 WebP 清单缓存
+
+在 `rust_backend` 执行 `CARGO_TARGET_DIR=/home/pma213x/.cache/liveshow-rust-target cargo test --locked`；在 `frontend` 执行 `npm run test:cache` 和 `npm run build`。
+
+Rust 回归不等待 4 小时，覆盖：
+
+1. 压缩结果具有 WebP 魔数、可完整解码、尺寸 40×40 且严格小于 100 KiB。
+2. 损坏图片、错误魔数和超限输入被拒绝。
+3. 旧 JPEG 成功迁移后删除，清单重开可恢复 WebP。
+4. 并发替换同一键后清单和文件仍一致，无 `.tmp` 残留。
+5. 304、压缩字节不变和内容变化分别只更新检查时间、保持 revision、递增 revision 并替换文件。
+6. `/gift/avatar_proxy` 响应头为 `image/webp`。
+
+前端测试验证单例批量请求、WebP data URL 覆盖及失败时保留 JPEG 默认头像。
+
+#### 4.5 卡片序号与头像回归
+
+在 `frontend` 执行 `npm run test:cache` 和 `npm run build`，随后启动完整服务并访问 `http://127.0.0.1:2992/`。
+
+1. 首张主播卡显示 `#1`，导航排名、卡片序号及 `card-N` 跳转一致。
+2. 卡片头像显示为 60×60px 圆形；批量头像返回 `data:image/webp;base64,...` 且图片可解码。
+3. 卡片保留“动态标题 / 咿喔io粉丝站维阿PSP斗虫榜 / 斜杠dc点yioio点top”三行结构。
+4. 选择 manifest 中存在的 `room_id` 打开 `/live-sessions`，每张会话卡显示同一主播头像，序号按返回顺序从 `#1` 连续。
+5. 使用浏览器请求拦截令 `/gift/avatars/batch` 失败，确认 Vue 应用仍挂载且保留 JPEG 默认头像。
+6. 在 1280px、1024px、768px、480px、360px 检查无重叠，并保存截图证据。
+
 ### 5. 性能测试
 
 观察日志中的缓存命中情况：

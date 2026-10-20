@@ -6,6 +6,8 @@
 
 浏览器 → 10 秒 Gift HTTP 响应缓存 → handler → 共享 VR/PSP 源数据缓存 → 上游 API。
 
+头像压缩图是独立的持久层：`avatar_cache.rs` 的 `AvatarStore` 以 `cache_data/avatars_compressed/manifest.json` 索引 40×40 WebP，清单命中直接返回；缺失时下载并压缩。启动迁移、4 小时强制刷新、条件请求和原子替换详见[头像缓存架构](avatar-cache.md)。
+
 - HTTP 层按完整路径和查询缓存，保持 512 条/64 MiB、单响应 16 MiB、同键并发合并、错误缓存及 `X-Gift-Cache` 诊断头。
 - 源数据层按来源、上游接口、房间和月份缓存，展示筛选与调用入口不分裂缓存键；VR/PSP 完全隔离。
 - 源数据内存层采用 512 条/128 MiB 的 LRU，容量为序列化字节估算，不是整个进程内存限额。
