@@ -220,7 +220,7 @@ export default {
       } else {
         title = item.anchor_name || item.name || `项目 ${item.rank || item.id || 'N/A'}`;
       }
-      return title + ' -dc 点 hihivr 点 top';
+      return title + ' -dc 点 yioio 点 top';
     };
 
     const getStatus = (item) => {
@@ -243,7 +243,7 @@ export default {
       }
     };
 
-    const titleColumn = props.itemType === 'session' ? '直播标题-dc 点 hihivr 点 top' : '主播名称-dc 点 hihivr 点 top';
+    const titleColumn = props.itemType === 'session' ? '直播标题-dc 点 yioio 点 top' : '主播名称-dc 点 yioio 点 top';
 
     return {
       scrollToCard,

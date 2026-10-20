@@ -587,7 +587,7 @@ export default {
           plugins: {
             title: {
               display: true,
-              text: `恶意斗虫 - ${this.metricNameMap[metric]}对比 - 维阿斗虫榜 dc 点 hihivr 点 top`,
+              text: `恶意斗虫 - ${this.metricNameMap[metric]}对比 - 咿喔io粉丝站维阿斗虫榜 dc 点 yioio 点 top`,
               font: { size: 24, weight: 'bold' },
               padding: 30
             },
@@ -779,7 +779,7 @@ export default {
         console.log('原始标题:', originalTitle)
 
         // 修改标题为导出格式（更大字体，带后缀）
-        chart.options.plugins.title.text = `恶意斗虫 - ${this.metricNameMap[this.currentMetric]}对比 - 维阿斗虫榜 dc 点 hihivr 点 top`
+        chart.options.plugins.title.text = `恶意斗虫 - ${this.metricNameMap[this.currentMetric]}对比 - 咿喔io粉丝站维阿斗虫榜 dc 点 yioio 点 top`
         chart.options.plugins.title.font.size = 72
         chart.options.plugins.title.padding = 50
 

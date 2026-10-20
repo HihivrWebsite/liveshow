@@ -663,7 +663,6 @@ async fn main() {
             get_service(ServeDir::new("../rust_backend/dist/assets")),
         )
         .route("/logo1.png", get(serve_logo1))
-        .route("/logo2.png", get(serve_logo2))
         .route("/favicon.ico", get(favicon))
         .fallback(index_handler)
         // 添加中间件
@@ -1787,13 +1786,6 @@ async fn get_avatars_batch() -> Json<serde_json::Value> {
 
 async fn serve_logo1() -> impl IntoResponse {
     match std::fs::read("../rust_backend/dist/logo1.png") {
-        Ok(data) => ([(header::CONTENT_TYPE, "image/png".to_string())], data).into_response(),
-        Err(_) => StatusCode::NOT_FOUND.into_response(),
-    }
-}
-
-async fn serve_logo2() -> impl IntoResponse {
-    match std::fs::read("../rust_backend/dist/logo2.png") {
         Ok(data) => ([(header::CONTENT_TYPE, "image/png".to_string())], data).into_response(),
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }

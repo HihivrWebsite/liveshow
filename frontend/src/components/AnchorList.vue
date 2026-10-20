@@ -535,7 +535,7 @@ export default {
       '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE'
     ]
     const anchors = ref([])
-    const title = ref('维阿PSP斗虫榜')
+    const title = ref('咿喔io粉丝站维阿PSP斗虫榜')
     const refreshTime = ref(new Date().toLocaleString())
     const currentFilter = ref('all')
     const loading = ref(true)
@@ -673,7 +673,6 @@ export default {
 
       try {
         const logo1 = await imageToBase64('/logo1.png')
-        const logo2 = await imageToBase64('/logo2.png')
 
         const months = getMonthRange(exportStartMonth.value, exportEndMonth.value)
         let combinedAnchors = {}
@@ -778,15 +777,18 @@ export default {
           </tr>`
         })
 
-        const siteUrl = 'hihivr点top'
+        const siteUrl = 'yioio点top'
         const htmlContent = `
           <div style="font-family:'Microsoft YaHei',sans-serif;background:#FFF8E1;padding:20px;width:2200px;">
             <header style="background:#FFF8E1;padding:20px 0;">
               <div style="margin:0 auto;padding:0 20px;">
                 <div style="display:flex;align-items:center;justify-content:center;gap:15px;margin-bottom:15px;">
                   ${logo1 ? `<img src="${logo1}" style="height:100px;" />` : ''}
-                  ${logo2 ? `<img src="${logo2}" style="height:100px;" />` : ''}
-                  <h1 style="color:#FF6600;font-size:2rem;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.5);margin:0;">维阿PSP斗虫榜_${siteUrl}</h1>
+                  <div style="text-align:center;line-height:1.35;">
+                    <div style="color:#5D4B24;font-size:1.5rem;font-weight:bold;margin:0;">📸 导出数据截图</div>
+                    <div style="color:#FF6B9D;font-size:2rem;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.5);margin:0;">咿喔io粉丝站维阿PSP斗虫榜</div>
+                    <div style="color:#5D4B24;font-size:1.35rem;font-weight:bold;margin:0;">斜杠dc点yioio点top</div>
+                  </div>
                 </div>
                 <div style="text-align:center;">
                   <p style="color:#f9729a;font-size:1.2rem;margin-bottom:10px;line-height:1.4;font-weight:bold;text-align:center;">特别感谢某热心小礼猫-千秋紫莹提供的斗虫数据API，感谢其对本项目提供了巨大的帮助</p>
@@ -797,7 +799,7 @@ export default {
               <div style="font-weight:bold;margin-bottom:4px;">使用导出功能制作</div>
               <div>使用方法：在主页勾选主播 → 点击导出截图 → 选择时间范围 → 确定导出</div>
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="color:#f9729a;font-weight:bold;font-size:1.1rem;">${startLabel}-${endLabel}数据</span><span style="color:#00BFFF;font-weight:bold;font-size:1.1rem;">向阳Hihi粉丝站-维阿PSP斗虫榜 dc.hihivr.top</span></div>
+            <div style="display:flex;justify-content:flex-start;align-items:center;margin-bottom:10px;"><span style="color:#f9729a;font-weight:bold;font-size:1.1rem;">${startLabel}-${endLabel}数据</span></div>
             <table style="width:100%;border-collapse:collapse;background:#FFF8E1;border-radius:15px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
               <thead>
                 <tr style="background:linear-gradient(45deg,#FFC633,#FFA500);color:#333;">
@@ -869,10 +871,10 @@ export default {
     if (monthFromRoute) {
       const year = monthFromRoute.substring(0, 4)
       const month = parseInt(monthFromRoute.substring(4, 6)).toString().padStart(2, '0')
-      title.value = `维阿PSP斗虫榜_${year}年${month}月记录数据（点击"正在直播"跳转到对应直播间）`
+      title.value = `咿喔io粉丝站维阿PSP斗虫榜_${year}年${month}月记录数据（点击"正在直播"跳转到对应直播间）`
     } else {
-      title.value = filterFromRoute === 'vr' ? '维阿斗虫榜' :
-                   filterFromRoute === 'psp' ? 'PSPlive斗虫榜' : '维阿PSP斗虫榜'
+      title.value = filterFromRoute === 'vr' ? '咿喔io粉丝站维阿斗虫榜' :
+                   filterFromRoute === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜' : '咿喔io粉丝站维阿PSP斗虫榜'
     }
 
     // 获取数据
@@ -1036,7 +1038,7 @@ export default {
     const showVRPSPComparison = async () => {
       chartType.value = 'vrpsp'
       if (currentFilter.value !== 'all') {
-        alert('VR PSP对比图仅在"维阿PSP斗虫榜"模式下可用')
+        alert('VR PSP对比图仅在"咿喔io粉丝站维阿PSP斗虫榜"模式下可用')
         return
       }
 
@@ -2788,7 +2790,7 @@ export default {
         const startMon = sMonth.substring(4, 6)
         const endYear = eMonth.substring(0, 4)
         const endMon = eMonth.substring(4, 6)
-        title.value = `维阿PSP斗虫榜_${startYear}年${startMon}月-${endYear}年${endMon}月累计数据`
+        title.value = `咿喔io粉丝站维阿PSP斗虫榜_${startYear}年${startMon}月-${endYear}年${endMon}月累计数据`
 
         refreshTime.value = new Date().toLocaleString()
       } catch (err) {
@@ -2812,10 +2814,10 @@ export default {
         if (newMonth) {
           const year = newMonth.substring(0, 4)
           const monthNum = parseInt(newMonth.substring(4, 6)).toString().padStart(2, '0')
-          title.value = `维阿PSP斗虫榜_${year}年${monthNum}月记录数据（点击"正在直播"跳转到对应直播间）`
+          title.value = `咿喔io粉丝站维阿PSP斗虫榜_${year}年${monthNum}月记录数据（点击"正在直播"跳转到对应直播间）`
         } else {
-          title.value = currentFilter.value === 'vr' ? '维阿斗虫榜' :
-                       currentFilter.value === 'psp' ? 'PSPlive斗虫榜' : '维阿PSP斗虫榜'
+          title.value = currentFilter.value === 'vr' ? '咿喔io粉丝站维阿斗虫榜' :
+                       currentFilter.value === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜' : '咿喔io粉丝站维阿PSP斗虫榜'
         }
         fetchData()
 

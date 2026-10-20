@@ -1,6 +1,6 @@
 # 缓存架构
 
-当前策略对应 v4.7.17，完整接口和指标说明见[共享上游缓存](../features/upstream-cache.md)。
+当前策略对应 v4.7.19，完整接口和指标说明见[共享上游缓存](../features/upstream-cache.md)。
 
 ## 请求路径
 

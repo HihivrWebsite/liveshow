@@ -68,7 +68,7 @@ export default {
     const router = useRouter()
     const route = useRoute()
     const anchors = ref([])
-    const title = ref('维阿PSP斗虫榜（全部展开视图）')
+    const title = ref('咿喔io粉丝站维阿PSP斗虫榜（全部展开视图）')
     const refreshTime = ref(new Date().toLocaleString())
     const loading = ref(true)
     const error = ref(null)
@@ -89,10 +89,10 @@ export default {
     if (monthFromRoute) {
       const year = monthFromRoute.substring(0, 4)
       const month = parseInt(monthFromRoute.substring(4, 6)).toString().padStart(2, '0')
-      title.value = `维阿PSP斗虫榜_${year}年${month}月记录数据（全部展开视图）`
+      title.value = `咿喔io粉丝站维阿PSP斗虫榜_${year}年${month}月记录数据（全部展开视图）`
     } else {
-      title.value = filterFromRoute === 'vr' ? '维阿斗虫榜（全部展开视图）' :
-                   filterFromRoute === 'psp' ? 'PSPlive斗虫榜（全部展开视图）' : '维阿PSP斗虫榜（全部展开视图）'
+      title.value = filterFromRoute === 'vr' ? '咿喔io粉丝站维阿斗虫榜（全部展开视图）' :
+                   filterFromRoute === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜（全部展开视图）' : '咿喔io粉丝站维阿PSP斗虫榜（全部展开视图）'
     }
 
     // 获取数据

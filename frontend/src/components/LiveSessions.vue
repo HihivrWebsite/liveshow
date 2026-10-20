@@ -297,7 +297,7 @@ export default {
     title.value = `${month.substring(0, 4)}年${parseInt(month.substring(4, 6)).toString().padStart(2, '0')}月直播数据`
 
     const goToMainSite = () => {
-      window.open('https://hihivr.top', '_blank')
+      window.open('https://yioio.top', '_blank')
     }
 
     const followCreator = () => {

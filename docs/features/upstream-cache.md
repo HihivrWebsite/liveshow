@@ -1,4 +1,4 @@
-# 共享上游数据缓存（v4.7.17）
+# 共享上游数据缓存（v4.7.19）
 
 ## 缓存层与有效期
 
@@ -41,6 +41,6 @@
 
 顶层 `hits/misses/hit_rate` 现按全部 VR/PSP 源数据缓存统计，`misses` 包含未使用长缓存的 SC 请求；`gift_response_cache.misses` 仍仅是 handler 执行次数。只统计两次采样间相同 `version/pid/started_at` 的计数差，实际回源平均速率为 `Δupstream_requests / Δ秒数`。
 
-上游请求附带 `User-Agent: liveshow-backend/4.7.17` 和 `X-Liveshow-Caller`，本地结构化日志记录版本、来源、接口、入口、房间及月份，不记录响应正文。上游访问日志如需区分同 IP 的其他程序，应额外记录这两个请求头；仅凭出口 IP 无法确认全部请求都来自 liveshow。此改动不修改 VR_douchong 或生产服务器日志配置。
+上游请求附带 `User-Agent: liveshow-backend/4.7.19` 和 `X-Liveshow-Caller`，本地结构化日志记录版本、来源、接口、入口、房间及月份，不记录响应正文。上游访问日志如需区分同 IP 的其他程序，应额外记录这两个请求头；仅凭出口 IP 无法确认全部请求都来自 liveshow。此改动不修改 VR_douchong 或生产服务器日志配置。
 
 上线后应核对版本、统计计数增量、空结果比例及同一历史房间月份的重复回源。离线 mock 测试不能证明生产服务器已部署，也不能把此前日志回放的节省比例视为上线保证。

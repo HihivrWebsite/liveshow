@@ -1,12 +1,16 @@
 <template>
   <div :class="['base-card', cardType ? `${cardType}-card` : '', {'live-card': isLive}]" :id="'card-' + (rank || Math.random())">
-    <div class="card-header" v-if="showHeader">
+    <div
+      class="card-header"
+      v-if="showHeader"
+      :title="title"
+      :aria-label="title"
+    >
       <div class="header-main">
-        <div v-if="rank !== undefined" class="card-rank">#{{ rank }}</div>
-        <div v-if="title" class="card-title"><img v-if="avatarUrl" :src="avatarUrl" class="card-avatar" @error="$event.target.style.display='none'" />{{ title }}</div>
+        <div v-if="title" class="card-title">{{ title }}</div>
       </div>
-      <div v-if="subtitle" class="card-subtitle">{{ subtitle }}</div>
-      <div class="card-subtitle-secondary">斜杠<strong><em>dc</em></strong>点<strong><em>hihivr</em></strong>点<strong><em>top</em></strong></div>
+      <div class="card-subtitle">咿喔io粉丝站维阿PSP斗虫榜</div>
+      <div class="card-subtitle-secondary">斜杠<strong><em>dc</em></strong>点<strong><em>yioio</em></strong>点<strong><em>top</em></strong></div>
     </div>
 
     <div class="card-body" @click.stop>

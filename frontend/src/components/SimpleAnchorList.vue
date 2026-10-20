@@ -131,7 +131,7 @@ export default {
     const router = useRouter()
     const route = useRoute()
     const anchors = ref([])
-    const title = ref('维阿PSP斗虫榜')
+    const title = ref('咿喔io粉丝站维阿PSP斗虫榜')
     const refreshTime = ref(new Date().toLocaleString())
     const currentFilter = ref('all')
     const loading = ref(true)
@@ -146,10 +146,10 @@ export default {
     if (monthFromRoute) {
       const year = monthFromRoute.substring(0, 4)
       const month = parseInt(monthFromRoute.substring(4, 6)).toString().padStart(2, '0')
-      title.value = `维阿PSP斗虫榜_${year}年${month}月记录数据（点击"正在直播"跳转到对应直播间）`
+      title.value = `咿喔io粉丝站维阿PSP斗虫榜_${year}年${month}月记录数据（点击"正在直播"跳转到对应直播间）`
     } else {
-      title.value = filterFromRoute === 'vr' ? '维阿斗虫榜' :
-                   filterFromRoute === 'psp' ? 'PSPlive斗虫榜' : '维阿PSP斗虫榜'
+      title.value = filterFromRoute === 'vr' ? '咿喔io粉丝站维阿斗虫榜' :
+                   filterFromRoute === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜' : '咿喔io粉丝站维阿PSP斗虫榜'
     }
 
     // 获取数据
@@ -175,7 +175,7 @@ export default {
     }
 
     const goToMainSite = () => {
-      window.open('https://hihivr.top', '_blank')
+      window.open('https://yioio.top', '_blank')
     }
 
     const followCreator = () => {
@@ -242,10 +242,10 @@ export default {
         if (newMonth) {
           const year = newMonth.substring(0, 4)
           const monthNum = parseInt(newMonth.substring(4, 6)).toString().padStart(2, '0')
-          title.value = `维阿PSP斗虫榜_${year}年${monthNum}月记录数据（点击"正在直播"跳转到对应直播间）`
+          title.value = `咿喔io粉丝站维阿PSP斗虫榜_${year}年${monthNum}月记录数据（点击"正在直播"跳转到对应直播间）`
         } else {
-          title.value = currentFilter.value === 'vr' ? '维阿斗虫榜' :
-                       currentFilter.value === 'psp' ? 'PSPlive斗虫榜' : '维阿PSP斗虫榜'
+          title.value = currentFilter.value === 'vr' ? '咿喔io粉丝站维阿斗虫榜' :
+                       currentFilter.value === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜' : '咿喔io粉丝站维阿PSP斗虫榜'
         }
         fetchData()
       },

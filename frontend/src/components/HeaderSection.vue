@@ -3,17 +3,10 @@
     <div class="header-content">
       <div class="logo-section">
         <div class="logo-images">
-          <a href="https://smms.app/image/BvHWJNoL2iscPXl" target="_blank">
+          <a href="https://ibb.co/yBQ0KDkp" target="_blank" rel="noopener noreferrer">
             <img
-              src="https://s2.loli.net/2024/11/16/BvHWJNoL2iscPXl.png"
-              alt="h222.png"
-              class="logo-img"
-            >
-          </a>
-          <a href="https://smms.app/image/Q2i7IUqjMDb3pev" target="_blank">
-            <img
-              src="https://s2.loli.net/2024/11/16/Q2i7IUqjMDb3pev.png"
-              alt="hihi.png"
+              src="https://i.ibb.co/vvj1fbdh/io2t.png"
+              alt="咿喔io头像"
               class="logo-img"
             >
           </a>
@@ -52,7 +45,7 @@
       <div class="header-actions">
         <div class="main-site-group">
           <button @click="goToMainSite" class="action-btn primary">
-            进入向阳Hihi粉丝站主站<br>为成为向阳人而骄傲
+            进入咿喔io粉丝站主站
           </button>
           <a
             href="https://space.bilibili.com/85996232"
@@ -93,7 +86,8 @@
         <button @click="showGuide = false" class="guide-close">✕</button>
       </div>
       <div class="guide-content">
-        <p class="guide-welcome">欢迎使用维阿PSP斗虫榜！以下是网站所有功能的介绍和使用方法。</p>
+        <p class="domain-migration-notice">网站域名由dc点hihivr点top迁移至dc点yioio点top 过渡期结束后原网址将无法访问，请互相转达。</p>
+        <p class="guide-welcome">欢迎使用咿喔io粉丝站维阿PSP斗虫榜！以下是网站所有功能的介绍和使用方法。</p>
         <div class="guide-follow-action">
           <a
             href="https://space.bilibili.com/85996232"
@@ -169,7 +163,7 @@
           <h4>9. VR PSP对比图</h4>
           <p><b>位置：</b>页面顶部操作栏</p>
           <p><b>用途：</b>对比维阿和PSPlive两个工会的总收入占比</p>
-          <p><b>使用：</b>需在"维阿PSP斗虫榜"模式下，点击按钮 → 自动弹出对比饼图</p>
+          <p><b>使用：</b>需在"咿喔io粉丝站维阿PSP斗虫榜"模式下，点击按钮 → 自动弹出对比饼图</p>
         </div>
         <div class="guide-item">
           <h4>10. 进行回归分析</h4>
@@ -279,10 +273,10 @@ export default {
       if (month) {
         const year = month.substring(0, 4)
         const monthNum = parseInt(month.substring(4, 6)).toString().padStart(2, '0')
-        return `维阿PSP斗虫榜_${year}年${monthNum}月记录数据（点击"正在直播"跳转到对应直播间）_hihivr点top`
+        return `咿喔io粉丝站维阿PSP斗虫榜_${year}年${monthNum}月记录数据（点击"正在直播"跳转到对应直播间）_yioio点top`
       } else {
-        return (filter === 'vr' ? '维阿斗虫榜' :
-               filter === 'psp' ? 'PSPlive斗虫榜' : '维阿PSP斗虫榜') + '_hihivr点top'
+        return (filter === 'vr' ? '咿喔io粉丝站维阿斗虫榜' :
+               filter === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜' : '咿喔io粉丝站维阿PSP斗虫榜') + '_yioio点top'
       }
     })
 
@@ -325,12 +319,12 @@ export default {
       }
     })
 
-    const goToMainSite = () => {
-      window.open('https://hihivr.top', '_blank')
-    }
-
     const followCreator = () => {
       window.open('https://space.bilibili.com/1048135385', '_blank')
+    }
+
+    const goToMainSite = () => {
+      window.open('https://yioio.top', '_blank')
     }
 
     return {
@@ -517,7 +511,7 @@ export default {
   animation: secondary-shine 2s infinite;
 }
 
-/* 咿喔ioo关注入口：指定红色作为六色色板的需求例外 */
+  /* 咿喔ioo关注入口：指定砖红色作为六色色板的需求例外 */
 .follow-yioo-btn {
   position: relative;
   display: inline-flex;
@@ -529,7 +523,7 @@ export default {
   overflow: hidden;
   border: 2px solid #F6B100;
   border-radius: 999px;
-  background: #B22222;
+  background: #b1646e;
   color: #FFF3D0;
   font-size: 1.35rem;
   font-weight: bold;
@@ -757,7 +751,7 @@ export default {
     box-shadow:
       0 0 22px #F6B100,
       0 0 48px rgba(255, 107, 157, 0.7),
-      0 0 72px rgba(178, 34, 34, 0.55);
+      0 0 72px rgba(177, 100, 110, 0.55);
   }
 }
 
@@ -786,6 +780,27 @@ export default {
   100% {
     transform: scale(1.35) rotate(18deg);
     opacity: 1;
+  }
+}
+
+@keyframes domain-migration-flash {
+  0% {
+    color: #FF0000;
+    background: #FFF3D0;
+    text-shadow: 0 0 8px #FFF3D0;
+    box-shadow:
+      0 0 16px rgba(255, 0, 0, 0.65),
+      0 0 32px rgba(255, 107, 157, 0.45);
+  }
+  100% {
+    color: #FF6B9D;
+    background: #FFF3D0;
+    text-shadow:
+      0 0 10px #FFF3D0,
+      0 0 20px #FF6B9D;
+    box-shadow:
+      0 0 24px #FF6B9D,
+      0 0 48px rgba(255, 0, 0, 0.7);
   }
 }
 
@@ -1029,6 +1044,24 @@ export default {
   flex: 1;
 }
 
+.domain-migration-notice {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 2px solid #FF0000;
+  border-radius: 24px;
+  background: #FFF3D0;
+  color: #FF0000;
+  font-size: clamp(1.2rem, 3vw, 1.75rem);
+  font-weight: 900;
+  line-height: 1.5;
+  text-align: center;
+  text-shadow: 0 0 8px #FFF3D0;
+  box-shadow:
+    0 0 16px rgba(255, 0, 0, 0.65),
+    0 0 32px rgba(255, 107, 157, 0.45);
+  animation: domain-migration-flash 1.1s ease-in-out infinite alternate;
+}
+
 .guide-welcome {
   color: #f9729a;
   font-size: 1.1rem;
@@ -1136,7 +1169,8 @@ export default {
 @media (prefers-reduced-motion: reduce) {
   .follow-yioo-btn,
   .follow-yioo-btn::before,
-  .follow-yioo-btn::after {
+  .follow-yioo-btn::after,
+  .domain-migration-notice {
     animation: none !important;
     transition: none !important;
   }
@@ -1144,6 +1178,13 @@ export default {
   .follow-yioo-btn::before {
     background-position: 50% 0;
     opacity: 0.35;
+  }
+
+  .domain-migration-notice {
+    color: #FF0000;
+    box-shadow:
+      0 0 16px rgba(255, 0, 0, 0.65),
+      0 0 32px rgba(255, 107, 157, 0.45);
   }
 }
 </style>

@@ -10,8 +10,8 @@
         </p>
       </div>
       <div class="footer-links">
-        <a href="https://hihivr.top" target="_blank" class="footer-button">
-          向阳Hihi粉丝站
+        <a href="https://yioio.top" target="_blank" rel="noopener noreferrer" class="footer-button">
+          咿喔io粉丝站
         </a>
       </div>
     </div>

@@ -6,6 +6,12 @@
 - **协议**: HTTP/RESTful
 - **数据格式**: JSON
 
+### 静态资源
+
+- `GET /logo1.png`：本地品牌图片
+- `GET /favicon.ico`：站点图标
+- `GET /logo2.png`：已随旧 Logo 删除，不再提供
+
 ### Gift 接口通用 10 秒响应缓存
 
 下列 10 个 `GET` 路由共用一层位于压缩中间件内侧的 10 秒内存响应缓存：
@@ -400,7 +406,7 @@ GET /cache/stats
   "attention_entries": 10,
   "live_sessions_entries": 20,
   "upstream_cache": {
-    "version": "4.7.17",
+    "version": "4.7.19",
     "pid": 1234,
     "started_at": "2026-10-20T10:00:00+08:00",
     "totals": {
