@@ -53,7 +53,7 @@ GET /gift
 
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
-| filter | string | 否 | 过滤条件：`all`(默认)、`vr`、`psp` |
+| filter | string | 否 | 过滤条件：`all`(默认，仅 VR+PSP)、`vr`、`psp`、`vup` |
 
 ### 响应
 
@@ -83,7 +83,9 @@ GET /gift
     }
   ],
   "refresh_time": "2026-01-15 12:00:00",
-  "filter": "all"
+  "filter": "all",
+  "source": "all",
+  "union": "all"
 }
 ```
 
@@ -126,7 +128,7 @@ GET /gift/by_month
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
 | month | string | 是 | 月份，格式 YYYYMM（如 202601） |
-| filter | string | 否 | 过滤条件：`all`(默认)、`vr`、`psp` |
+| filter | string | 否 | 过滤条件：`all`(默认，仅 VR+PSP)、`vr`、`psp`、`vup` |
 
 ### 响应
 
@@ -135,6 +137,8 @@ GET /gift/by_month
   "anchors": [...],
   "refresh_time": "2026-01-15 12:00:00",
   "filter": "all",
+  "source": "all",
+  "union": "all",
   "month": "202601"
 }
 ```
@@ -154,7 +158,7 @@ GET /gift/live_sessions
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
 | room_id | string | 是 | 直播间ID |
-| union | string | 是 | 工会名称：`VirtuaReal` 或 `PSPlive` |
+| union | string | 是 | 工会名称：`VirtuaReal`、`PSPlive` 或 `VUP` |
 | month | string | 否 | 月份，格式 YYYYMM，默认当前月份 |
 
 ### 响应
@@ -191,6 +195,7 @@ GET /gift/live_sessions
   "room_id": "1713546334",
   "queried_user": "主播名称",
   "union": "VirtuaReal",
+  "source": "vr",
   "title": "页面标题",
   "refresh_time": "2026-01-15 12:00:00"
 }
@@ -239,7 +244,7 @@ GET /gift/live_sessions_with_fans
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
 | room_id | string | 是 | 直播间ID |
-| union | string | 是 | 工会名称：`VirtuaReal` 或 `PSPlive` |
+| union | string | 是 | 工会名称：`VirtuaReal`、`PSPlive` 或 `VUP` |
 | month | string | 否 | 月份，格式 YYYYMM，默认当前月份 |
 
 ### 响应
@@ -262,7 +267,7 @@ GET /gift/attention
 |------|------|------|------|
 | room_id | int | 是 | 直播间ID，必须为正整数 |
 | month | string | 否 | 月份，支持 YYYYMM 或 YYYY-MM 格式，默认当前月份 |
-| union | string | 否 | 工会名称，用于缓存键生成 |
+| union | string | 否 | 工会名称：`VirtuaReal`、`PSPlive` 或 `VUP`，用于缓存键生成；缺省为 `VirtuaReal` |
 
 ### 响应
 
@@ -270,6 +275,8 @@ GET /gift/attention
 {
   "room_id": 1713546334,
   "month": "202603",
+  "source": "vr",
+  "union": "VirtuaReal",
   "attention": [
     {"20260327": "87138"},
     {"20260328": "87181"},
@@ -390,7 +397,7 @@ GET /gift/sc
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
 | room_id | int | 是 | 直播间ID |
-| union | string | 否 | 工会名称 |
+| union | string | 否 | 工会名称：`VirtuaReal`、`PSPlive` 或 `VUP`；缺省为 `VirtuaReal` |
 
 ### 响应
 
@@ -398,6 +405,8 @@ GET /gift/sc
 {
   "room_id": 1713546334,
   "month": "202601",
+  "source": "vr",
+  "union": "VirtuaReal",
   "list": [
     {
       "send_time": "2026-01-15 20:30:00",
@@ -476,7 +485,9 @@ GET /cache/stats
 
 有效调用 `POST /cache/clear?room_id=...&month=...` 会清空 Gift 10 秒响应缓存并递增 generation。清除期间已经启动的慢请求不能把清除前结果写回。无参数或参数无效时，接口维持既有的 `ok: false` 行为，不清除该短缓存。
 
-同时清理该房间及月份的场次、Attention 内存与磁盘缓存、对应月榜单及当前主播列表源缓存。可选 `union=VirtuaReal|PSPlive` 限定来源，不传则清理两个来源。房间号必须为正整数，月份必须为有效 `YYYYMM`；磁盘清理失败返回 500，客户端必须确认 `ok:true` 后再刷新。
+同时清理该房间及月份的场次、Attention 内存与磁盘缓存、对应月榜单及当前主播列表源缓存。可选 `union=VirtuaReal|PSPlive|VUP` 限定来源，不传则清理 VR、PSP、VUP 三个启用来源。房间号必须为正整数，月份必须为有效 `YYYYMM`；磁盘清理失败返回 500，客户端必须确认 `ok:true` 后再刷新。
+
+未知 `filter` 或 `union` 返回 HTTP 400；同一请求中 `filter` 与 `union` 指向不同来源也返回 400，不回退到 VR。VUP 详情使用 `union=VUP`，列表使用 `filter=vup`，不使用 `source` 查询参数。
 
 ---
 
@@ -484,10 +495,10 @@ GET /cache/stats
 
 | 路径 | 功能 | 查询参数 |
 |------|------|---------|
-| `/` | 主播排行榜 | `filter` (可选) |
-| `/by-month` | 按月查看主播数据 | `month` (必需), `filter` (可选) |
-| `/live-sessions` | 直播会话详情 | `room_id` (必需), `union` (必需), `month` (可选) |
-| `/superchat-detail` | SC详情 | `room_id`, `union` |
+| `/` | 主播排行榜 | `filter` (可选：`all|vr|psp|vup`) |
+| `/by-month` | 按月查看主播数据 | `month` (必需), `filter` (可选：`all|vr|psp|vup`) |
+| `/live-sessions` | 直播会话详情 | `room_id` (必需), `union` (必需：`VirtuaReal|PSPlive|VUP`), `month` (可选) |
+| `/superchat-detail` | SC详情 | `room_id`, `union` (`VirtuaReal|PSPlive|VUP`) |
 | `/expanded-view` | 全展开卡片视图 | - |
 | `/expanded-view/:source` | 特定来源展开视图 | - |
 | 恶意斗虫 | 多主播数据对比分析 | 通过主页按钮访问 |

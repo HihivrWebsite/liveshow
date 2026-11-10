@@ -1,5 +1,10 @@
 // api/index.js
 import axios from 'axios'
+import {
+  GuildConfigError,
+  requireGuildFilterConfig,
+  requireUnion
+} from '../utils/guildConfig.js'
 
 // 创建axios实例
 const apiClient = axios.create({
@@ -9,6 +14,44 @@ const apiClient = axios.create({
     'Content-Type': 'application/json'
   }
 })
+
+export class ApiError extends Error {
+  constructor(message, { status = 0, code = 'API_ERROR', cause = null } = {}) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+    this.cause = cause
+  }
+}
+
+const STATUS_MESSAGES = Object.freeze({
+  400: '请求参数无效，请检查筛选、月份或工会来源',
+  404: '请求的数据不存在，请检查房间、月份或工会来源',
+  429: '请求过于频繁，请稍后重试',
+  503: '服务暂时不可用，请稍后重试'
+})
+
+function backendMessage(data) {
+  if (!data) return ''
+  if (typeof data === 'string') return data.trim()
+  for (const key of ['message', 'error', 'detail']) {
+    const value = data[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+export function getApiErrorMessage(error, fallback = '请求失败，请稍后重试') {
+  if (error instanceof GuildConfigError || error instanceof ApiError) {
+    return error.message
+  }
+  const status = error?.response?.status
+  return backendMessage(error?.response?.data) ||
+    (status && STATUS_MESSAGES[status]) ||
+    error?.message ||
+    fallback
+}
 
 // 请求拦截器
 apiClient.interceptors.request.use(
@@ -30,9 +73,17 @@ apiClient.interceptors.response.use(
     return response.data
   },
   error => {
-    // 对响应错误做点什么
-    console.error('API Error:', error)
-    return Promise.reject(error)
+    const status = error?.response?.status
+    const message = backendMessage(error?.response?.data) ||
+      (status && STATUS_MESSAGES[status]) ||
+      (error?.request ? '网络连接失败，请检查网络连接' : error?.message || '请求失败，请稍后重试')
+    const normalized = new ApiError(message, {
+      status: status || 0,
+      code: status ? `HTTP_${status}` : 'NETWORK_ERROR',
+      cause: error
+    })
+    console.error('API Error:', normalized)
+    return Promise.reject(normalized)
   }
 )
 
@@ -42,6 +93,7 @@ export default apiClient
 export const anchorAPI = {
   // 获取主播列表
   getAnchors: (filter = 'all', month = null) => {
+    requireGuildFilterConfig(filter)
     const params = new URLSearchParams()
     if (filter) params.append('filter', filter)
     if (month) params.append('month', month)
@@ -52,6 +104,7 @@ export const anchorAPI = {
 
   // 获取按月份主播数据
   getAnchorsByMonth: (month, filter = 'all') => {
+    requireGuildFilterConfig(filter)
     const params = new URLSearchParams()
     params.append('month', month)
     params.append('filter', filter)
@@ -61,6 +114,7 @@ export const anchorAPI = {
 
   // 获取直播会话详情
   getLiveSessions: (roomId, union, month) => {
+    requireUnion(union)
     const params = new URLSearchParams()
     params.append('room_id', roomId)
     params.append('union', union)
@@ -70,7 +124,8 @@ export const anchorAPI = {
   },
 
   // 获取SC历史数据
-  getSuperChatHistory: (roomId, union = 'VirtuaReal') => {
+  getSuperChatHistory: (roomId, union) => {
+    requireUnion(union)
     const params = new URLSearchParams()
     params.append('room_id', roomId)
     params.append('union', union)
@@ -85,7 +140,10 @@ export const anchorAPI = {
   },
 
   // Invalidate server memory, disk and HTTP caches before requesting fresh data.
-  clearCache: async (roomId, month, union = 'VirtuaReal') => {
+  clearCache: async (roomId, month, union) => {
+    if (union !== undefined && union !== null && union !== '') {
+      requireUnion(union)
+    }
     const response = await apiClient.post('/cache/clear', null, {
       params: { room_id: roomId, month, union }
     })
@@ -96,7 +154,9 @@ export const anchorAPI = {
   clearLiveSessionsForRange: async (anchors, months) => {
     const seen = new Set()
     for (const anchor of anchors) {
-      const union = anchor.union || 'VirtuaReal'
+      const union = anchor.union === undefined || anchor.union === null || anchor.union === ''
+        ? undefined
+        : requireUnion(anchor.union)
       for (const month of months) {
         const key = `${union}:${anchor.room_id}:${month}`
         if (seen.has(key)) continue
@@ -108,6 +168,7 @@ export const anchorAPI = {
 
   // 获取包含粉丝计算的直播会话（完整模式）
   getLiveSessionsWithFans: (roomId, union, month) => {
+    requireUnion(union)
     const params = new URLSearchParams()
     params.append('room_id', roomId)
     params.append('union', union)
@@ -116,7 +177,8 @@ export const anchorAPI = {
   },
 
   // 获取粉丝数快照 - 支持缓存机制
-  getAttention: (roomId, month, union = 'VirtuaReal') => {
+  getAttention: (roomId, month, union) => {
+    requireUnion(union)
     const params = new URLSearchParams()
     params.append('room_id', roomId)
     if (month) params.append('month', month)

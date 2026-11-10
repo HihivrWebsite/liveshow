@@ -3,22 +3,12 @@
     <div class="controls-section">
       <div class="filter-controls">
         <button 
-          @click="switchFilter('all')" 
-          :class="['filter-btn', { active: currentFilter === 'all' }]"
+          v-for="option in filterOptions"
+          :key="option.filter"
+          @click="switchFilter(option.filter)"
+          :class="['filter-btn', { active: currentFilter === option.filter }]"
         >
-          维阿PSP斗虫榜
-        </button>
-        <button 
-          @click="switchFilter('vr')" 
-          :class="['filter-btn', { active: currentFilter === 'vr' }]"
-        >
-          维阿斗虫榜
-        </button>
-        <button 
-          @click="switchFilter('psp')" 
-          :class="['filter-btn', { active: currentFilter === 'psp' }]"
-        >
-          PSPlive斗虫榜
+          {{ option.label }}
         </button>
       </div>
 
@@ -122,8 +112,9 @@
 <script>
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { anchorAPI } from '@/api'
+import { anchorAPI, getApiErrorMessage } from '@/api'
 import { formatCurrency, formatNumber, calculateTotalRevenue } from '@/utils/dataProcessor'
+import { GUILD_FILTER_OPTIONS, getGuildBoardTitle } from '@/utils/guildConfig'
 
 export default {
   name: 'SimpleAnchorList',
@@ -132,6 +123,7 @@ export default {
     const route = useRoute()
     const anchors = ref([])
     const title = ref('咿喔io粉丝站维阿PSP斗虫榜')
+    const filterOptions = GUILD_FILTER_OPTIONS
     const refreshTime = ref(new Date().toLocaleString())
     const currentFilter = ref('all')
     const loading = ref(true)
@@ -143,14 +135,10 @@ export default {
     currentFilter.value = filterFromRoute
 
     // 更新标题
-    if (monthFromRoute) {
-      const year = monthFromRoute.substring(0, 4)
-      const month = parseInt(monthFromRoute.substring(4, 6)).toString().padStart(2, '0')
-      title.value = `咿喔io粉丝站维阿PSP斗虫榜_${year}年${month}月记录数据（点击"正在直播"跳转到对应直播间）`
-    } else {
-      title.value = filterFromRoute === 'vr' ? '咿喔io粉丝站维阿斗虫榜' :
-                   filterFromRoute === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜' : '咿喔io粉丝站维阿PSP斗虫榜'
-    }
+    title.value = getGuildBoardTitle(filterFromRoute, {
+      month: monthFromRoute,
+      detailSuffix: monthFromRoute ? '（点击"正在直播"跳转到对应直播间）' : ''
+    })
 
     // 获取数据
     const fetchData = async () => {
@@ -168,7 +156,7 @@ export default {
         refreshTime.value = response.refresh_time || new Date().toLocaleString()
       } catch (err) {
         console.error('获取主播数据失败:', err)
-        error.value = '获取数据失败，请稍后重试'
+        error.value = getApiErrorMessage(err, '获取数据失败，请稍后重试')
       } finally {
         loading.value = false
       }
@@ -239,14 +227,10 @@ export default {
 
         currentFilter.value = newQuery.filter || 'all'
         const newMonth = newQuery.month || null
-        if (newMonth) {
-          const year = newMonth.substring(0, 4)
-          const monthNum = parseInt(newMonth.substring(4, 6)).toString().padStart(2, '0')
-          title.value = `咿喔io粉丝站维阿PSP斗虫榜_${year}年${monthNum}月记录数据（点击"正在直播"跳转到对应直播间）`
-        } else {
-          title.value = currentFilter.value === 'vr' ? '咿喔io粉丝站维阿斗虫榜' :
-                       currentFilter.value === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜' : '咿喔io粉丝站维阿PSP斗虫榜'
-        }
+        title.value = getGuildBoardTitle(currentFilter.value, {
+          month: newMonth,
+          detailSuffix: newMonth ? '（点击"正在直播"跳转到对应直播间）' : ''
+        })
         fetchData()
       },
       { immediate: true }
@@ -259,6 +243,7 @@ export default {
     return {
       anchors,
       title,
+      filterOptions,
       refreshTime,
       currentFilter,
       loading,

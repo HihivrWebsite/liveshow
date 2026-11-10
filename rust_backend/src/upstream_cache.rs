@@ -22,26 +22,173 @@ const HISTORY_TTL: Duration = Duration::from_secs(24 * 3600);
 pub enum Source {
     Vr,
     Psp,
+    Vup,
+}
+
+#[derive(Debug)]
+pub struct UpstreamHttpError {
+    pub status: reqwest::StatusCode,
+}
+
+impl std::fmt::Display for UpstreamHttpError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "upstream returned HTTP {}", self.status)
+    }
+}
+
+impl std::error::Error for UpstreamHttpError {}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SourceConfig {
+    pub id: Source,
+    pub base_url: &'static str,
+    pub union_name: &'static str,
+    pub filter_alias: &'static str,
+    pub min_month: &'static str,
+    pub official_uid: Option<&'static str>,
+    pub enabled: bool,
 }
 
 impl Source {
-    pub fn from_union(union: &str) -> Self {
-        if union.eq_ignore_ascii_case("PSPlive") || union.eq_ignore_ascii_case("psp") {
-            Self::Psp
-        } else {
-            Self::Vr
+    pub fn config(self) -> SourceConfig {
+        match self {
+            Self::Vr => SourceConfig {
+                id: Self::Vr,
+                base_url: "https://vr.qianqiuzy.cn",
+                union_name: "VirtuaReal",
+                filter_alias: "vr",
+                min_month: "190001",
+                official_uid: Some("413748120"),
+                enabled: true,
+            },
+            Self::Psp => SourceConfig {
+                id: Self::Psp,
+                base_url: "https://psp.qianqiuzy.cn",
+                union_name: "PSPlive",
+                filter_alias: "psp",
+                min_month: "190001",
+                official_uid: Some("454673997"),
+                enabled: true,
+            },
+            Self::Vup => SourceConfig {
+                id: Self::Vup,
+                base_url: "https://vup.qianqiuzy.cn",
+                union_name: "VUP",
+                filter_alias: "vup",
+                min_month: "202508",
+                official_uid: None,
+                enabled: true,
+            },
         }
     }
+
+    pub fn from_union(union: &str) -> Option<Self> {
+        match union {
+            "VirtuaReal" | "vr" => Self::Vr.enabled().then_some(Self::Vr),
+            "PSPlive" | "psp" => Self::Psp.enabled().then_some(Self::Psp),
+            "VUP" | "vup" => Self::Vup.enabled().then_some(Self::Vup),
+            _ => None,
+        }
+    }
+
+    pub fn from_filter(filter: &str) -> Option<Self> {
+        [Self::Vr, Self::Psp, Self::Vup]
+            .into_iter()
+            .find(|source| source.config().enabled && source.config().filter_alias == filter)
+    }
+
+    pub fn enabled_sources() -> Vec<Self> {
+        [Self::Vr, Self::Psp, Self::Vup]
+            .into_iter()
+            .filter(|source| source.config().enabled)
+            .collect()
+    }
+
+    fn enabled(self) -> bool {
+        self.config().enabled
+    }
+
     fn name(self) -> &'static str {
-        match self {
-            Self::Vr => "vr",
-            Self::Psp => "psp",
+        self.config().filter_alias
+    }
+
+    fn base(self) -> &'static str {
+        self.config().base_url
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SourceSelection {
+    All,
+    One(Source),
+}
+
+impl SourceSelection {
+    pub fn from_filter(filter: &str) -> Option<Self> {
+        match filter {
+            "all" => Some(Self::All),
+            _ => Source::from_filter(filter).map(Self::One),
         }
     }
-    fn base(self) -> &'static str {
+
+    pub fn from_union(union: &str) -> Option<Self> {
+        Source::from_union(union).map(Self::One)
+    }
+
+    pub fn resolve(
+        filter: Option<&str>,
+        union: Option<&str>,
+        default: Self,
+        allow_all: bool,
+    ) -> Option<Self> {
+        if filter.is_some_and(|value| Self::from_filter(value).is_none()) {
+            return None;
+        }
+        if union.is_some_and(|value| Self::from_union(value).is_none()) {
+            return None;
+        }
+        let from_filter = filter.and_then(Self::from_filter);
+        let from_union = union.and_then(Self::from_union);
+        let selected = match (from_filter, from_union) {
+            (Some(filter), Some(union)) => {
+                if filter == union {
+                    Some(filter)
+                } else {
+                    None
+                }
+            }
+            (Some(filter), None) => Some(filter),
+            (None, Some(union)) => Some(union),
+            (None, None) => Some(default),
+        }?;
+        if selected == Self::All && !allow_all {
+            return None;
+        }
+        (!selected.sources().is_empty()).then_some(selected)
+    }
+
+    pub fn sources(self) -> Vec<Source> {
         match self {
-            Self::Vr => "https://vr.qianqiuzy.cn",
-            Self::Psp => "https://psp.qianqiuzy.cn",
+            Self::All => [Source::Vr, Source::Psp]
+                .into_iter()
+                .filter(|source| source.config().enabled)
+                .collect(),
+            Self::One(source) if source.config().enabled => vec![source],
+            Self::One(_) => Vec::new(),
+        }
+    }
+
+    pub fn source_name(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::One(source) => source.config().filter_alias,
+        }
+    }
+
+    pub fn union_name(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::One(source) => source.config().union_name,
         }
     }
 }
@@ -89,6 +236,14 @@ pub fn normalize_month(month: &str) -> Option<String> {
     Some(month.to_owned())
 }
 
+pub fn normalize_attention_month(month: &str) -> Option<String> {
+    if month.len() == 7 && month.as_bytes()[4] == b'-' {
+        let compact = format!("{}{}", &month[..4], &month[5..]);
+        return normalize_month(&compact);
+    }
+    normalize_month(month)
+}
+
 #[derive(Clone, Debug)]
 pub struct Key {
     pub source: Source,
@@ -104,7 +259,14 @@ impl Key {
         room: Option<&str>,
         month: &str,
     ) -> Result<Self, Error> {
+        let config = source.config();
+        if !config.enabled {
+            return Err("source is disabled".into());
+        }
         let month = normalize_month(month).ok_or("month must be YYYYMM")?;
+        if month.as_str() < config.min_month {
+            return Err("month predates source minimum".into());
+        }
         let room = match room {
             Some(room) => {
                 if !room.bytes().all(|b| b.is_ascii_digit()) {
@@ -605,7 +767,7 @@ async fn fetch_json(client: &Client, key: &Key, caller: &str) -> Result<Value, E
 }
 
 async fn fetch_json_from_url(client: &Client, url: &str, caller: &str) -> Result<Value, Error> {
-    let mut response = client
+    let response = client
         .get(url)
         .header(
             "User-Agent",
@@ -614,8 +776,12 @@ async fn fetch_json_from_url(client: &Client, url: &str, caller: &str) -> Result
         .header("X-Liveshow-Caller", caller)
         .header("Accept", "application/json")
         .send()
-        .await?
-        .error_for_status()?;
+        .await?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(UpstreamHttpError { status }.into());
+    }
+    let mut response = response;
     let mut bytes = Vec::new();
     while let Some(chunk) = response.chunk().await? {
         if bytes.len() + chunk.len() > MAX_RESPONSE_BYTES {
@@ -997,7 +1163,7 @@ mod tests {
         assert!(normalize_month("202613").is_none());
         assert!(normalize_month("20261").is_none());
         assert!(normalize_month("２０２６１０").is_none());
-        assert_eq!(Source::from_union("psp"), Source::Psp);
+        assert_eq!(Source::from_union("psp"), Some(Source::Psp));
     }
 
     #[tokio::test]

@@ -3,22 +3,12 @@
     <div class="controls-section">
       <div class="filter-controls">
         <button
-          @click="switchFilter('all')"
-          :class="['filter-btn', { active: currentFilter === 'all' }]"
+          v-for="option in filterOptions"
+          :key="option.filter"
+          @click="switchFilter(option.filter)"
+          :class="['filter-btn', { active: currentFilter === option.filter }]"
         >
-          维阿PSP斗虫榜
-        </button>
-        <button
-          @click="switchFilter('vr')"
-          :class="['filter-btn', { active: currentFilter === 'vr' }]"
-        >
-          维阿斗虫榜
-        </button>
-        <button
-          @click="switchFilter('psp')"
-          :class="['filter-btn', { active: currentFilter === 'psp' }]"
-        >
-          PSPlive斗虫榜
+          {{ option.label }}
         </button>
       </div>
 
@@ -507,6 +497,12 @@ import MonthSelector from '@/components/MonthSelector.vue'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
 import { getAvatar, getAvatarByUid, scaleAvatar, getAvatarSync } from '@/utils/avatarCache'
+import {
+  GUILD_COMPARISON_CONFIG,
+  GUILD_FILTER_OPTIONS,
+  getGuildBoardTitle
+} from '@/utils/guildConfig'
+import { getApiErrorMessage } from '@/api'
 
 Chart.register(...registerables)
 
@@ -536,6 +532,7 @@ export default {
     ]
     const anchors = ref([])
     const title = ref('咿喔io粉丝站维阿PSP斗虫榜')
+    const filterOptions = GUILD_FILTER_OPTIONS
     const refreshTime = ref(new Date().toLocaleString())
     const currentFilter = ref('all')
     const loading = ref(true)
@@ -715,6 +712,7 @@ export default {
             })
           } catch (err) {
             console.error(`获取${month}月份数据失败:`, err)
+            throw err
           }
         }
 
@@ -786,7 +784,7 @@ export default {
                   ${logo1 ? `<img src="${logo1}" style="height:100px;" />` : ''}
                   <div style="text-align:center;line-height:1.35;">
                     <div style="color:#5D4B24;font-size:1.5rem;font-weight:bold;margin:0;">📸 导出数据截图</div>
-                    <div style="color:#FF6B9D;font-size:2rem;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.5);margin:0;">咿喔io粉丝站维阿PSP斗虫榜</div>
+                  <div style="color:#FF6B9D;font-size:2rem;font-weight:bold;text-shadow:2px 2px 4px rgba(0,0,0,0.5);margin:0;">${getGuildBoardTitle(currentFilter.value)}</div>
                     <div style="color:#5D4B24;font-size:1.35rem;font-weight:bold;margin:0;">斜杠dc点yioio点top</div>
                   </div>
                 </div>
@@ -868,14 +866,10 @@ export default {
     currentFilter.value = filterFromRoute
 
     // 更新标题
-    if (monthFromRoute) {
-      const year = monthFromRoute.substring(0, 4)
-      const month = parseInt(monthFromRoute.substring(4, 6)).toString().padStart(2, '0')
-      title.value = `咿喔io粉丝站维阿PSP斗虫榜_${year}年${month}月记录数据（点击"正在直播"跳转到对应直播间）`
-    } else {
-      title.value = filterFromRoute === 'vr' ? '咿喔io粉丝站维阿斗虫榜' :
-                   filterFromRoute === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜' : '咿喔io粉丝站维阿PSP斗虫榜'
-    }
+    title.value = getGuildBoardTitle(filterFromRoute, {
+      month: monthFromRoute,
+      detailSuffix: monthFromRoute ? '（点击"正在直播"跳转到对应直播间）' : ''
+    })
 
     // 获取数据
     const fetchData = async () => {
@@ -900,7 +894,7 @@ export default {
         })
       } catch (err) {
         console.error('获取主播数据失败:', err)
-        error.value = '获取数据失败，请稍后重试'
+        error.value = getApiErrorMessage(err, '获取数据失败，请稍后重试')
       } finally {
         loading.value = false
       }
@@ -1042,24 +1036,20 @@ export default {
         return
       }
 
-      let vrTotal = 0
-      let pspTotal = 0
-
+      const totals = Object.fromEntries(GUILD_COMPARISON_CONFIG.map(item => [item.key, 0]))
       anchors.value.forEach(anchor => {
+        const item = GUILD_COMPARISON_CONFIG.find(config => config.union === anchor.union)
+        if (!item) return
         const revenue = parseFloat(anchor.total_revenue || anchor.gift + anchor.guard + anchor.super_chat || 0) || 0
-        if (anchor.union === 'VirtuaReal') {
-          vrTotal += revenue
-        } else if (anchor.union === 'PSPlive') {
-          pspTotal += revenue
-        }
+        totals[item.key] += revenue
       })
 
-      if (vrTotal === 0 && pspTotal === 0) {
+      if (Object.values(totals).every(value => value === 0)) {
         alert('没有可用的数据来生成对比图')
         return
       }
 
-      vrpspTotal.value = { vr: vrTotal, psp: pspTotal }
+      vrpspTotal.value = totals
       chartVisible.value = true
       await nextTick()
       if (currentChart) currentChart.destroy()
@@ -1068,19 +1058,17 @@ export default {
 
       const AVATAR_SIZE = 30
 
-      const vrImg = await getAvatarByUid('413748120')
-      if (vrImg) {
-        const c = document.createElement('canvas')
-        c.width = vrImg.naturalWidth; c.height = vrImg.naturalHeight
-        c.getContext('2d').drawImage(vrImg, 0, 0)
-        vrAvatarUrl.value = c.toDataURL('image/jpeg', 0.8)
-      }
-      const pspImg = await getAvatarByUid('454673997')
-      if (pspImg) {
-        const c = document.createElement('canvas')
-        c.width = pspImg.naturalWidth; c.height = pspImg.naturalHeight
-        c.getContext('2d').drawImage(pspImg, 0, 0)
-        pspAvatarUrl.value = c.toDataURL('image/jpeg', 0.8)
+      const avatarRefs = { vr: vrAvatarUrl, psp: pspAvatarUrl }
+      const images = {}
+      for (const item of GUILD_COMPARISON_CONFIG) {
+        const img = item.uid ? await getAvatarByUid(item.uid) : null
+        images[item.key] = img
+        if (img) {
+          const c = document.createElement('canvas')
+          c.width = img.naturalWidth; c.height = img.naturalHeight
+          c.getContext('2d').drawImage(img, 0, 0)
+          avatarRefs[item.key].value = c.toDataURL('image/jpeg', 0.8)
+        }
       }
 
       const createPatternFromImg = (img, fallbackColor) => {
@@ -1089,17 +1077,18 @@ export default {
         return fallbackColor
       }
 
-      const vrPattern = createPatternFromImg(vrImg, '#FF6384')
-      const pspPattern = createPatternFromImg(pspImg, '#36A2EB')
+      const patterns = GUILD_COMPARISON_CONFIG.map((item, index) =>
+        createPatternFromImg(images[item.key], index === 0 ? '#FF6384' : '#36A2EB')
+      )
 
       currentChart = new Chart(chartCtx, {
         type: 'pie',
         data: {
-          labels: ['VirtuaReal', 'PSPlive'],
+          labels: GUILD_COMPARISON_CONFIG.map(item => item.label),
           datasets: [{
             label: '工会总营收对比',
-            data: [vrTotal, pspTotal],
-            backgroundColor: [vrPattern, pspPattern],
+            data: GUILD_COMPARISON_CONFIG.map(item => totals[item.key]),
+            backgroundColor: patterns,
             borderWidth: 2,
             borderColor: '#fff'
           }]
@@ -2764,7 +2753,7 @@ export default {
             })
           } catch (err) {
             console.error(`获取${month}月份数据失败:`, err)
-            // 继续处理下一个月份
+            throw err
           }
         }
 
@@ -2786,16 +2775,14 @@ export default {
         anchors.value = combinedAnchorsArray
 
         // 更新标题
-        const startYear = sMonth.substring(0, 4)
-        const startMon = sMonth.substring(4, 6)
-        const endYear = eMonth.substring(0, 4)
-        const endMon = eMonth.substring(4, 6)
-        title.value = `咿喔io粉丝站维阿PSP斗虫榜_${startYear}年${startMon}月-${endYear}年${endMon}月累计数据`
+        title.value = getGuildBoardTitle(currentFilter.value, {
+          range: { startMonth: sMonth, endMonth: eMonth }
+        })
 
         refreshTime.value = new Date().toLocaleString()
       } catch (err) {
         console.error('多月份统计查询失败:', err)
-        error.value = '多月份统计查询失败，请稍后重试'
+        error.value = getApiErrorMessage(err, '多月份统计查询失败，请稍后重试')
       } finally {
         loading.value = false
         closeMultiMonthModal()
@@ -2811,14 +2798,10 @@ export default {
 
         currentFilter.value = newQuery.filter || 'all'
         const newMonth = newQuery.month || null
-        if (newMonth) {
-          const year = newMonth.substring(0, 4)
-          const monthNum = parseInt(newMonth.substring(4, 6)).toString().padStart(2, '0')
-          title.value = `咿喔io粉丝站维阿PSP斗虫榜_${year}年${monthNum}月记录数据（点击"正在直播"跳转到对应直播间）`
-        } else {
-          title.value = currentFilter.value === 'vr' ? '咿喔io粉丝站维阿斗虫榜' :
-                       currentFilter.value === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜' : '咿喔io粉丝站维阿PSP斗虫榜'
-        }
+        title.value = getGuildBoardTitle(currentFilter.value, {
+          month: newMonth,
+          detailSuffix: newMonth ? '（点击"正在直播"跳转到对应直播间）' : ''
+        })
         fetchData()
 
         // 检查是否有scrollTo参数，如果有则跳转到指定元素
@@ -2891,6 +2874,7 @@ export default {
       chartColors,
       anchors,
       title,
+      filterOptions,
       refreshTime,
       currentFilter,
       loading,

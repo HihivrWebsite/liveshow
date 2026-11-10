@@ -136,7 +136,7 @@
         <div class="guide-item">
           <h4>5. 工会筛选</h4>
           <p><b>位置：</b>页面顶部三个按钮</p>
-          <p><b>用途：</b>切换查看维阿PSP全部主播、仅维阿（VirtuaReal）主播、或仅PSPlive主播的数据</p>
+          <p><b>用途：</b>切换查看维阿PSP全部主播、仅维阿（VirtuaReal）、PSPlive 或 VUP 主播的数据</p>
           <p><b>使用：</b>点击对应按钮即可切换</p>
         </div>
         <div class="guide-item">
@@ -162,7 +162,7 @@
         <div class="guide-item">
           <h4>9. VR PSP对比图</h4>
           <p><b>位置：</b>页面顶部操作栏</p>
-          <p><b>用途：</b>对比维阿和PSPlive两个工会的总收入占比</p>
+          <p><b>用途：</b>对比维阿和PSPlive两个工会的总收入占比（VUP 独立筛选不参与对比）</p>
           <p><b>使用：</b>需在"咿喔io粉丝站维阿PSP斗虫榜"模式下，点击按钮 → 自动弹出对比饼图</p>
         </div>
         <div class="guide-item">
@@ -245,6 +245,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { anchorAPI } from '@/api'
+import { getGuildBoardTitle } from '@/utils/guildConfig'
 
 export default {
   name: 'HeaderSection',
@@ -269,15 +270,11 @@ export default {
     const title = computed(() => {
       const filter = route.query.filter || 'all'
       const month = route.query.month
-
-      if (month) {
-        const year = month.substring(0, 4)
-        const monthNum = parseInt(month.substring(4, 6)).toString().padStart(2, '0')
-        return `咿喔io粉丝站维阿PSP斗虫榜_${year}年${monthNum}月记录数据（点击"正在直播"跳转到对应直播间）_yioio点top`
-      } else {
-        return (filter === 'vr' ? '咿喔io粉丝站维阿斗虫榜' :
-               filter === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜' : '咿喔io粉丝站维阿PSP斗虫榜') + '_yioio点top'
-      }
+      return getGuildBoardTitle(filter, {
+        month,
+        detailSuffix: month ? '（点击"正在直播"跳转到对应直播间）' : '',
+        siteSuffix: '_yioio点top'
+      })
     })
 
     // 获取缓存统计信息

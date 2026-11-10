@@ -1,0 +1,185 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - link [ref=e8]:
+            - /url: https://smms.app/image/BvHWJNoL2iscPXl
+            - img "h222.png" [ref=e9]
+          - link [ref=e10]:
+            - /url: https://smms.app/image/Q2i7IUqjMDb3pev
+            - img "hihi.png" [ref=e11]
+        - heading "维阿PSP斗虫榜_hihivr点top" [level=1] [ref=e12]
+      - generic [ref=e13]:
+        - generic [ref=e14]: 缓存命中率0.00%
+        - generic [ref=e15]:
+          - text: 缓存占用4.56 MB
+          - generic [ref=e16]: 最大容量 5120.00 MB
+        - generic [ref=e17]: 缓存总条目244
+        - generic [ref=e18]: Attention缓存条目1
+        - generic [ref=e19]: LiveSessions缓存条目243
+        - generic [ref=e20]: 缓存策略历史月永久缓存，当前月每日1:30刷新
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - button "进入向阳Hihi粉丝站主站 为成为向阳人而骄傲" [ref=e23]: 进入向阳Hihi粉丝站主站为成为向阳人而骄傲
+          - button "📖 功能指南" [ref=e24]
+        - generic [ref=e25]:
+          - paragraph [ref=e26]: 特别感谢某热心小礼猫-千秋紫莹提供的斗虫数据API，感谢其对本项目提供了巨大的帮助
+          - button "关注花礼harei喵，关注花礼harei谢谢喵" [ref=e27]
+  - generic [ref=e29]:
+    - generic [ref=e30]:
+      - heading "📖 功能指南" [level=2] [ref=e31]
+      - button "✕" [ref=e32]
+    - generic [ref=e33]:
+      - paragraph [ref=e34]: 欢迎使用维阿PSP斗虫榜！以下是网站所有功能的介绍和使用方法。
+      - heading "一、核心功能" [level=3] [ref=e35]
+      - generic [ref=e36]:
+        - heading "⭐ 1. 导出截图" [level=4] [ref=e37]
+        - img "导出截图示例" [ref=e38]
+        - paragraph [ref=e39]: 位置：导航表格上方按钮区
+        - paragraph [ref=e40]: 用途：将选中主播的数据导出为图片，包含网站信息和数据表格
+        - paragraph [ref=e41]: 使用：选择主播 → 点击按钮 → 选择时间范围 → 确定导出 → 自动下载PNG
+      - generic [ref=e42]:
+        - heading "2. 排名对比" [level=4] [ref=e43]
+        - paragraph [ref=e44]: 位置：导航表格上方按钮区
+        - paragraph [ref=e45]: 用途：查看各主播在指定指标上的排名变化趋势
+        - paragraph [ref=e46]: 使用：选择2个以上主播 → 点击按钮 → 选择日期范围 → 选择指标 → 生成排名折线图
+      - generic [ref=e47]:
+        - heading "3. 恶意斗虫" [level=4] [ref=e48]
+        - paragraph [ref=e49]: 位置：导航表格上方按钮区
+        - paragraph [ref=e50]: 用途：多主播数据对比分析，支持13种指标折线图
+        - paragraph [ref=e51]: 使用：选择2个以上主播 → 点击按钮 → 选择日期范围 → 选择指标 → 生成图表
+      - generic [ref=e52]:
+        - heading "20. 粉丝重合度查询" [level=4] [ref=e53]
+        - paragraph [ref=e54]: 位置：导航表格上方按钮区 / 右侧快捷抽屉
+        - paragraph [ref=e55]: 用途：分析两个主播粉丝团的重叠情况，包括双向重叠百分比、等级分布和舰长统计
+        - paragraph [ref=e56]: 使用：① 在导航表格中勾选2个主播 ② 点击🔍粉丝重合度查询按钮 ③ 查看分析结果
+      - generic [ref=e57]:
+        - heading "⭐ 4. Super Chat历史" [level=4] [ref=e58]
+        - paragraph [ref=e59]: 位置：详情页操作栏
+        - paragraph [ref=e60]: 用途：查看主播的Super Chat（醒目留言）记录
+        - paragraph [ref=e61]: 使用：点击按钮 → 进入SC历史页面
+      - heading "二、数据筛选" [level=3] [ref=e62]
+      - generic [ref=e63]:
+        - heading "5. 工会筛选" [level=4] [ref=e64]
+        - paragraph [ref=e65]: 位置：页面顶部三个按钮
+        - paragraph [ref=e66]: 用途：切换查看维阿PSP全部主播、仅维阿（VirtuaReal）主播、或仅PSPlive主播的数据
+        - paragraph [ref=e67]: 使用：点击对应按钮即可切换
+      - generic [ref=e68]:
+        - heading "6. 切换不同月份" [level=4] [ref=e69]
+        - paragraph [ref=e70]: 位置：页面顶部操作栏
+        - paragraph [ref=e71]: 用途：查看历史月份的主播数据
+        - paragraph [ref=e72]: 使用：点击按钮 → 选择月份 → 确定
+      - generic [ref=e73]:
+        - heading "7. 多月份共同统计" [level=4] [ref=e74]
+        - paragraph [ref=e75]: 位置：页面顶部操作栏
+        - paragraph [ref=e76]: 用途：合并多个月份的数据，查看累计排名
+        - paragraph [ref=e77]: 使用：点击按钮 → 选择起始和结束月份 → 确定
+      - heading "三、数据可视化" [level=3] [ref=e78]
+      - generic [ref=e79]:
+        - heading "8. 查看营收占比" [level=4] [ref=e80]
+        - paragraph [ref=e81]: 位置：页面顶部操作栏
+        - paragraph [ref=e82]: 用途：以饼图展示各主播的收入占比，扇形内显示主播头像
+        - paragraph [ref=e83]: 使用：点击按钮 → 自动弹出饼图
+      - generic [ref=e84]:
+        - heading "9. VR PSP对比图" [level=4] [ref=e85]
+        - paragraph [ref=e86]: 位置：页面顶部操作栏
+        - paragraph [ref=e87]: 用途：对比维阿和PSPlive两个工会的总收入占比
+        - paragraph [ref=e88]: 使用：需在"维阿PSP斗虫榜"模式下，点击按钮 → 自动弹出对比饼图
+      - generic [ref=e89]:
+        - heading "10. 进行回归分析" [level=4] [ref=e90]
+        - paragraph [ref=e91]: 位置：页面顶部操作栏
+        - paragraph [ref=e92]: 用途：对主播数据进行回归分析，查看变量之间的关系
+        - paragraph [ref=e93]: 使用：点击按钮 → 选择变量 → 生成分析结果
+      - heading "四、导航表格" [level=3] [ref=e94]
+      - generic [ref=e95]:
+        - heading "11. 快速导航" [level=4] [ref=e96]
+        - paragraph [ref=e97]: 位置：页面中部导航表格
+        - paragraph [ref=e98]: 用途：快速查看主播排名、状态、营收，点击跳转到对应卡片
+        - paragraph [ref=e99]: 使用：点击"跳转"按钮滚动到对应主播卡片
+      - generic [ref=e100]:
+        - heading "12. 全选功能" [level=4] [ref=e101]
+        - paragraph [ref=e102]: 位置：导航表格左侧复选框
+        - paragraph [ref=e103]: 用途：选择多个主播进行对比分析或导出
+        - paragraph [ref=e104]: 使用：勾选复选框，表头可全选/全不选
+      - heading "五、主播卡片" [level=3] [ref=e105]
+      - generic [ref=e106]:
+        - heading "13. 查看详细数据" [level=4] [ref=e107]
+        - paragraph [ref=e108]: 位置：每个主播卡片底部
+        - paragraph [ref=e109]: 用途：进入该主播的直播会话详情页
+        - paragraph [ref=e110]: 使用：点击"查看详情"按钮
+      - heading "六、详情页功能" [level=3] [ref=e111]
+      - generic [ref=e112]:
+        - heading "14. 直播会话详情" [level=4] [ref=e113]
+        - paragraph [ref=e114]: 位置：详情页
+        - paragraph [ref=e115]: 用途：查看主播每场直播的详细数据（时长、收入、弹幕等）
+        - paragraph [ref=e116]: 进入：从主页点击主播卡片的"查看详情"
+      - generic [ref=e117]:
+        - heading "15. 计算新增粉丝数" [level=4] [ref=e118]
+        - paragraph [ref=e119]: 位置：详情页操作栏
+        - paragraph [ref=e120]: 用途：计算每场直播的新增关注数
+        - paragraph [ref=e121]: 使用：点击按钮 → 自动计算并显示
+      - generic [ref=e122]:
+        - heading "16. 显示直播数据折线图" [level=4] [ref=e123]
+        - paragraph [ref=e124]: 位置：详情页操作栏
+        - paragraph [ref=e125]: 用途：以折线图展示直播数据趋势
+        - paragraph [ref=e126]: 使用：点击按钮 → 自动弹出图表
+      - generic [ref=e127]:
+        - heading "17. 跳转到直播间" [level=4] [ref=e128]
+        - paragraph [ref=e129]: 位置：详情页操作栏
+        - paragraph [ref=e130]: 用途：直接跳转到主播的Bilibili直播间
+        - paragraph [ref=e131]: 使用：点击按钮 → 新标签页打开直播间
+      - heading "七、其他功能" [level=3] [ref=e132]
+      - generic [ref=e133]:
+        - heading "18. 主播头像" [level=4] [ref=e134]
+        - paragraph [ref=e135]: 位置：主播卡片、导航表格、详情页
+        - paragraph [ref=e136]: 用途：显示主播的Bilibili头像，帮助快速识别
+      - generic [ref=e137]:
+        - heading "19. 缓存统计" [level=4] [ref=e138]
+        - paragraph [ref=e139]: 位置：页面顶部信息区
+        - paragraph [ref=e140]: 用途：显示后端缓存的命中率和占用情况
+      - paragraph [ref=e141]: 提示：所有月份选择器最早只能选择到2025年8月。
+    - button "我知道了" [ref=e143]
+  - main [ref=e144]:
+    - generic [ref=e145]:
+      - generic [ref=e146]:
+        - generic [ref=e147]:
+          - button "维阿PSP斗虫榜" [ref=e148]
+          - button "维阿斗虫榜" [ref=e149]
+          - button "PSPlive斗虫榜" [ref=e150]
+        - generic [ref=e151]:
+          - button "切换不同月份" [ref=e152]
+          - button "多月份共同统计" [ref=e153]
+      - generic [ref=e154]:
+        - heading "维阿PSP斗虫榜" [level=2] [ref=e155]
+        - paragraph [ref=e156]: 刷新时间：2026/9/12 00:02:21
+      - generic [ref=e157]:
+        - button "查看营收占比" [ref=e158]
+        - button "VR PSP对比图" [ref=e159]
+        - button "关闭图表" [ref=e160]
+        - button "进行回归分析" [ref=e161]
+      - paragraph [ref=e164]: 加载中...
+  - contentinfo [ref=e165]:
+    - generic [ref=e166]:
+      - generic [ref=e167]:
+        - paragraph [ref=e168]: © 2026 为成为向阳人而骄傲
+        - paragraph [ref=e169]: "技术栈: Rust + Axum + Vue 3 + Vite + MimoCode"
+      - link "向阳Hihi粉丝站" [ref=e171]:
+        - /url: https://hihivr.top
+  - generic [ref=e172]:
+    - generic [ref=e173] [cursor=pointer]: ▶
+    - generic [ref=e175]:
+      - heading "快捷操作" [level=3] [ref=e176]
+      - generic [ref=e177]:
+        - button "🎯 恶意斗虫 (0)" [ref=e178]
+        - paragraph [ref=e179]: 选择多个主播后点击进行数据对比
+      - generic [ref=e180]:
+        - button "📸 导出截图 (0)" [ref=e181]
+        - paragraph [ref=e182]: 将选中主播数据导出为图片
+      - generic [ref=e183]:
+        - button "📊 排名对比 (0)" [ref=e184]
+        - paragraph [ref=e185]: 选择多个主播后进行排名对比
+      - generic [ref=e186]:
+        - button "🔍 粉丝重合度查询 (0)" [ref=e187]
+        - paragraph [ref=e188]: 分析两个主播的粉丝重叠情况
+      - paragraph [ref=e189]: 选择多个主播后点击进行数据对比

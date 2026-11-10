@@ -18,7 +18,9 @@ use std::time::Duration;
 mod avatar_cache;
 mod gift_response_cache;
 mod upstream_cache;
-use upstream_cache::{Endpoint, Key, Source, UpstreamCache};
+use upstream_cache::{
+    Endpoint, Key, Source, SourceSelection, UpstreamCache, UpstreamHttpError,
+};
 
 use avatar_cache::{
     AvatarCacheResult, AvatarStore, ConditionalHeaders, RefreshOutcome, RemoteAvatarResponse,
@@ -111,22 +113,14 @@ async fn fetch_all_anchors_for_avatars(
 ) -> Result<Vec<(String, String)>, Box<dyn std::error::Error + Send + Sync>> {
     let mut anchors = Vec::new();
 
-    if let Ok(vr_anchors) =
-        fetch_anchor_data_by_url("https://vr.qianqiuzy.cn/gift", "avatars").await
-    {
-        for anchor in vr_anchors {
-            let room_id = anchor.room_id.to_string();
-            let face_url = get_face_url_from_bilibili(&room_id, force_refresh).await;
-            if let Some(url) = face_url {
-                anchors.push((room_id, url));
-            }
-        }
-    }
-
-    if let Ok(psp_anchors) =
-        fetch_anchor_data_by_url("https://psp.qianqiuzy.cn/gift", "avatars").await
-    {
-        for anchor in psp_anchors {
+    let month = chrono::Local::now().format("%Y%m").to_string();
+    for source in Source::enabled_sources() {
+        let Ok(source_anchors) =
+            fetch_anchor_data_by_source(source, Endpoint::Gift, &month, "avatars").await
+        else {
+            continue;
+        };
+        for anchor in source_anchors {
             let room_id = anchor.room_id.to_string();
             let face_url = get_face_url_from_bilibili(&room_id, force_refresh).await;
             if let Some(url) = face_url {
@@ -241,12 +235,17 @@ async fn batch_download_avatars() {
         }
     };
 
-    // 添加工会官方账号 UID
-    let guild_uids = vec![
-        ("uid_413748120".to_string(), "VirtuaReal".to_string()),
-        ("uid_454673997".to_string(), "PSPlive".to_string()),
-    ];
-    for (key, name) in &guild_uids {
+    // 工会官方账号 UID 统一来自各数据源配置。
+    let official_accounts: Vec<_> = Source::enabled_sources()
+        .into_iter()
+        .filter_map(|source| {
+            source
+                .config()
+                .official_uid
+                .map(|uid| (format!("uid_{uid}"), source.config().union_name.to_string()))
+        })
+        .collect();
+    for (key, name) in &official_accounts {
         let api_url = format!(
             "https://api.bilibili.com/x/web-interface/card?mid={}",
             key.replace("uid_", "")
@@ -318,14 +317,9 @@ async fn get_attention_cache_data(
     client: &Client,
     room_id: &str,
     month: &str,
-    union: &str,
+    source: Source,
 ) -> Result<serde_json::Value, upstream_cache::Error> {
-    let key = Key::new(
-        Source::from_union(union),
-        Endpoint::Attention,
-        Some(room_id),
-        month,
-    )?;
+    let key = Key::new(source, Endpoint::Attention, Some(room_id), month)?;
     UPSTREAM_CACHE.get(client, key, "attention").await
 }
 
@@ -560,6 +554,8 @@ pub struct SuperChat {
 pub struct SCResponse {
     pub room_id: u64,
     pub month: String,
+    pub source: String,
+    pub union: String,
     pub list: Vec<SuperChat>,
 }
 
@@ -580,6 +576,8 @@ pub struct ApiResponse {
     pub anchors: Vec<Anchor>,
     pub refresh_time: String,
     pub filter: String,
+    pub source: String,
+    pub union: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -587,6 +585,8 @@ pub struct ByMonthResponse {
     pub anchors: Vec<Anchor>,
     pub refresh_time: String,
     pub filter: String,
+    pub source: String,
+    pub union: String,
     pub month: String,
 }
 
@@ -595,6 +595,7 @@ pub struct LiveSessionResponse {
     pub sessions: Vec<LiveSession>,
     pub room_id: String,
     pub queried_user: String,
+    pub source: String,
     pub union: String,
     pub title: String,
     pub refresh_time: String,
@@ -603,12 +604,14 @@ pub struct LiveSessionResponse {
 #[derive(Debug, Deserialize)]
 struct FilterQuery {
     filter: Option<String>,
+    union: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct MonthQuery {
     month: Option<String>,
     filter: Option<String>,
+    union: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -770,16 +773,26 @@ async fn get_anchors(
     Query(query): Query<FilterQuery>,
     _data: State<SharedData>,
 ) -> Result<Json<ApiResponse>, StatusCode> {
-    // 增加请求计数
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
 
-    let filter = query.filter.unwrap_or_else(|| "all".to_string());
-    let anchors = fetch_anchor_data(&filter, None).await?;
+    let selection = SourceSelection::resolve(
+        query.filter.as_deref(),
+        query.union.as_deref(),
+        SourceSelection::All,
+        true,
+    )
+    .ok_or(StatusCode::BAD_REQUEST)?;
+    let filter = query
+        .filter
+        .unwrap_or_else(|| selection.source_name().to_string());
+    let anchors = fetch_anchor_data_by_selection(selection, None).await?;
 
     Ok(Json(ApiResponse {
         anchors,
         refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         filter,
+        source: selection.source_name().to_string(),
+        union: selection.union_name().to_string(),
     }))
 }
 
@@ -787,20 +800,29 @@ async fn get_anchors_by_month(
     Query(query): Query<MonthQuery>,
     _data: State<SharedData>,
 ) -> Result<Json<ByMonthResponse>, StatusCode> {
-    // 增加请求计数
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
 
     let month = query
         .month
         .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
-    let filter = query.filter.unwrap_or_else(|| "all".to_string());
-
-    let anchors = fetch_anchor_data(&filter, Some(&month)).await?;
+    let selection = SourceSelection::resolve(
+        query.filter.as_deref(),
+        query.union.as_deref(),
+        SourceSelection::All,
+        true,
+    )
+    .ok_or(StatusCode::BAD_REQUEST)?;
+    let filter = query
+        .filter
+        .unwrap_or_else(|| selection.source_name().to_string());
+    let anchors = fetch_anchor_data_by_selection(selection, Some(&month)).await?;
 
     Ok(Json(ByMonthResponse {
         anchors,
         refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         filter,
+        source: selection.source_name().to_string(),
+        union: selection.union_name().to_string(),
         month,
     }))
 }
@@ -809,14 +831,18 @@ async fn get_live_sessions(
     Query(query): Query<LiveSessionQuery>,
     _data: State<SharedData>,
 ) -> Result<Json<LiveSessionResponse>, StatusCode> {
-    // 增加请求计数
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
 
     let room_id = query.room_id.unwrap_or_default();
     let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
+    let source = Source::from_union(&union).ok_or(StatusCode::BAD_REQUEST)?;
     let month = query
         .month
         .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
+    upstream_cache::normalize_month(&month).ok_or(StatusCode::BAD_REQUEST)?;
+    if month.as_str() < source.config().min_month {
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
     println!(
         "📊 [/gift/live_sessions] room_id={}, union={}, month={}",
@@ -828,27 +854,22 @@ async fn get_live_sessions(
             sessions: vec![],
             room_id,
             queried_user: "未知主播".to_string(),
+            source: source.config().filter_alias.to_string(),
             union,
             title: format_month_title(&month),
             refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         }));
     }
 
-    Key::new(
-        Source::from_union(&union),
-        Endpoint::Sessions,
-        Some(&room_id),
-        &month,
+    let current_month = chrono::Local::now().format("%Y%m").to_string();
+    let all_data = match fetch_anchor_data_by_source(
+        source,
+        Endpoint::Gift,
+        &current_month,
+        "session_name",
     )
-    .map_err(|_| StatusCode::BAD_REQUEST)?;
-
-    let base_api_url = if Source::from_union(&union) == Source::Psp {
-        "https://psp.qianqiuzy.cn/gift"
-    } else {
-        "https://vr.qianqiuzy.cn/gift"
-    };
-
-    let all_data = match fetch_anchor_data_by_url(base_api_url, "session_name").await {
+    .await
+    {
         Ok(data) => {
             let mut data_with_union = data;
             for item in &mut data_with_union {
@@ -876,6 +897,7 @@ async fn get_live_sessions(
         sessions,
         room_id,
         queried_user,
+        source: source.config().filter_alias.to_string(),
         union,
         title: format_month_title(&month),
         refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
@@ -885,7 +907,6 @@ async fn get_live_sessions(
 async fn get_sc_history(
     Query(query): Query<SCQuery>,
 ) -> Result<Json<SCResponse>, (StatusCode, String)> {
-    // 增加请求计数
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
 
     let room_id = query.room_id.ok_or_else(|| {
@@ -903,17 +924,21 @@ async fn get_sc_history(
         ));
     }
 
-    let key = Key::new(
-        Source::from_union(query.union.as_deref().unwrap_or("VirtuaReal")),
-        Endpoint::Sc,
-        Some(&room_id),
-        &chrono::Local::now().format("%Y%m").to_string(),
-    )
-    .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid room_id".to_owned()))?;
+    let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
+    let source = Source::from_union(&union)
+        .ok_or((StatusCode::BAD_REQUEST, "Invalid union".to_owned()))?;
+    let month = chrono::Local::now().format("%Y%m").to_string();
+    let key = Key::new(source, Endpoint::Sc, Some(&room_id), &month)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid room_id".to_owned()))?;
     let raw_data = UPSTREAM_CACHE
         .uncached(&HTTP_CLIENT, key, "sc")
         .await
-        .map_err(|_| (StatusCode::BAD_GATEWAY, "上游SC接口请求失败".to_owned()))?;
+        .map_err(|error| {
+            (
+                upstream_status(&error),
+                format!("上游SC接口请求失败: {error}"),
+            )
+        })?;
 
     let mut sc_list = Vec::new();
 
@@ -985,36 +1010,55 @@ async fn get_sc_history(
 
     Ok(Json(SCResponse {
         room_id: room_id.parse::<u64>().unwrap_or(0),
-        month: chrono::Local::now().format("%Y%m").to_string(),
+        month,
+        source: source.config().filter_alias.to_string(),
+        union,
         list: sc_list,
     }))
 }
 
-async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Result<Vec<Anchor>, StatusCode> {
+fn upstream_status(error: &upstream_cache::Error) -> StatusCode {
+    match error.downcast_ref::<UpstreamHttpError>() {
+        Some(upstream) if upstream.status == reqwest::StatusCode::NOT_FOUND => StatusCode::NOT_FOUND,
+        Some(upstream) if upstream.status == reqwest::StatusCode::TOO_MANY_REQUESTS => {
+            StatusCode::TOO_MANY_REQUESTS
+        }
+        Some(upstream) if upstream.status == reqwest::StatusCode::SERVICE_UNAVAILABLE => {
+            StatusCode::SERVICE_UNAVAILABLE
+        }
+        Some(_) => StatusCode::BAD_GATEWAY,
+        None => StatusCode::BAD_GATEWAY,
+    }
+}
+
+async fn fetch_anchor_data_by_selection(
+    selection: SourceSelection,
+    month: Option<&str>,
+) -> Result<Vec<Anchor>, StatusCode> {
     if let Some(month) = month {
         upstream_cache::normalize_month(month).ok_or(StatusCode::BAD_REQUEST)?;
     }
     let mut all_data = Vec::new();
-    for (name, base) in [
-        ("vr", "https://vr.qianqiuzy.cn/gift"),
-        ("psp", "https://psp.qianqiuzy.cn/gift"),
-    ] {
-        if filter != "all" && filter != name {
-            continue;
-        }
-        let url = month
-            .map(|month| format!("{base}/by_month?month={month}"))
-            .unwrap_or_else(|| base.to_owned());
-        let mut data = fetch_anchor_data_by_url(&url, "anchor_list")
-            .await
-            .map_err(|_| StatusCode::BAD_GATEWAY)?;
-        for item in &mut data {
-            item.union = if name == "vr" {
-                "VirtuaReal"
-            } else {
-                "PSPlive"
+    for source in selection.sources() {
+        let config = source.config();
+        if let Some(month) = month {
+            if month < config.min_month {
+                continue;
             }
-            .to_owned();
+        }
+        let endpoint = if month.is_some() {
+            Endpoint::Month
+        } else {
+            Endpoint::Gift
+        };
+        let request_month = month
+            .map(ToOwned::to_owned)
+            .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
+        let mut data = fetch_anchor_data_by_source(source, endpoint, &request_month, "anchor_list")
+            .await
+            .map_err(|error| upstream_status(&error))?;
+        for item in &mut data {
+            item.union = config.union_name.to_string();
         }
         all_data.extend(data);
     }
@@ -1030,6 +1074,17 @@ async fn fetch_anchor_data(filter: &str, month: Option<&str>) -> Result<Vec<Anch
             .unwrap_or(std::cmp::Ordering::Equal)
     });
     Ok(all_data)
+}
+
+async fn fetch_anchor_data_by_source(
+    source: Source,
+    endpoint: Endpoint,
+    month: &str,
+    caller: &str,
+) -> Result<Vec<Anchor>, upstream_cache::Error> {
+    let key = Key::new(source, endpoint, None, month)?;
+    let raw_data = UPSTREAM_CACHE.get(&HTTP_CLIENT, key, caller).await?;
+    Ok(parse_anchor_data(raw_data))
 }
 
 // 缓存统计信息响应结构 - 增强版，包含更详细的信息
@@ -1128,11 +1183,10 @@ async fn clear_cache_endpoint(
             serde_json::json!({"ok": false, "message": "month 必须为有效 YYYYMM"}),
         ));
     }
-    let sources = query
-        .union
-        .as_deref()
-        .map(|union| vec![Source::from_union(union)])
-        .unwrap_or_else(|| vec![Source::Vr, Source::Psp]);
+    let sources = match query.union.as_deref() {
+        Some(union) => vec![Source::from_union(union).ok_or(StatusCode::BAD_REQUEST)?],
+        None => Source::enabled_sources(),
+    };
     UPSTREAM_CACHE
         .clear(&sources, &room, &month)
         .await
@@ -1142,31 +1196,6 @@ async fn clear_cache_endpoint(
     Ok(Json(
         serde_json::json!({"ok": true, "message": format!("已清除 {} {} 的内存、磁盘及响应缓存", room, month)}),
     ))
-}
-
-async fn fetch_anchor_data_by_url(
-    url: &str,
-    caller: &str,
-) -> Result<Vec<Anchor>, upstream_cache::Error> {
-    let source = if url.starts_with("https://psp.qianqiuzy.cn/") {
-        Source::Psp
-    } else {
-        Source::Vr
-    };
-    let parsed = reqwest::Url::parse(url)?;
-    let endpoint = if parsed.path() == "/gift/by_month" {
-        Endpoint::Month
-    } else {
-        Endpoint::Gift
-    };
-    let month = parsed
-        .query_pairs()
-        .find(|(key, _)| key == "month")
-        .map(|(_, value)| value.into_owned())
-        .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
-    let key = Key::new(source, endpoint, None, &month)?;
-    let raw_data = UPSTREAM_CACHE.get(&HTTP_CLIENT, key, caller).await?;
-    Ok(parse_anchor_data(raw_data))
 }
 
 fn parse_anchor_data(raw_data: serde_json::Value) -> Vec<Anchor> {
@@ -1281,26 +1310,22 @@ async fn fetch_live_session_data(
     union: &str,
     month: &str,
 ) -> Result<Vec<LiveSession>, StatusCode> {
-    fetch_live_session_data_with_fans_calc(client, room_id, union, month).await
+    let source = Source::from_union(union).ok_or(StatusCode::BAD_REQUEST)?;
+    fetch_live_session_data_with_fans_calc(client, source, room_id, month).await
 }
 
 async fn fetch_live_session_data_with_fans_calc(
     client: &Client,
+    source: Source,
     room_id: &str,
-    union: &str,
     month: &str,
 ) -> Result<Vec<LiveSession>, StatusCode> {
-    let key = Key::new(
-        Source::from_union(union),
-        Endpoint::Sessions,
-        Some(room_id),
-        month,
-    )
-    .map_err(|_| StatusCode::BAD_REQUEST)?;
+    let key =
+        Key::new(source, Endpoint::Sessions, Some(room_id), month).map_err(|_| StatusCode::BAD_REQUEST)?;
     let raw_data = UPSTREAM_CACHE
         .get(client, key, "live_sessions")
         .await
-        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        .map_err(|error| upstream_status(&error))?;
     parse_live_session_data(raw_data).map_err(|_| StatusCode::BAD_GATEWAY)
 }
 
@@ -1421,8 +1446,9 @@ async fn get_attention_data(
     let month = query
         .month
         .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
-
+    let month = upstream_cache::normalize_attention_month(&month).ok_or(StatusCode::BAD_REQUEST)?;
     let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
+    let source = Source::from_union(&union).ok_or(StatusCode::BAD_REQUEST)?;
 
     println!(
         "📊 [/gift/attention] room_id={}, month={}, union={}",
@@ -1430,19 +1456,19 @@ async fn get_attention_data(
     );
 
     // 使用缓存机制获取数据
-    Key::new(
-        Source::from_union(&union),
-        Endpoint::Attention,
-        Some(&room_id),
-        &month,
-    )
-    .map_err(|_| StatusCode::BAD_REQUEST)?;
-    match get_attention_cache_data(&HTTP_CLIENT, &room_id, &month, &union).await {
+    Key::new(source, Endpoint::Attention, Some(&room_id), &month)
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
+    match get_attention_cache_data(&HTTP_CLIENT, &room_id, &month, source).await {
         Ok(data) => {
             println!(
                 "✅ [/gift/attention] 缓存/API调用成功 - room_id={}, month={}",
                 room_id, month
             );
+            let mut data = data;
+            if let Some(object) = data.as_object_mut() {
+                object.insert("source".to_string(), source.config().filter_alias.into());
+                object.insert("union".to_string(), union.clone().into());
+            }
             Ok(Json(data))
         }
         Err(e) => {
@@ -1450,7 +1476,7 @@ async fn get_attention_data(
                 "❌ [/gift/attention] 获取失败 - room_id={}, month={}, error={}",
                 room_id, month, e
             );
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
+            Err(upstream_status(&e))
         }
     }
 }
@@ -1460,14 +1486,18 @@ async fn get_live_sessions_with_fans(
     Query(query): Query<LiveSessionQuery>,
     _data: State<SharedData>,
 ) -> Result<Json<LiveSessionResponse>, StatusCode> {
-    // 增加请求计数
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
 
     let room_id = query.room_id.unwrap_or_default();
     let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
+    let source = Source::from_union(&union).ok_or(StatusCode::BAD_REQUEST)?;
     let month = query
         .month
         .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
+    upstream_cache::normalize_month(&month).ok_or(StatusCode::BAD_REQUEST)?;
+    if month.as_str() < source.config().min_month {
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
     println!(
         "📊 [/gift/live_sessions_with_fans] room_id={}, union={}, month={}",
@@ -1479,27 +1509,22 @@ async fn get_live_sessions_with_fans(
             sessions: vec![],
             room_id,
             queried_user: "未知主播".to_string(),
+            source: source.config().filter_alias.to_string(),
             union,
             title: format_month_title(&month),
             refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         }));
     }
 
-    Key::new(
-        Source::from_union(&union),
-        Endpoint::Sessions,
-        Some(&room_id),
-        &month,
+    let current_month = chrono::Local::now().format("%Y%m").to_string();
+    let all_data = match fetch_anchor_data_by_source(
+        source,
+        Endpoint::Gift,
+        &current_month,
+        "session_name",
     )
-    .map_err(|_| StatusCode::BAD_REQUEST)?;
-
-    let base_api_url = if Source::from_union(&union) == Source::Psp {
-        "https://psp.qianqiuzy.cn/gift"
-    } else {
-        "https://vr.qianqiuzy.cn/gift"
-    };
-
-    let all_data = match fetch_anchor_data_by_url(base_api_url, "session_name").await {
+    .await
+    {
         Ok(data) => {
             let mut data_with_union = data;
             for item in &mut data_with_union {
@@ -1522,13 +1547,13 @@ async fn get_live_sessions_with_fans(
     println!("👤 主播: {}", queried_user);
 
     // 使用完整计算模式
-    let sessions =
-        fetch_live_session_data_with_fans_calc(&HTTP_CLIENT, &room_id, &union, &month).await?;
+    let sessions = fetch_live_session_data_with_fans_calc(&HTTP_CLIENT, source, &room_id, &month).await?;
 
     Ok(Json(LiveSessionResponse {
         sessions,
         room_id,
         queried_user,
+        source: source.config().filter_alias.to_string(),
         union,
         title: format_month_title(&month),
         refresh_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
