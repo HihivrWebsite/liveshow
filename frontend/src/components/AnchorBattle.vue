@@ -401,7 +401,7 @@ export default {
         try {
           const response = await anchorAPI.getLiveSessions(
             anchor.room_id,
-            anchor.union || 'VirtuaReal',
+            anchor.union,
             month
           )
           const sessionList = response.sessions || []
@@ -443,7 +443,7 @@ export default {
 
               const response = await anchorAPI.getLiveSessions(
                 anchor.room_id,
-                anchor.union || 'VirtuaReal',
+                anchor.union,
                 month
               )
               const sessionList = response.sessions || []

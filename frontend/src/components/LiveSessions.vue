@@ -52,7 +52,7 @@
       <p class="refresh-time">刷新时间：{{ refreshTime }}</p>
       <div class="queried-user">
         <img v-if="anchorAvatar" :src="anchorAvatar" class="queried-user-avatar" @error="$event.target.style.display='none'" />
-        查询用户：{{ queriedUser }} ({{ union }})
+        查询用户：{{ getAnchorDisplayName({ room_id, anchor_name: queriedUser, union }, 'vup') }} ({{ union }})
       </div>
     </div>
 
@@ -250,13 +250,14 @@
 import { ref, onMounted, watch, nextTick, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Chart, registerables } from 'chart.js'
-import { anchorAPI } from '@/api'
+import { anchorAPI, getApiErrorMessage } from '@/api'
 import BaseCard from '@/components/BaseCard.vue'
 import NavigationTable from '@/components/NavigationTable.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
 import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
 import { getAvatar, getAvatarSync } from '@/utils/avatarCache'
+import { getAnchorDisplayName, isSupportedUnion } from '@/utils/guildConfig'
 
 Chart.register(...registerables)
 
@@ -289,7 +290,11 @@ export default {
 
     // 从路由参数获取数据
     const room_id = route.query.room_id
-    union.value = route.query.union || 'VirtuaReal'
+    union.value = route.query.union || ''
+    if (!isSupportedUnion(union.value)) {
+      error.value = '缺少或不支持的工会来源，请从榜单重新进入'
+      loading.value = false
+    }
     const currentDate = new Date()
     const currentYear = currentDate.getFullYear()
     const currentMonth = String(currentDate.getMonth() + 1).padStart(2, '0')
@@ -858,7 +863,7 @@ export default {
 
       } catch (err) {
         console.error('获取直播会话数据失败:', err)
-        error.value = '获取数据失败，请稍后重试'
+        error.value = getApiErrorMessage(err, '获取数据失败，请稍后重试')
       } finally {
         loading.value = false
       }
@@ -875,6 +880,7 @@ export default {
         }
       } catch (err) {
         console.error('获取粉丝数据失败:', err)
+        error.value = getApiErrorMessage(err, '获取粉丝数据失败，请稍后重试')
       } finally {
         fansLoading.value = false
       }
@@ -883,7 +889,7 @@ export default {
     // 获取SC历史数据
     const fetchSCHistory = async (roomId) => {
       try {
-        const response = await anchorAPI.getSuperChatHistory(roomId)
+        const response = await anchorAPI.getSuperChatHistory(roomId, union.value)
         scHistory.value = response
       } catch (err) {
         console.error('获取SC历史数据失败:', err)
@@ -973,7 +979,7 @@ export default {
         refreshTime.value = new Date().toLocaleString()
       } catch (err) {
         console.error('多月份统计查询失败:', err)
-        error.value = '多月份统计查询失败，请稍后重试'
+        error.value = getApiErrorMessage(err, '多月份统计查询失败，请稍后重试')
       } finally {
         loading.value = false
         closeMultiMonthModal()
@@ -1016,6 +1022,7 @@ export default {
     return {
       sessions,
       queriedUser,
+      room_id,
       title,
       refreshTime,
       union,
@@ -1036,6 +1043,7 @@ export default {
       formatCurrency,
       formatNumber,
       formatDurationCell,
+      getAnchorDisplayName,
       showSessionChart,
       hideChart,
       // 月份选择器相关

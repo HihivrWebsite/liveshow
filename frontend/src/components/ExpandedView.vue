@@ -31,6 +31,8 @@
           :card-type="sourceFromRoute === 'live-sessions' ? 'session' : 'anchor'"
           :rank="index + 1"
           :title="getTitle(item, index)"
+          :avatar-url="item.room_id ? getAvatarSync(item.room_id) : ''"
+
           :subtitle="''"
           :default-collapsed="false"  <!-- 所有卡片默认展开 -->
           :fields="getFields(item)"
@@ -55,9 +57,13 @@
 <script>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { anchorAPI } from '@/api'
+import { anchorAPI, getApiErrorMessage } from '@/api'
 import BaseCard from '@/components/BaseCard.vue'
 import { formatCurrency, formatNumber } from '@/utils/dataProcessor'
+import { getAvatarSync } from '@/utils/avatarCache'
+import { getGuildBoardTitle, getAnchorDisplayName } from '@/utils/guildConfig'
+
+
 
 export default {
   name: 'ExpandedView',
@@ -91,8 +97,7 @@ export default {
       const month = parseInt(monthFromRoute.substring(4, 6)).toString().padStart(2, '0')
       title.value = `咿喔io粉丝站维阿PSP斗虫榜_${year}年${month}月记录数据（全部展开视图）`
     } else {
-      title.value = filterFromRoute === 'vr' ? '咿喔io粉丝站维阿斗虫榜（全部展开视图）' :
-                   filterFromRoute === 'psp' ? '咿喔io粉丝站PSPlive斗虫榜（全部展开视图）' : '咿喔io粉丝站维阿PSP斗虫榜（全部展开视图）'
+      title.value = getGuildBoardTitle(filterFromRoute, { detailSuffix: '（全部展开视图）' })
     }
 
     // 获取数据
@@ -137,7 +142,7 @@ export default {
         let errorMessage = '获取数据失败，请稍后重试';
         if (err.response) {
           // 服务器响应了错误状态码
-          errorMessage = `服务器错误 (${err.response.status}): ${err.response.data?.message || '请求失败'}`;
+          errorMessage = getApiErrorMessage(err, `服务器错误 (${err.response.status})`);
         } else if (err.request) {
           // 请求已发出但没有收到响应
           errorMessage = '网络连接失败，请检查网络连接';
@@ -179,7 +184,7 @@ export default {
         return item.title || `直播会话 ${index + 1}`;
       } else {
         // 主播数据
-        return `${item.anchor_name || item.name} [${item.union || item.group}]`;
+        return `${getAnchorDisplayName(item, filterFromRoute)} [${item.union || item.group}]`;
       }
     };
 
@@ -293,7 +298,9 @@ export default {
       getActionButton,
       getActionButtonText,
       getActionButtonClass,
-      handleActionClick
+      handleActionClick,
+      getAvatarSync,
+      getAnchorDisplayName
     }
   }
 }

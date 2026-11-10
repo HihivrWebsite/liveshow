@@ -91,6 +91,8 @@
 import { formatCurrency } from '@/utils/dataProcessor'
 import { anchorAPI } from '@/api'
 import { getAvatarSync } from '@/utils/avatarCache'
+import { getAnchorDisplayName } from '@/utils/guildConfig'
+
 
 export default {
   name: 'NavigationTable',
@@ -134,8 +136,8 @@ export default {
       } else {
         this.selectedAnchors.push({
           room_id: item.room_id,
-          anchor_name: item.anchor_name,
-          union: item.union || 'VirtuaReal'
+          anchor_name: getAnchorDisplayName(item),
+          union: item.union
         });
       }
       this.$emit('selection-change', [...this.selectedAnchors]);
@@ -146,8 +148,8 @@ export default {
       } else {
         this.selectedAnchors = this.items.map(item => ({
           room_id: item.room_id,
-          anchor_name: item.anchor_name,
-          union: item.union || 'VirtuaReal'
+          anchor_name: getAnchorDisplayName(item),
+          union: item.union
         }));
       }
       this.$emit('selection-change', [...this.selectedAnchors]);
@@ -218,7 +220,7 @@ export default {
       if (props.itemType === 'session') {
         title = item.title || item.anchor_name || `直播会话 ${item.rank || item.id || 'N/A'}`;
       } else {
-        title = item.anchor_name || item.name || `项目 ${item.rank || item.id || 'N/A'}`;
+        title = getAnchorDisplayName(item) || item.name || `项目 ${item.rank || item.id || 'N/A'}`;
       }
       return title + ' -dc 点 yioio 点 top';
     };

@@ -437,7 +437,7 @@
           :key="anchor.room_id || index"
           card-type="anchor"
           :rank="index + 1"
-          :title="anchor.anchor_name + ' [' + anchor.union + ']'"
+          :title="getAnchorDisplayName(anchor, currentFilter) + ' [' + anchor.union + ']'"
           :subtitle="''"
           :is-live="anchor.status === 1"
           :avatar-url="avatarMap[anchor.room_id] || ''"
@@ -500,7 +500,8 @@ import { getAvatar, getAvatarByUid, scaleAvatar, getAvatarSync } from '@/utils/a
 import {
   GUILD_COMPARISON_CONFIG,
   GUILD_FILTER_OPTIONS,
-  getGuildBoardTitle
+  getGuildBoardTitle,
+  getAnchorDisplayName
 } from '@/utils/guildConfig'
 import { getApiErrorMessage } from '@/api'
 
@@ -770,7 +771,7 @@ export default {
           tableRows += `<tr>
             <td style="padding:8px 12px;border-bottom:1px solid #FFC633;text-align:center;font-weight:bold;color:#FF6600;">${overallRanks[anchor.room_id]}</td>
             <td style="padding:8px 12px;border-bottom:1px solid #FFC633;text-align:center;">${avatarImg}</td>
-            <td style="padding:8px 12px;border-bottom:1px solid #FFC633;font-weight:bold;white-space:nowrap;">${anchor.anchor_name}</td>
+            <td style="padding:8px 12px;border-bottom:1px solid #FFC633;font-weight:bold;white-space:nowrap;">${getAnchorDisplayName(anchor, currentFilter.value)}</td>
             ${fieldsHtml}
           </tr>`
         })
@@ -952,7 +953,7 @@ export default {
         const revenue = parseFloat(anchor.total_revenue || anchor.gift + anchor.guard + anchor.super_chat || 0)
         if (!isNaN(revenue) && revenue > 0) {
           data.push(revenue)
-          labels.push(anchor.anchor_name)
+          labels.push(getAnchorDisplayName(anchor, currentFilter.value))
           roomIds.push(anchor.room_id)
         }
       })
@@ -2886,6 +2887,7 @@ export default {
       pspAvatarUrl,
       avatarMap,
       getAvatarSync,
+      getAnchorDisplayName,
       viewLiveSessions,
       switchFilter,
       openMonthSelector,

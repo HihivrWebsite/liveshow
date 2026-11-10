@@ -60,7 +60,7 @@
               :class="{ 'live-row': anchor.status === 1 }"
             >
               <td class="rank-cell">{{ index + 1 }}</td>
-              <td class="name-cell">{{ anchor.anchor_name }}</td>
+              <td class="name-cell"><img v-if="getAvatarSync(anchor.room_id)" :src="getAvatarSync(anchor.room_id)" class="name-avatar" alt=""><span>{{ getAnchorDisplayName(anchor, currentFilter) }}</span></td>
               <td class="union-cell">{{ anchor.union }}</td>
               <td class="number-cell">{{ formatNumber(anchor.attention) }}</td>
               <td class="number-cell">{{ anchor.effective_days }}</td>
@@ -111,10 +111,12 @@
 
 <script>
 import { ref, onMounted, watch } from 'vue'
+import { getAvatarSync } from '@/utils/avatarCache'
+
 import { useRouter, useRoute } from 'vue-router'
 import { anchorAPI, getApiErrorMessage } from '@/api'
 import { formatCurrency, formatNumber, calculateTotalRevenue } from '@/utils/dataProcessor'
-import { GUILD_FILTER_OPTIONS, getGuildBoardTitle } from '@/utils/guildConfig'
+import { GUILD_FILTER_OPTIONS, getGuildBoardTitle, getAnchorDisplayName } from '@/utils/guildConfig'
 
 export default {
   name: 'SimpleAnchorList',
@@ -255,7 +257,13 @@ export default {
       openMonthSelector,
       formatCurrency,
       formatNumber,
-      calculateTotalRevenue
+      calculateTotalRevenue,
+      getAvatarSync,
+      getAnchorDisplayName,
+      getAvatarSync,
+      getAnchorDisplayName,
+      getAvatarSync,
+      getAnchorDisplayName
     }
   }
 }
@@ -649,5 +657,13 @@ export default {
     padding: 4px 8px;
     font-size: 0.7rem;
   }
+}
+.name-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 8px;
+  vertical-align: middle;
 }
 </style>

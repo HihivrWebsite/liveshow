@@ -18,9 +18,7 @@ use std::time::Duration;
 mod avatar_cache;
 mod gift_response_cache;
 mod upstream_cache;
-use upstream_cache::{
-    Endpoint, Key, Source, SourceSelection, UpstreamCache, UpstreamHttpError,
-};
+use upstream_cache::{Endpoint, Key, Source, SourceSelection, UpstreamCache, UpstreamHttpError};
 
 use avatar_cache::{
     AvatarCacheResult, AvatarStore, ConditionalHeaders, RefreshOutcome, RemoteAvatarResponse,
@@ -862,23 +860,19 @@ async fn get_live_sessions(
     }
 
     let current_month = chrono::Local::now().format("%Y%m").to_string();
-    let all_data = match fetch_anchor_data_by_source(
-        source,
-        Endpoint::Gift,
-        &current_month,
-        "session_name",
-    )
-    .await
-    {
-        Ok(data) => {
-            let mut data_with_union = data;
-            for item in &mut data_with_union {
-                item.union = union.clone();
+    let all_data =
+        match fetch_anchor_data_by_source(source, Endpoint::Gift, &current_month, "session_name")
+            .await
+        {
+            Ok(data) => {
+                let mut data_with_union = data;
+                for item in &mut data_with_union {
+                    item.union = union.clone();
+                }
+                data_with_union
             }
-            data_with_union
-        }
-        Err(_) => vec![],
-    };
+            Err(_) => vec![],
+        };
 
     let anchor_data = all_data
         .iter()
@@ -925,8 +919,8 @@ async fn get_sc_history(
     }
 
     let union = query.union.unwrap_or_else(|| "VirtuaReal".to_string());
-    let source = Source::from_union(&union)
-        .ok_or((StatusCode::BAD_REQUEST, "Invalid union".to_owned()))?;
+    let source =
+        Source::from_union(&union).ok_or((StatusCode::BAD_REQUEST, "Invalid union".to_owned()))?;
     let month = chrono::Local::now().format("%Y%m").to_string();
     let key = Key::new(source, Endpoint::Sc, Some(&room_id), &month)
         .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid room_id".to_owned()))?;
@@ -1019,7 +1013,9 @@ async fn get_sc_history(
 
 fn upstream_status(error: &upstream_cache::Error) -> StatusCode {
     match error.downcast_ref::<UpstreamHttpError>() {
-        Some(upstream) if upstream.status == reqwest::StatusCode::NOT_FOUND => StatusCode::NOT_FOUND,
+        Some(upstream) if upstream.status == reqwest::StatusCode::NOT_FOUND => {
+            StatusCode::NOT_FOUND
+        }
         Some(upstream) if upstream.status == reqwest::StatusCode::TOO_MANY_REQUESTS => {
             StatusCode::TOO_MANY_REQUESTS
         }
@@ -1320,8 +1316,8 @@ async fn fetch_live_session_data_with_fans_calc(
     room_id: &str,
     month: &str,
 ) -> Result<Vec<LiveSession>, StatusCode> {
-    let key =
-        Key::new(source, Endpoint::Sessions, Some(room_id), month).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let key = Key::new(source, Endpoint::Sessions, Some(room_id), month)
+        .map_err(|_| StatusCode::BAD_REQUEST)?;
     let raw_data = UPSTREAM_CACHE
         .get(client, key, "live_sessions")
         .await
@@ -1517,23 +1513,19 @@ async fn get_live_sessions_with_fans(
     }
 
     let current_month = chrono::Local::now().format("%Y%m").to_string();
-    let all_data = match fetch_anchor_data_by_source(
-        source,
-        Endpoint::Gift,
-        &current_month,
-        "session_name",
-    )
-    .await
-    {
-        Ok(data) => {
-            let mut data_with_union = data;
-            for item in &mut data_with_union {
-                item.union = union.clone();
+    let all_data =
+        match fetch_anchor_data_by_source(source, Endpoint::Gift, &current_month, "session_name")
+            .await
+        {
+            Ok(data) => {
+                let mut data_with_union = data;
+                for item in &mut data_with_union {
+                    item.union = union.clone();
+                }
+                data_with_union
             }
-            data_with_union
-        }
-        Err(_) => vec![],
-    };
+            Err(_) => vec![],
+        };
 
     let anchor_data = all_data
         .iter()
@@ -1547,7 +1539,8 @@ async fn get_live_sessions_with_fans(
     println!("👤 主播: {}", queried_user);
 
     // 使用完整计算模式
-    let sessions = fetch_live_session_data_with_fans_calc(&HTTP_CLIENT, source, &room_id, &month).await?;
+    let sessions =
+        fetch_live_session_data_with_fans_calc(&HTTP_CLIENT, source, &room_id, &month).await?;
 
     Ok(Json(LiveSessionResponse {
         sessions,

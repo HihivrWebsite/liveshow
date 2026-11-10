@@ -74,6 +74,11 @@ export const SUPPORTED_UNIONS = Object.freeze(
   Object.keys(UNION_LABELS)
 )
 
+export const VUP_FIXED_NAME_SUFFIX = '（不是VUP）'
+export const VUP_NAME_OVERRIDES = Object.freeze({
+  851181: Object.freeze({ suffix: VUP_FIXED_NAME_SUFFIX })
+})
+
 export function isSupportedUnion(union) {
   return SUPPORTED_UNIONS.includes(union)
 }
@@ -104,6 +109,19 @@ export function requireUnion(union) {
 
 export function getUnionLabel(union) {
   return UNION_LABELS[union] || union || '未知工会'
+}
+
+export function getAnchorDisplayName(anchor, filter = null) {
+  if (!anchor) return ''
+  const rawName = anchor.anchor_name || anchor.name || ''
+  const override = VUP_NAME_OVERRIDES[anchor.room_id]
+  const belongsToVupGroup = anchor.union === 'VUP' &&
+    (filter === null || filter === undefined || filter === 'vup')
+
+  if (!override || !belongsToVupGroup || rawName.endsWith(override.suffix)) {
+    return rawName
+  }
+  return `${rawName}${override.suffix}`
 }
 
 function formatYearMonthParts(yearMonth) {

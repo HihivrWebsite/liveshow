@@ -60,7 +60,7 @@
 <script>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { anchorAPI } from '@/api'
+import { anchorAPI, getApiErrorMessage } from '@/api'
 
 export default {
   name: 'SuperChatDetail',
@@ -77,7 +77,7 @@ export default {
     const roomId = route.query.room_id
     const startTime = route.query.start_time
     const endTime = route.query.end_time
-    const union = route.query.union || 'VirtuaReal'
+    const union = route.query.union || ''
 
     // 获取SC数据
     const fetchData = async () => {
@@ -138,7 +138,7 @@ export default {
         filterSCByTimeRange()
       } catch (err) {
         console.error('获取SC数据失败:', err)
-        error.value = `获取数据失败: ${err.message || '未知错误'}`
+        error.value = getApiErrorMessage(err, '获取数据失败，请稍后重试')
       } finally {
         loading.value = false
       }
