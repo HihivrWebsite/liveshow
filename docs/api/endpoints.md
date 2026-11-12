@@ -53,7 +53,7 @@ GET /gift
 
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
-| filter | string | 否 | 过滤条件：`all`(默认，仅 VR+PSP)、`vr`、`psp`、`vup` |
+| filter | string | 否 | 过滤条件：`all`(默认，仅 VR+PSP)、`everything`(VR+PSP+VUP)、`vr`、`psp`、`vup` |
 
 ### 响应
 
@@ -128,7 +128,7 @@ GET /gift/by_month
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
 | month | string | 是 | 月份，格式 YYYYMM（如 202601） |
-| filter | string | 否 | 过滤条件：`all`(默认，仅 VR+PSP)、`vr`、`psp`、`vup` |
+| filter | string | 否 | 过滤条件：`all`(默认，仅 VR+PSP)、`everything`(VR+PSP+VUP)、`vr`、`psp`、`vup` |
 
 ### 响应
 
@@ -495,8 +495,8 @@ GET /cache/stats
 
 | 路径 | 功能 | 查询参数 |
 |------|------|---------|
-| `/` | 主播排行榜 | `filter` (可选：`all|vr|psp|vup`) |
-| `/by-month` | 按月查看主播数据 | `month` (必需), `filter` (可选：`all|vr|psp|vup`) |
+| `/` | 主播排行榜 | `filter` (可选：`all|everything|vr|psp|vup`) |
+| `/by-month` | 按月查看主播数据 | `month` (必需), `filter` (可选：`all|everything|vr|psp|vup`) |
 | `/live-sessions` | 直播会话详情 | `room_id` (必需), `union` (必需：`VirtuaReal|PSPlive|VUP`), `month` (可选) |
 | `/superchat-detail` | SC详情 | `room_id`, `union` (`VirtuaReal|PSPlive|VUP`) |
 | `/expanded-view` | 全展开卡片视图 | - |

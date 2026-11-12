@@ -40,7 +40,7 @@ SourceConfig {
 
 ## 选择规则
 
-- 列表请求通过 `filter=vr|psp|vup` 选择单一源；`filter=all` 只聚合 `Vr+Psp`，VUP 不进入默认聚合。
+- 列表请求通过 `filter=vr|psp|vup` 选择单一源；`filter=all` 只聚合 `Vr+Psp`，VUP 不进入该聚合；`filter=everything` 聚合全部三源（VR+PSP+VUP）。
 - 详情请求通过 `union=VirtuaReal|PSPlive|VUP` 选择单一源，VUP 使用 `union=VUP`。
 - 未知 `filter`/`union` 返回 HTTP 400，不回退 VR；同一请求的 `filter` 与 `union` 不一致返回 400。
 - 不新增本地 `source` 查询参数。上游地址按 `base_url + 接口路径 + 业务参数` 构造，也不追加 `source` 查询参数。
@@ -55,7 +55,7 @@ SourceConfig {
 
 ## 兼容性
 
-- 不传 `filter` 仍等价于 `all`，默认页面继续只显示 VR+PSP，VUP 不会突然混入旧聚合。
+- 不传 `filter` 的后端请求仍等价于 `all`（VR+PSP），API 兼容语义不变；前端列表页默认显式请求 `filter=everything`（全部三源），带 `filter=all` 的旧链接仍只显示 VR+PSP。
 - 既有 `vr`、`psp` 和 `VirtuaReal`、`PSPlive` 用法保持；`vup` 与 `VUP` 为新增显式入口。
 - 旧的未知值静默回退行为取消，统一改为 400，避免错误源被当成 VR 数据展示。
 - 磁盘源缓存已包含来源身份，新增 VUP 不需要迁移或删除既有 VR/PSP 缓存。

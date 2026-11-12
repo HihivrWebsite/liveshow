@@ -14,7 +14,7 @@
 
 ### 工会筛选
 
-支持按工会筛选：全部 / VR（VirtuaReal）/ PSP（PSPlive）
+支持按工会筛选：全部（VR+PSP+VUP，默认）/ 维阿PSP（VR+PSP）/ VR（VirtuaReal）/ PSP（PSPlive）/ VUP
 
 ### 月份选择
 

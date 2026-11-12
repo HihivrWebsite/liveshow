@@ -135,8 +135,8 @@
         <h3>二、数据筛选</h3>
         <div class="guide-item">
           <h4>5. 工会筛选</h4>
-          <p><b>位置：</b>页面顶部三个按钮</p>
-          <p><b>用途：</b>切换查看维阿PSP全部主播、仅维阿（VirtuaReal）、PSPlive 或 VUP 主播的数据</p>
+          <p><b>位置：</b>页面顶部五个按钮</p>
+          <p><b>用途：</b>切换查看全部主播（VR+PSP+VUP）、维阿PSP（VR+PSP）、仅维阿（VirtuaReal）、PSPlive 或 VUP 主播的数据</p>
           <p><b>使用：</b>点击对应按钮即可切换</p>
         </div>
         <div class="guide-item">

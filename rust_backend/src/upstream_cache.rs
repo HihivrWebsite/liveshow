@@ -120,6 +120,7 @@ impl Source {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceSelection {
     All,
+    Everything,
     One(Source),
 }
 
@@ -127,6 +128,7 @@ impl SourceSelection {
     pub fn from_filter(filter: &str) -> Option<Self> {
         match filter {
             "all" => Some(Self::All),
+            "everything" => Some(Self::Everything),
             _ => Source::from_filter(filter).map(Self::One),
         }
     }
@@ -173,6 +175,7 @@ impl SourceSelection {
                 .into_iter()
                 .filter(|source| source.config().enabled)
                 .collect(),
+            Self::Everything => Source::enabled_sources(),
             Self::One(source) if source.config().enabled => vec![source],
             Self::One(_) => Vec::new(),
         }
@@ -181,6 +184,7 @@ impl SourceSelection {
     pub fn source_name(self) -> &'static str {
         match self {
             Self::All => "all",
+            Self::Everything => "everything",
             Self::One(source) => source.config().filter_alias,
         }
     }
@@ -188,6 +192,7 @@ impl SourceSelection {
     pub fn union_name(self) -> &'static str {
         match self {
             Self::All => "all",
+            Self::Everything => "everything",
             Self::One(source) => source.config().union_name,
         }
     }
@@ -988,6 +993,60 @@ mod tests {
                 .unwrap();
             assert_eq!(key.fresh(&daily, time.into()), expected);
         }
+    }
+
+    #[test]
+    fn source_selection_everything_covers_all_enabled_sources() {
+        assert_eq!(
+            SourceSelection::from_filter("everything"),
+            Some(SourceSelection::Everything)
+        );
+        assert_eq!(SourceSelection::from_filter("all"), Some(SourceSelection::All));
+        assert_eq!(SourceSelection::from_filter("bogus"), None);
+        assert_eq!(
+            SourceSelection::All.sources(),
+            vec![Source::Vr, Source::Psp]
+        );
+        assert!(!SourceSelection::All.sources().contains(&Source::Vup));
+        assert_eq!(
+            SourceSelection::Everything.sources(),
+            Source::enabled_sources()
+        );
+        assert!(SourceSelection::Everything.sources().contains(&Source::Vup));
+        assert_eq!(SourceSelection::Everything.source_name(), "everything");
+        assert_eq!(SourceSelection::Everything.union_name(), "everything");
+        assert_eq!(SourceSelection::All.source_name(), "all");
+    }
+
+    #[test]
+    fn resolve_everything_rejects_union_and_keeps_default_all() {
+        assert_eq!(
+            SourceSelection::resolve(Some("everything"), None, SourceSelection::All, true),
+            Some(SourceSelection::Everything)
+        );
+        for union in ["VirtuaReal", "PSPlive", "VUP"] {
+            assert_eq!(
+                SourceSelection::resolve(
+                    Some("everything"),
+                    Some(union),
+                    SourceSelection::All,
+                    true
+                ),
+                None
+            );
+        }
+        assert_eq!(
+            SourceSelection::resolve(Some("bogus"), None, SourceSelection::All, true),
+            None
+        );
+        assert_eq!(
+            SourceSelection::resolve(None, None, SourceSelection::All, true),
+            Some(SourceSelection::All)
+        );
+        assert_eq!(
+            SourceSelection::resolve(Some("all"), None, SourceSelection::All, true),
+            Some(SourceSelection::All)
+        );
     }
 
     #[tokio::test]

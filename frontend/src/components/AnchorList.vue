@@ -535,7 +535,7 @@ export default {
     const title = ref('咿喔io粉丝站维阿PSP斗虫榜')
     const filterOptions = GUILD_FILTER_OPTIONS
     const refreshTime = ref(new Date().toLocaleString())
-    const currentFilter = ref('all')
+    const currentFilter = ref('everything')
     const loading = ref(true)
     const error = ref(null)
     const avatarMap = ref({})
@@ -862,7 +862,7 @@ export default {
     provide('globalCardState', globalCardState)
 
     // 从路由参数获取初始值
-    const filterFromRoute = route.query.filter || 'all'
+    const filterFromRoute = route.query.filter || 'everything'
     const monthFromRoute = route.query.month || null
     currentFilter.value = filterFromRoute
 
@@ -2797,7 +2797,7 @@ export default {
         // 页面变化时关闭所有图表
         hideAllCharts()
 
-        currentFilter.value = newQuery.filter || 'all'
+        currentFilter.value = newQuery.filter || 'everything'
         const newMonth = newQuery.month || null
         title.value = getGuildBoardTitle(currentFilter.value, {
           month: newMonth,

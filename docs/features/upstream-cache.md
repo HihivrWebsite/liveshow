@@ -2,9 +2,9 @@
 
 ## 缓存层与有效期
 
-浏览器请求先经过既有 10 秒 Gift HTTP 响应缓存，再由 `upstream_cache.rs` 按数据源、上游接口、房间及月份共享数据。VR、PSP 与 VUP 完全隔离；`all/vr/psp/vup` 筛选、详情主播名查询及头像后台任务不再各自回源。同一源数据键的并发请求只执行一次上游请求。
+浏览器请求先经过既有 10 秒 Gift HTTP 响应缓存，再由 `upstream_cache.rs` 按数据源、上游接口、房间及月份共享数据。VR、PSP 与 VUP 完全隔离；`all/everything/vr/psp/vup` 筛选、详情主播名查询及头像后台任务不再各自回源。同一源数据键的并发请求只执行一次上游请求。
 
-数据源由 `SourceConfig` 统一描述：VR 使用 `https://vr.qianqiuzy.cn`、PSP 使用 `https://psp.qianqiuzy.cn`、VUP 使用 `https://vup.qianqiuzy.cn`。`filter=all` 仅聚合 VR 与 PSP，VUP 必须通过 `filter=vup` 独立访问；详情使用 `union=VUP`。
+数据源由 `SourceConfig` 统一描述：VR 使用 `https://vr.qianqiuzy.cn`、PSP 使用 `https://psp.qianqiuzy.cn`、VUP 使用 `https://vup.qianqiuzy.cn`。`filter=all` 仅聚合 VR 与 PSP，`filter=everything` 聚合三源（VR+PSP+VUP）；VUP 亦可通过 `filter=vup` 独立访问；详情使用 `union=VUP`。
 
 | 数据 | 非空数据有效期 | 成功空结果有效期 | 持久化 |
 | --- | --- | --- | --- |

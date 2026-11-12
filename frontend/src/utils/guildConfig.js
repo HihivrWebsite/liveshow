@@ -15,6 +15,13 @@ export const UNION_LABELS = Object.freeze({
 })
 
 export const GUILD_FILTERS = Object.freeze({
+  everything: Object.freeze({
+    filter: 'everything',
+    label: '全部',
+    title: '咿喔io粉丝站维阿PSP斗虫榜',
+    unions: Object.freeze(['VirtuaReal', 'PSPlive', 'VUP']),
+    uid: null
+  }),
   all: Object.freeze({
     filter: 'all',
     label: '维阿PSP斗虫榜',
@@ -46,13 +53,14 @@ export const GUILD_FILTERS = Object.freeze({
 })
 
 export const GUILD_FILTER_OPTIONS = Object.freeze([
+  GUILD_FILTERS.everything,
   GUILD_FILTERS.all,
   GUILD_FILTERS.vr,
   GUILD_FILTERS.psp,
   GUILD_FILTERS.vup
 ])
 
-// “全部”仅由 VR 与 PSP 组成，VUP 只能通过独立筛选进入。
+// 对比图仅限维阿PSP（all，VR+PSP）；“全部”(everything) 为三源全集，不参与对比图。
 export const GUILD_COMPARISON_CONFIG = Object.freeze([
   Object.freeze({
     key: 'vr',
