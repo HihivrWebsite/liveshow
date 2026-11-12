@@ -1,6 +1,6 @@
 <template>
   <div id="app" class="app">
-    <CursorProvider />
+    <JellyCursor />
     <HeaderSection />
     <main class="main-content">
       <router-view v-slot="{ Component }">
@@ -60,14 +60,14 @@
 import { defineAsyncComponent } from 'vue'
 import HeaderSection from './components/HeaderSection.vue'
 import FooterSection from './components/FooterSection.vue'
-import CursorProvider from './components/ui/cursor/CursorProvider.vue'
+import JellyCursor from './components/ui/cursor/JellyCursor.vue'
 
 export default {
   name: 'App',
   components: {
     HeaderSection,
     FooterSection,
-    CursorProvider
+    JellyCursor
   },
   data() {
     return {
