@@ -586,6 +586,7 @@ pub struct ByMonthResponse {
     pub source: String,
     pub union: String,
     pub month: String,
+    pub year: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -608,6 +609,7 @@ struct FilterQuery {
 #[derive(Debug, Deserialize)]
 struct MonthQuery {
     month: Option<String>,
+    year: Option<String>,
     filter: Option<String>,
     union: Option<String>,
 }
@@ -783,7 +785,7 @@ async fn get_anchors(
     let filter = query
         .filter
         .unwrap_or_else(|| selection.source_name().to_string());
-    let anchors = fetch_anchor_data_by_selection(selection, None).await?;
+    let anchors = fetch_anchor_data_by_selection(selection, None, None).await?;
 
     Ok(Json(ApiResponse {
         anchors,
@@ -800,9 +802,13 @@ async fn get_anchors_by_month(
 ) -> Result<Json<ByMonthResponse>, StatusCode> {
     REQUEST_COUNT.fetch_add(1, Ordering::SeqCst);
 
-    let month = query
-        .month
-        .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
+    if query.year.is_some() && query.month.is_some() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let year = match query.year.as_deref() {
+        Some(year) => Some(upstream_cache::normalize_year(year).ok_or(StatusCode::BAD_REQUEST)?),
+        None => None,
+    };
     let selection = SourceSelection::resolve(
         query.filter.as_deref(),
         query.union.as_deref(),
@@ -813,7 +819,21 @@ async fn get_anchors_by_month(
     let filter = query
         .filter
         .unwrap_or_else(|| selection.source_name().to_string());
-    let anchors = fetch_anchor_data_by_selection(selection, Some(&month)).await?;
+
+    let (anchors, month, year) = match year {
+        Some(year) => {
+            let anchors = fetch_anchor_data_by_selection(selection, None, Some(year)).await?;
+            let year = format!("{year:04}");
+            (anchors, year.clone(), Some(year))
+        }
+        None => {
+            let month = query
+                .month
+                .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
+            let anchors = fetch_anchor_data_by_selection(selection, Some(&month), None).await?;
+            (anchors, month, None)
+        }
+    };
 
     Ok(Json(ByMonthResponse {
         anchors,
@@ -822,6 +842,7 @@ async fn get_anchors_by_month(
         source: selection.source_name().to_string(),
         union: selection.union_name().to_string(),
         month,
+        year,
     }))
 }
 
@@ -1030,6 +1051,7 @@ fn upstream_status(error: &upstream_cache::Error) -> StatusCode {
 async fn fetch_anchor_data_by_selection(
     selection: SourceSelection,
     month: Option<&str>,
+    year: Option<u16>,
 ) -> Result<Vec<Anchor>, StatusCode> {
     if let Some(month) = month {
         upstream_cache::normalize_month(month).ok_or(StatusCode::BAD_REQUEST)?;
@@ -1037,22 +1059,32 @@ async fn fetch_anchor_data_by_selection(
     let mut all_data = Vec::new();
     for source in selection.sources() {
         let config = source.config();
-        if let Some(month) = month {
-            if month < config.min_month {
-                continue;
-            }
-        }
-        let endpoint = if month.is_some() {
-            Endpoint::Month
+        let mut data = if let Some(year) = year {
+            let key = Key::new_year(source, Endpoint::Month, None, year)
+                .map_err(|error| upstream_status(&error))?;
+            let raw_data = UPSTREAM_CACHE
+                .get(&HTTP_CLIENT, key, "anchor_list")
+                .await
+                .map_err(|error| upstream_status(&error))?;
+            parse_anchor_data(raw_data)
         } else {
-            Endpoint::Gift
+            if let Some(month) = month {
+                if month < config.min_month {
+                    continue;
+                }
+            }
+            let endpoint = if month.is_some() {
+                Endpoint::Month
+            } else {
+                Endpoint::Gift
+            };
+            let request_month = month
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
+            fetch_anchor_data_by_source(source, endpoint, &request_month, "anchor_list")
+                .await
+                .map_err(|error| upstream_status(&error))?
         };
-        let request_month = month
-            .map(ToOwned::to_owned)
-            .unwrap_or_else(|| chrono::Local::now().format("%Y%m").to_string());
-        let mut data = fetch_anchor_data_by_source(source, endpoint, &request_month, "anchor_list")
-            .await
-            .map_err(|error| upstream_status(&error))?;
         for item in &mut data {
             item.union = config.union_name.to_string();
         }
@@ -2227,5 +2259,113 @@ mod cache_api_tests {
             env!("CARGO_PKG_VERSION")
         );
         assert!(stats["upstream_cache"]["totals"]["upstream_requests"].is_u64());
+    }
+
+    #[tokio::test]
+    async fn by_month_year_param_rejects_conflicts_and_invalid_values_without_upstream() {
+        let data: SharedData = Arc::new(RwLock::new(HashMap::new()));
+        let future = chrono::Local::now()
+            .format("%Y")
+            .to_string()
+            .parse::<u16>()
+            .unwrap()
+            + 1;
+        let cases = vec![
+            MonthQuery {
+                month: Some("202601".into()),
+                year: Some("2026".into()),
+                filter: None,
+                union: None,
+            },
+            MonthQuery {
+                month: None,
+                year: Some("abc".into()),
+                filter: None,
+                union: None,
+            },
+            MonthQuery {
+                month: None,
+                year: Some("26".into()),
+                filter: None,
+                union: None,
+            },
+            MonthQuery {
+                month: None,
+                year: Some("20261".into()),
+                filter: None,
+                union: None,
+            },
+            MonthQuery {
+                month: None,
+                year: Some(format!("{future:04}")),
+                filter: None,
+                union: None,
+            },
+        ];
+        let before = UPSTREAM_CACHE.stats();
+        for query in cases {
+            let result = get_anchors_by_month(Query(query), State(data.clone())).await;
+            assert!(matches!(result, Err(StatusCode::BAD_REQUEST)));
+        }
+        let after = UPSTREAM_CACHE.stats();
+        assert_eq!(
+            before.totals.upstream_requests, after.totals.upstream_requests,
+            "invalid year params must be rejected before any upstream request"
+        );
+    }
+
+    #[test]
+    fn year_snapshot_rows_normalize_missing_frontend_fields_to_null() {
+        let raw = serde_json::json!([{
+            "room_id": 80397u64,
+            "anchor_name": "测试主播",
+            "attention": 1000,
+            "status": 1,
+            "gift": 1.5,
+            "guard": 2.5,
+            "super_chat": 3.5,
+            "payer_count": null,
+            "steel_coin_count": null,
+            "blind_box_count": 0,
+            "blind_box_profit": 0.0,
+            "live_duration": "10:00:00",
+            "effective_days": 5,
+            "live_time": "0000-00-00 00:00:00",
+            "title": "",
+            "year": "2026",
+            "guard_1": null,
+            "guard_2": null,
+            "guard_3": null,
+            "fans_count": null,
+            "danmaku": {
+                "total": null,
+                "captain": null,
+                "admiral": null,
+                "governor": null,
+                "normal": null
+            },
+            "whale_dependency": null
+        }]);
+        let anchors = parse_anchor_data(raw);
+        assert_eq!(anchors.len(), 1);
+        let value = serde_json::to_value(&anchors[0]).unwrap();
+        let object = value.as_object().unwrap();
+        for field in [
+            "current_concurrency",
+            "top1",
+            "top5",
+            "top10",
+            "top1_percent",
+            "danmaku_total",
+            "danmaku_captain",
+            "danmaku_admiral",
+            "danmaku_governor",
+            "danmaku_normal",
+        ] {
+            assert!(object.contains_key(field), "{field} must be present");
+            assert!(object[field].is_null(), "{field} must be null");
+        }
+        assert!(object.get("total_revenue").is_some_and(|v| v.is_f64()));
+        assert!(object.get("month").is_some_and(|v| v.is_string()));
     }
 }

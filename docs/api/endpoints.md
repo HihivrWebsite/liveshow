@@ -127,8 +127,11 @@ GET /gift/by_month
 
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
-| month | string | 是 | 月份，格式 YYYYMM（如 202601） |
+| month | string | 否 | 月份，格式 YYYYMM（如 202601）；与 `year` 互斥；两者都不传时默认当前月 |
+| year | string | 否 | 年份，格式 YYYY（如 2026），年度累计快照；与 `month` 互斥，必须为 4 位数字且 ≤ 当前年，否则 400 |
 | filter | string | 否 | 过滤条件：`all`(默认，仅 VR+PSP)、`everything`(VR+PSP+VUP)、`vr`、`psp`、`vup` |
+
+参数校验（镜像上游）：`month` 与 `year` 同传 → 400；`year` 非法（非 4 位数字或晚于当前年）→ 400；非法 `month` → 400。`year` 路径跳过 `month` 规范化与 `min_month` 逐月过滤，直接请求上游 `{base}/gift/by_month?year={YYYY}`。
 
 ### 响应
 
@@ -139,9 +142,17 @@ GET /gift/by_month
   "filter": "all",
   "source": "all",
   "union": "all",
-  "month": "202601"
+  "month": "202601",
+  "year": null
 }
 ```
+
+`year` 字段回显请求年份（按月请求时为 `null`）；按年请求时 `month` 置为同年份字符串（如 `"2026"`）。按年响应与按月的条目差异（上游实探确认）：
+
+- `payer_count` / `steel_coin_count` / `whale_dependency` 恒为 `null` → 顶层 `top1/top5/top10/top1_percent` 随之为 `null`（前端按 `!= null` 判空展示）；
+- 上游不返回 `current_concurrency` → 后端统一规范化为 `current_concurrency: null`，前端据此显示「未开播」；
+- 条目 `month` 字段被 `year`（字符串，如 `"2026"`）替代；`danmaku` 对象存在，实探历史年各值为 `null`、当年部分非空；
+- `total_revenue` 由后端按 gift+guard+super_chat 计算回填，合并排序语义与按月一致。
 
 ---
 

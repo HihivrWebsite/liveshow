@@ -249,12 +249,45 @@ pub fn normalize_attention_month(month: &str) -> Option<String> {
     normalize_month(month)
 }
 
+pub fn normalize_year(year: &str) -> Option<u16> {
+    if year.len() != 4 || !year.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let year: u16 = year.parse().ok()?;
+    // 镜像上游规则：四位年份且不能晚于当前年
+    (year <= current_year()).then_some(year)
+}
+
+fn current_year() -> u16 {
+    Local::now()
+        .format("%Y")
+        .to_string()
+        .parse()
+        .unwrap_or(u16::MAX)
+}
+
 #[derive(Clone, Debug)]
 pub struct Key {
     pub source: Source,
     pub endpoint: Endpoint,
     room: Option<String>,
-    month: String,
+    // 与 year 互斥：构造器保证两者恰有一个 Some
+    month: Option<String>,
+    year: Option<u16>,
+}
+
+fn normalize_room(room: Option<&str>) -> Result<Option<String>, Error> {
+    let Some(room) = room else {
+        return Ok(None);
+    };
+    if !room.bytes().all(|b| b.is_ascii_digit()) {
+        return Err("invalid room_id".into());
+    }
+    let id = room.parse::<u64>()?;
+    if id == 0 {
+        return Err("room_id must be positive".into());
+    }
+    Ok(Some(id.to_string()))
 }
 
 impl Key {
@@ -272,19 +305,7 @@ impl Key {
         if month.as_str() < config.min_month {
             return Err("month predates source minimum".into());
         }
-        let room = match room {
-            Some(room) => {
-                if !room.bytes().all(|b| b.is_ascii_digit()) {
-                    return Err("invalid room_id".into());
-                }
-                let id = room.parse::<u64>()?;
-                if id == 0 {
-                    return Err("room_id must be positive".into());
-                }
-                Some(id.to_string())
-            }
-            None => None,
-        };
+        let room = normalize_room(room)?;
         if matches!(
             endpoint,
             Endpoint::Sessions | Endpoint::Attention | Endpoint::Sc
@@ -296,16 +317,46 @@ impl Key {
             source,
             endpoint,
             room,
-            month,
+            month: Some(month),
+            year: None,
+        })
+    }
+    pub fn new_year(
+        source: Source,
+        endpoint: Endpoint,
+        room: Option<&str>,
+        year: u16,
+    ) -> Result<Self, Error> {
+        if endpoint != Endpoint::Month {
+            return Err("year is only supported by the by_month endpoint".into());
+        }
+        if !source.config().enabled {
+            return Err("source is disabled".into());
+        }
+        if year > current_year() {
+            return Err("year must not be later than the current year".into());
+        }
+        // 年度快照不做 min_month 过滤：历史年可能早于某源的起始月
+        Ok(Self {
+            source,
+            endpoint,
+            room: normalize_room(room)?,
+            month: None,
+            year: Some(year),
         })
     }
     fn id(&self) -> String {
+        let period = match (&self.year, &self.month) {
+            (Some(year), _) => format!("y{year:04}"),
+            (None, Some(month)) => month.clone(),
+            (None, None) => String::new(), // 构造器保证不可达
+        };
         format!(
             "{}_{}_{}_{}",
             self.source.name(),
             self.endpoint.slug(),
             self.room.as_deref().unwrap_or("all"),
-            self.month
+            period
         )
     }
     fn metric(&self) -> String {
@@ -318,16 +369,32 @@ impl Key {
         }
         if self.endpoint == Endpoint::Sc {
             url.push_str(&format!("?room_id={}", self.room.as_deref().unwrap()));
+            return url;
+        }
+        if let Some(year) = self.year {
+            url.push_str(&format!("?year={year:04}"));
         } else {
-            url.push_str(&format!("?month={}", self.month));
-            if let Some(room) = &self.room {
-                url.push_str(&format!("&room_id={room}"));
-            }
+            url.push_str(&format!(
+                "?month={}",
+                self.month.as_deref().unwrap_or_default()
+            ));
+        }
+        if let Some(room) = &self.room {
+            url.push_str(&format!("&room_id={room}"));
         }
         url
     }
     fn historical(&self) -> bool {
-        self.month < Local::now().format("%Y%m").to_string()
+        if let Some(year) = self.year {
+            return year < current_year();
+        }
+        match self.month.as_deref() {
+            Some(month) => {
+                let now = Local::now().format("%Y%m").to_string();
+                month < now.as_str()
+            }
+            None => false, // 构造器保证不可达
+        }
     }
     fn persistent(&self) -> bool {
         matches!(self.endpoint, Endpoint::Sessions | Endpoint::Attention)
@@ -670,7 +737,8 @@ impl UpstreamCache {
             endpoint = key.endpoint.path(),
             caller,
             room_id = key.room.as_deref().unwrap_or("all"),
-            month = key.month,
+            month = key.month.as_deref().unwrap_or_default(),
+            year = ?key.year,
             "upstream request"
         );
         let result = match fetch().await {
@@ -1001,7 +1069,10 @@ mod tests {
             SourceSelection::from_filter("everything"),
             Some(SourceSelection::Everything)
         );
-        assert_eq!(SourceSelection::from_filter("all"), Some(SourceSelection::All));
+        assert_eq!(
+            SourceSelection::from_filter("all"),
+            Some(SourceSelection::All)
+        );
         assert_eq!(SourceSelection::from_filter("bogus"), None);
         assert_eq!(
             SourceSelection::All.sources(),
@@ -1269,5 +1340,80 @@ mod tests {
         .await
         .is_err());
         task.abort();
+    }
+
+    #[test]
+    fn year_and_month_keys_have_distinct_ids_and_urls() {
+        let month = Key::new(Source::Vr, Endpoint::Month, None, "202601").unwrap();
+        let year = Key::new_year(Source::Vr, Endpoint::Month, None, 2026).unwrap();
+        assert_eq!(month.id(), "vr_month_all_202601");
+        assert_eq!(year.id(), "vr_month_all_y2026");
+        assert_ne!(month.id(), year.id());
+        assert_eq!(
+            month.url(),
+            "https://vr.qianqiuzy.cn/gift/by_month?month=202601"
+        );
+        assert_eq!(
+            year.url(),
+            "https://vr.qianqiuzy.cn/gift/by_month?year=2026"
+        );
+        assert!(!month.url().contains("?year="));
+        assert!(!year.url().contains("?month="));
+        assert_eq!(month.metric(), year.metric());
+        assert_eq!(month.metric(), "vr:/gift/by_month");
+        let room_year = Key::new_year(Source::Psp, Endpoint::Month, Some("80397"), 2025).unwrap();
+        assert_eq!(room_year.id(), "psp_month_80397_y2025");
+        assert_eq!(
+            room_year.url(),
+            "https://psp.qianqiuzy.cn/gift/by_month?year=2025&room_id=80397"
+        );
+        assert!(Key::new_year(Source::Vr, Endpoint::Gift, None, 2026).is_err());
+        assert!(Key::new_year(Source::Vr, Endpoint::Sessions, Some("1"), 2026).is_err());
+    }
+
+    #[test]
+    fn normalize_year_rejects_invalid_and_future_values() {
+        let current = Local::now()
+            .format("%Y")
+            .to_string()
+            .parse::<u16>()
+            .unwrap();
+        assert_eq!(normalize_year(&format!("{current:04}")), Some(current));
+        assert_eq!(normalize_year("2025"), Some(2025));
+        assert!(normalize_year("abc").is_none());
+        assert!(normalize_year("26").is_none());
+        assert!(normalize_year("20261").is_none());
+        assert!(normalize_year("２０２６").is_none());
+        assert!(normalize_year(&format!("{:04}", current + 1)).is_none());
+        assert!(
+            Key::new_year(Source::Vr, Endpoint::Month, None, current + 1).is_err(),
+            "future year must be rejected at the Key boundary too"
+        );
+    }
+
+    #[test]
+    fn year_keys_reuse_month_ttl_and_persistence_tiers() {
+        let now = SystemTime::now();
+        let current = Local::now()
+            .format("%Y")
+            .to_string()
+            .parse::<u16>()
+            .unwrap();
+        let this_year = Key::new_year(Source::Vr, Endpoint::Month, None, current).unwrap();
+        let past = Key::new_year(Source::Vr, Endpoint::Month, None, current - 1).unwrap();
+        assert!(!this_year.historical());
+        assert!(!this_year.persistent());
+        assert!(past.historical());
+        assert!(past.persistent());
+        // 当年（同当月）：非空 300s、空 60s；历史年（同历史月）：非空 24h、空 1h
+        assert!(this_year.fresh(&entry(json!([{"room_id": 1}]), 299), now));
+        assert!(!this_year.fresh(&entry(json!([{"room_id": 1}]), 301), now));
+        assert!(this_year.fresh(&entry(json!([]), 59), now));
+        assert!(!this_year.fresh(&entry(json!([]), 61), now));
+        assert!(past.fresh(&entry(json!([{"room_id": 1}]), 3600 * 23), now));
+        assert!(!past.fresh(&entry(json!([{"room_id": 1}]), 3600 * 25), now));
+        assert!(past.fresh(&entry(json!([]), 3600 - 1), now));
+        assert!(!past.fresh(&entry(json!([]), 3600 + 1), now));
+        assert_eq!(this_year.metric(), "vr:/gift/by_month");
     }
 }

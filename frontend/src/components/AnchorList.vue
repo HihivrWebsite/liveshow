@@ -494,7 +494,6 @@ import AnchorBattle from '@/components/AnchorBattle.vue'
 import RankComparison from '@/components/RankComparison.vue'
 import FanOverlap from './FanOverlap.vue'
 import MonthSelector from '@/components/MonthSelector.vue'
-import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
 import { getAvatar, getAvatarByUid, scaleAvatar, getAvatarSync } from '@/utils/avatarCache'
 import {
@@ -672,49 +671,46 @@ export default {
       try {
         const logo1 = await imageToBase64('/logo1.png')
 
-        const months = getMonthRange(exportStartMonth.value, exportEndMonth.value)
+        const chunks = await anchorAPI.getAnchorsByMonthChunks({
+          startMonth: exportStartMonth.value,
+          endMonth: exportEndMonth.value,
+          filter: currentFilter.value
+        })
         let combinedAnchors = {}
 
-        for (const month of months) {
-          try {
-            const response = await anchorAPI.getAnchorsByMonth(month, currentFilter.value)
-            const anchorsForMonth = response.anchors || response.data || []
-            anchorsForMonth.forEach(anchor => {
-              const key = anchor.room_id || anchor.anchor_name
-              if (!combinedAnchors[key]) {
-                combinedAnchors[key] = { ...anchor }
-                combinedAnchors[key].attention = parseFloat(anchor.attention) || 0
-                combinedAnchors[key].effective_days = parseInt(anchor.effective_days) || 0
-                combinedAnchors[key].guard_1 = parseInt(anchor.guard_1) || 0
-                combinedAnchors[key].guard_2 = parseInt(anchor.guard_2) || 0
-                combinedAnchors[key].guard_3 = parseInt(anchor.guard_3) || 0
-                combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0
-                combinedAnchors[key].gift = parseFloat(anchor.gift) || 0
-                combinedAnchors[key].guard = parseFloat(anchor.guard) || 0
-                combinedAnchors[key].super_chat = parseFloat(anchor.super_chat) || 0
-              } else {
-                combinedAnchors[key].attention = parseFloat(anchor.attention) || 0
-                combinedAnchors[key].effective_days += parseInt(anchor.effective_days) || 0
-                combinedAnchors[key].guard_1 += parseInt(anchor.guard_1) || 0
-                combinedAnchors[key].guard_2 += parseInt(anchor.guard_2) || 0
-                combinedAnchors[key].guard_3 += parseInt(anchor.guard_3) || 0
-                combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0
-                combinedAnchors[key].gift += parseFloat(anchor.gift) || 0
-                combinedAnchors[key].guard += parseFloat(anchor.guard) || 0
-                combinedAnchors[key].super_chat += parseFloat(anchor.super_chat) || 0
-                // 金主依赖度是比率，保留最新月份的数据
-                if (anchor.top1 != null) {
-                  combinedAnchors[key].top1 = anchor.top1
-                  combinedAnchors[key].top5 = anchor.top5
-                  combinedAnchors[key].top10 = anchor.top10
-                  combinedAnchors[key].top1_percent = anchor.top1_percent
-                }
+        for (const anchorsForMonth of chunks) {
+          anchorsForMonth.forEach(anchor => {
+            const key = anchor.room_id || anchor.anchor_name
+            if (!combinedAnchors[key]) {
+              combinedAnchors[key] = { ...anchor }
+              combinedAnchors[key].attention = parseFloat(anchor.attention) || 0
+              combinedAnchors[key].effective_days = parseInt(anchor.effective_days) || 0
+              combinedAnchors[key].guard_1 = parseInt(anchor.guard_1) || 0
+              combinedAnchors[key].guard_2 = parseInt(anchor.guard_2) || 0
+              combinedAnchors[key].guard_3 = parseInt(anchor.guard_3) || 0
+              combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0
+              combinedAnchors[key].gift = parseFloat(anchor.gift) || 0
+              combinedAnchors[key].guard = parseFloat(anchor.guard) || 0
+              combinedAnchors[key].super_chat = parseFloat(anchor.super_chat) || 0
+            } else {
+              combinedAnchors[key].attention = parseFloat(anchor.attention) || 0
+              combinedAnchors[key].effective_days += parseInt(anchor.effective_days) || 0
+              combinedAnchors[key].guard_1 += parseInt(anchor.guard_1) || 0
+              combinedAnchors[key].guard_2 += parseInt(anchor.guard_2) || 0
+              combinedAnchors[key].guard_3 += parseInt(anchor.guard_3) || 0
+              combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0
+              combinedAnchors[key].gift += parseFloat(anchor.gift) || 0
+              combinedAnchors[key].guard += parseFloat(anchor.guard) || 0
+              combinedAnchors[key].super_chat += parseFloat(anchor.super_chat) || 0
+              // 金主依赖度是比率，保留最新月份的数据
+              if (anchor.top1 != null) {
+                combinedAnchors[key].top1 = anchor.top1
+                combinedAnchors[key].top5 = anchor.top5
+                combinedAnchors[key].top10 = anchor.top10
+                combinedAnchors[key].top1_percent = anchor.top1_percent
               }
-            })
-          } catch (err) {
-            console.error(`获取${month}月份数据失败:`, err)
-            throw err
-          }
+            }
+          })
         }
 
         const selectedRoomIds = new Set(selectedAnchorsForExport.value.map(a => a.room_id))
@@ -2713,49 +2709,45 @@ export default {
         loading.value = true
         error.value = null
 
-        const months = getMonthRange(sMonth, eMonth)
+        const chunks = await anchorAPI.getAnchorsByMonthChunks({
+          startMonth: sMonth,
+          endMonth: eMonth,
+          filter: currentFilter.value
+        })
 
         // 获取所有月份的数据并合并
         let combinedAnchors = {}
-        for (const month of months) {
-          try {
-            const response = await anchorAPI.getAnchorsByMonth(month, currentFilter.value)
-            const anchorsForMonth = response.anchors || response.data || []
-
-            anchorsForMonth.forEach(anchor => {
-              const key = anchor.room_id || anchor.anchor_name
-              if (!combinedAnchors[key]) {
-                // 初始化新主播的数据
-                combinedAnchors[key] = { ...anchor }
-                // 将数值字段初始化为数字
-                combinedAnchors[key].attention = parseFloat(anchor.attention) || 0
-                combinedAnchors[key].effective_days = parseInt(anchor.effective_days) || 0
-                combinedAnchors[key].guard_1 = parseInt(anchor.guard_1) || 0
-                combinedAnchors[key].guard_2 = parseInt(anchor.guard_2) || 0
-                combinedAnchors[key].guard_3 = parseInt(anchor.guard_3) || 0
-                combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0
-                combinedAnchors[key].gift = parseFloat(anchor.gift) || 0
-                combinedAnchors[key].guard = parseFloat(anchor.guard) || 0
-                combinedAnchors[key].super_chat = parseFloat(anchor.super_chat) || 0
-                combinedAnchors[key].total_revenue = parseFloat(anchor.total_revenue) || 0
-              } else {
-                // 累加数据（但关注数和粉丝团数使用最后一个月的数据，不累加）
-                combinedAnchors[key].attention = parseFloat(anchor.attention) || 0  // 使用最后一个月的数据
-                combinedAnchors[key].effective_days += parseInt(anchor.effective_days) || 0
-                combinedAnchors[key].guard_1 += parseInt(anchor.guard_1) || 0
-                combinedAnchors[key].guard_2 += parseInt(anchor.guard_2) || 0
-                combinedAnchors[key].guard_3 += parseInt(anchor.guard_3) || 0
-                combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0  // 使用最后一个月的数据
-                combinedAnchors[key].gift += parseFloat(anchor.gift) || 0
-                combinedAnchors[key].guard += parseFloat(anchor.guard) || 0
-                combinedAnchors[key].super_chat += parseFloat(anchor.super_chat) || 0
-                combinedAnchors[key].total_revenue += parseFloat(anchor.total_revenue) || 0
-              }
-            })
-          } catch (err) {
-            console.error(`获取${month}月份数据失败:`, err)
-            throw err
-          }
+        for (const anchorsForMonth of chunks) {
+          anchorsForMonth.forEach(anchor => {
+            const key = anchor.room_id || anchor.anchor_name
+            if (!combinedAnchors[key]) {
+              // 初始化新主播的数据
+              combinedAnchors[key] = { ...anchor }
+              // 将数值字段初始化为数字
+              combinedAnchors[key].attention = parseFloat(anchor.attention) || 0
+              combinedAnchors[key].effective_days = parseInt(anchor.effective_days) || 0
+              combinedAnchors[key].guard_1 = parseInt(anchor.guard_1) || 0
+              combinedAnchors[key].guard_2 = parseInt(anchor.guard_2) || 0
+              combinedAnchors[key].guard_3 = parseInt(anchor.guard_3) || 0
+              combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0
+              combinedAnchors[key].gift = parseFloat(anchor.gift) || 0
+              combinedAnchors[key].guard = parseFloat(anchor.guard) || 0
+              combinedAnchors[key].super_chat = parseFloat(anchor.super_chat) || 0
+              combinedAnchors[key].total_revenue = parseFloat(anchor.total_revenue) || 0
+            } else {
+              // 累加数据（但关注数和粉丝团数使用最后一个月的数据，不累加）
+              combinedAnchors[key].attention = parseFloat(anchor.attention) || 0  // 使用最后一个月的数据
+              combinedAnchors[key].effective_days += parseInt(anchor.effective_days) || 0
+              combinedAnchors[key].guard_1 += parseInt(anchor.guard_1) || 0
+              combinedAnchors[key].guard_2 += parseInt(anchor.guard_2) || 0
+              combinedAnchors[key].guard_3 += parseInt(anchor.guard_3) || 0
+              combinedAnchors[key].fans_count = parseInt(anchor.fans_count) || 0  // 使用最后一个月的数据
+              combinedAnchors[key].gift += parseFloat(anchor.gift) || 0
+              combinedAnchors[key].guard += parseFloat(anchor.guard) || 0
+              combinedAnchors[key].super_chat += parseFloat(anchor.super_chat) || 0
+              combinedAnchors[key].total_revenue += parseFloat(anchor.total_revenue) || 0
+            }
+          })
         }
 
         // 转换为数组并更新显示

@@ -5,6 +5,7 @@ import {
   requireGuildFilterConfig,
   requireUnion
 } from '../utils/guildConfig.js'
+import { getMonthRange, parseYearMonth } from '../utils/monthUtils.js'
 
 // 创建axios实例
 const apiClient = axios.create({
@@ -103,13 +104,54 @@ export const anchorAPI = {
   },
 
   // 获取按月份主播数据
-  getAnchorsByMonth: (month, filter = 'all') => {
+  getAnchorsByMonth: (month, filter = 'all', union = null) => {
     requireGuildFilterConfig(filter)
     const params = new URLSearchParams()
     params.append('month', month)
     params.append('filter', filter)
+    if (union) {
+      requireUnion(union)
+      params.append('union', union)
+    }
 
     return apiClient.get(`/gift/by_month?${params.toString()}`)
+  },
+
+  // 整年区间（同年 1–12 月）折叠为单次 year 请求以省去 12 倍逐月开销；
+  // 其余区间逐月循环。统一返回 Anchor[][] chunks，合并/排序逻辑与调用方无关。
+  getAnchorsByMonthChunks: async ({ startMonth, endMonth, filter = 'all', union = null }) => {
+    requireGuildFilterConfig(filter)
+    const start = parseYearMonth(startMonth)
+    const end = parseYearMonth(endMonth)
+    const startInt = start.year * 100 + start.month
+    const endInt = end.year * 100 + end.month
+    const isFullYear = startInt % 100 === 1 && endInt % 100 === 12 &&
+      Math.floor(startInt / 100) === Math.floor(endInt / 100)
+
+    if (isFullYear) {
+      const params = new URLSearchParams()
+      params.append('year', String(Math.floor(startInt / 100)))
+      params.append('filter', filter)
+      if (union) {
+        requireUnion(union)
+        params.append('union', union)
+      }
+      const response = await apiClient.get(`/gift/by_month?${params.toString()}`)
+      return [response.anchors || response.data || []]
+    }
+
+    const months = getMonthRange(startMonth, endMonth)
+    const chunks = []
+    for (const month of months) {
+      try {
+        const response = await anchorAPI.getAnchorsByMonth(month, filter, union)
+        chunks.push(response.anchors || response.data || [])
+      } catch (err) {
+        console.error(`获取${month}月份数据失败:`, err)
+        throw err
+      }
+    }
+    return chunks
   },
 
   // 获取直播会话详情

@@ -63,6 +63,8 @@
 
 图片自动下载为 PNG 格式，字段自动适配：表格列基于 `getExportFields` 配置，新增字段自动包含在导出中。
 
+导出与「多月区间查询」的月份范围经 `getAnchorsByMonthChunks` 拉取：整年区间（同年 1–12 月）内部折叠为单次 `GET /gift/by_month?year=YYYY` 请求，非整年仍逐月循环；合并排序与展示不变，详见 `month-selector.md`「整年区间内部折叠为 year 查询」。
+
 依赖：`html2canvas`（已安装）
 
 ### Logo 与域名

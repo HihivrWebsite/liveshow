@@ -71,6 +71,16 @@ getMonthRange('2026-03', '2026-05')
 
 常量 `'2025-08'`，项目最早可选月份。
 
+## 整年区间内部折叠为 year 查询
+
+多月区间查询与截图导出统一走 `anchorAPI.getAnchorsByMonthChunks({ startMonth, endMonth, filter, union })`（`frontend/src/api/index.js`）：
+
+- **整年判定**（纯整数数学，与 monthUtils 同约定）：起始月为某年 1 月、结束月为**同年** 12 月（`start%100==1 && end%100==12 && Math.floor(start/100)===Math.floor(end/100)`）时，整段区间折叠为**单次** `GET /gift/by_month?year=YYYY&filter=…[&union=…]`，返回 1 个 chunk；
+- **非整年区间**：保持 `getMonthRange` 逐月循环 `getAnchorsByMonth`，返回 N 个 chunk；
+- 调用方拿到统一的 `chunks` 数组合并，合并 / 排序 / 展示逻辑与逐月路径完全一致，**UI 无感**——不新增任何按钮或控件，单月选择、默认 `/gift` 入口不受影响。
+
+已知退化（按设计接受）：整年结果的「即时同接」恒显示「未开播」，因年度快照无同接概念（后端将 `current_concurrency` 规范化为 `null`）。
+
 ## 修复的 Bug
 
 ### 多月份统计偏移一个月
