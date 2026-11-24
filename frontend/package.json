@@ -1,6 +1,6 @@
 {
   "name": "liveshow-frontend",
-  "version": "4.7.28",
+  "version": "4.7.29",
   "private": true,
   "scripts": {
     "dev": "vite",
