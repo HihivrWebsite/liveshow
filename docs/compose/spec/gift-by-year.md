@@ -46,12 +46,13 @@ source: feat/gift-by-year
 
 - 响应仍为 `ByMonthResponse`（`anchors`、`refresh_time`、`filter/source/union` 等）；新增 `year` 字段回显请求年份（按月请求为 null），`month` 字段置为同一年份字符串（前端从不读取该字段，仅保持结构存在）。
 - 上游 year 响应与按月的差异（已实探，2026-11-17，三源 vr/psp/vup 的 `?year=2025`/`?year=2026` 均 200；字段清单以实探为准）：
-  - 结构仍为按房间裸数组；行字段全集：`room_id`、`anchor_name`、`attention`、`status`、`gift`、`guard`、`super_chat`、`payer_count`、`steel_coin_count`、`blind_box_count`、`blind_box_profit`、`live_duration`、`effective_days`、`live_time`、`title`、`year`、`guard_1/2/3`、`fans_count`、`danmaku{total,captain,admiral,governor,normal}`、`whale_dependency`；无 `month`、无 `top*`、无 `total_revenue`（后端计算回填）；
+  - 结构仍为按房间裸数组；行字段全集：`room_id`、`anchor_name`、`attention`、`status`、`gift`、`guard`、`super_chat`、`payer_count`、`steel_coin_count`、`blind_box_count`、`blind_box_profit`、`live_duration`、`effective_days`、`live_time`、`title`、`year`、`guard_1/2/3`、`fans_count`、`danmaku{total,captain,admiral,governor,normal,emoticon}`、`danmaku_user_count`、`danmaku_dependency`、`whale_dependency`；无 `month`、无 `top*`、无 `total_revenue`（后端计算回填）；
   - `payer_count` / `steel_coin_count` / `whale_dependency` 实探恒为 null → `whale_dependency` 为 null 使 `top1/top5/top10/top1_percent` 解析为 null → 前端未消费，原样透传 null；
+  - `danmaku_user_count` / `danmaku_dependency` 按年也固定为 null（上游约定）→ 后端解析出的 `danmaku_top*`、`danmaku_dependency_status`、`danmaku_user_count` 为 null，前端按 status 判空显示 `—`；`danmaku.emoticon` 随 `danmaku` 各分项规则（历史年 null、当年可能非空）；
   - 实探发现 `current_concurrency` 在 year **与** month 响应中均不返回（`?month=202610` 对照亦缺失）→ 后端既有解析路径统一规范化为 `current_concurrency: null`（Option 序列化恒带该键），使前端 `!== null` 判空走「未开播」分支，不显示 `formatNumber(undefined)`；
   - `year` 替代 `month`（字符串如 `"2026"`）；`danmaku` 对象存在但实探 2025 历史年各值全 null、2026 当年部分非空；不返回 total/时薪；
   - `fans_count` / `guard_1/2/3`：当年（2026）非空，历史年（2025）实探全 null → 后端 `parse_to_i64` 归 0（与按月历史条目既有的 null→0 行为一致，前端 `|| 0` 容错）。
-- 条目级必须保留：`room_id`、`anchor_name`、`gift`、`guard`、`super_chat`、`attention`、`fans_count`、`effective_days`、`total_revenue`、`top*`、`danmaku*`（缺失且前端消费的字段一律按 null 规范化，见上）。
+- 条目级必须保留：`room_id`、`anchor_name`、`gift`、`guard`、`super_chat`、`attention`、`fans_count`、`effective_days`、`total_revenue`、`top*`、`danmaku*`、`danmaku_top*`、`danmaku_dependency_status`、`danmaku_user_count`（缺失且前端消费的字段一律按 null 规范化，见上）。
 - `total_revenue` 必须存在（区间合并排序依赖，`AnchorList.vue` ~2766）。
 - 上游错误体实探：`?month=202601&year=2026` → 400 `{"error":"year 与 month 不能同时传入"}`；`?year=abc` → 400 `{"error":"year 参数无效，须为四位年份且不能晚于当前年"}`（三源一致，本地校验镜像此规则先于上游拒绝）。
 

@@ -2,6 +2,13 @@
 
 ## 版本历史
 
+### v4.7.27 — 2026-11-24
+
+#### 新增
+- 上游新字段接入：`danmaku.emoticon` / 场次 `emoticon_danmaku_count`（表情包弹幕数）、`danmaku_user_count`（去重发言人数）、`danmaku_dependency`（弹幕前排占比 + status）
+- 后端 `Anchor`/`LiveSession` 独立字段 `danmaku_emoticon`/`emoticon_danmaku_count`、`danmaku_top*`、`danmaku_dependency_status`、`danmaku_user_count`（Option + serde default，兼容旧缓存）
+- 前端列表/导出/场次详情/展开视图展示表情包弹幕与「弹幕Top*占比」，与金主 `top*` 并列区分；status 不可用显示 `—`，百分比 1 位小数
+
 ### v4.7.25 — 2026-11-17
 
 #### 变更

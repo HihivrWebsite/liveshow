@@ -59,7 +59,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { anchorAPI, getApiErrorMessage } from '@/api'
 import BaseCard from '@/components/BaseCard.vue'
-import { formatCurrency, formatNumber } from '@/utils/dataProcessor'
+import { formatCurrency, formatNumber, formatDanmakuDependencyPercent } from '@/utils/dataProcessor'
 import { getAvatarSync } from '@/utils/avatarCache'
 import { getGuildBoardTitle, getAnchorDisplayName } from '@/utils/guildConfig'
 
@@ -206,6 +206,12 @@ export default {
             { label: '总督弹幕', value: formatNumber(item.governor_danmaku_count || 0), type: 'number' },
             { label: '普通弹幕', value: formatNumber(item.normal_danmaku_count || 0), type: 'number' }
           ] : []),
+          { label: '表情包弹幕', value: item.emoticon_danmaku_count != null ? formatNumber(item.emoticon_danmaku_count) : '—' },
+          { label: '弹幕发言人数', value: item.danmaku_user_count != null ? formatNumber(item.danmaku_user_count) : '—' },
+          { label: '弹幕Top1占比', value: formatDanmakuDependencyPercent(item.danmaku_top1, item.danmaku_dependency_status) },
+          { label: '弹幕Top5占比', value: formatDanmakuDependencyPercent(item.danmaku_top5, item.danmaku_dependency_status) },
+          { label: '弹幕Top10占比', value: formatDanmakuDependencyPercent(item.danmaku_top10, item.danmaku_dependency_status) },
+          { label: '弹幕Top1%占比', value: formatDanmakuDependencyPercent(item.danmaku_top1_percent, item.danmaku_dependency_status) },
           { label: '礼物收入', value: formatCurrency(item.gift_income || 0), type: 'currency' },
           { label: '舰长收入', value: formatCurrency(item.guard_income || 0), type: 'currency' },
           { label: 'SC收入', value: formatCurrency(item.sc_income || 0), type: 'currency' },
@@ -226,6 +232,12 @@ export default {
           { label: '舰长收入', value: formatCurrency(item.guard || 0), type: 'currency' },
           { label: 'SC收入', value: formatCurrency(item.super_chat || 0), type: 'currency' },
           { label: '总营收', value: formatCurrency(calculateTotalRevenue(item)), type: 'currency' },
+          { label: '表情包弹幕', value: item.danmaku_emoticon != null ? formatNumber(item.danmaku_emoticon) : '—' },
+          { label: '弹幕发言人数', value: item.danmaku_user_count != null ? formatNumber(item.danmaku_user_count) : '—' },
+          { label: '弹幕Top1占比', value: formatDanmakuDependencyPercent(item.danmaku_top1, item.danmaku_dependency_status) },
+          { label: '弹幕Top5占比', value: formatDanmakuDependencyPercent(item.danmaku_top5, item.danmaku_dependency_status) },
+          { label: '弹幕Top10占比', value: formatDanmakuDependencyPercent(item.danmaku_top10, item.danmaku_dependency_status) },
+          { label: '弹幕Top1%占比', value: formatDanmakuDependencyPercent(item.danmaku_top1_percent, item.danmaku_dependency_status) },
           ...(item.top1 != null ? [
             { label: 'Top1金主占比', value: (item.top1 * 100).toFixed(2) + '%', className: 'whale-field' },
           ] : []),

@@ -506,6 +506,22 @@ pub struct Anchor {
     pub danmaku_admiral: Option<i64>,
     pub danmaku_governor: Option<i64>,
     pub danmaku_normal: Option<i64>,
+    // 表情包弹幕数（上游 danmaku.emoticon）；独立于 whale 的 top*
+    #[serde(default)]
+    pub danmaku_emoticon: Option<i64>,
+    // 弹幕前排占比（上游 danmaku_dependency），与金主 whale_dependency 独立
+    #[serde(default)]
+    pub danmaku_top1: Option<f64>,
+    #[serde(default)]
+    pub danmaku_top5: Option<f64>,
+    #[serde(default)]
+    pub danmaku_top10: Option<f64>,
+    #[serde(default)]
+    pub danmaku_top1_percent: Option<f64>,
+    #[serde(default)]
+    pub danmaku_dependency_status: Option<String>,
+    #[serde(default)]
+    pub danmaku_user_count: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -526,6 +542,22 @@ pub struct LiveSession {
     pub admiral_danmaku_count: Option<i64>,
     pub governor_danmaku_count: Option<i64>,
     pub normal_danmaku_count: Option<i64>,
+    // 表情包弹幕数（上游 emoticon_danmaku_count）
+    #[serde(default)]
+    pub emoticon_danmaku_count: Option<i64>,
+    // 弹幕前排占比（上游 danmaku_dependency），与金主独立
+    #[serde(default)]
+    pub danmaku_top1: Option<f64>,
+    #[serde(default)]
+    pub danmaku_top5: Option<f64>,
+    #[serde(default)]
+    pub danmaku_top10: Option<f64>,
+    #[serde(default)]
+    pub danmaku_top1_percent: Option<f64>,
+    #[serde(default)]
+    pub danmaku_dependency_status: Option<String>,
+    #[serde(default)]
+    pub danmaku_user_count: Option<i64>,
     pub gift: f64,
     pub guard: f64,
     pub super_chat: f64,
@@ -1295,6 +1327,31 @@ fn parse_anchor_data(raw_data: serde_json::Value) -> Vec<Anchor> {
             let danmaku_normal = danmaku
                 .and_then(|d| d.get("normal"))
                 .and_then(|v| v.as_i64());
+            let danmaku_emoticon = danmaku
+                .and_then(|d| d.get("emoticon"))
+                .and_then(|v| v.as_i64());
+
+            // 弹幕前排占比（与金主 whale_dependency 独立）
+            let danmaku_dep = item.get("danmaku_dependency");
+            let danmaku_top1 = danmaku_dep
+                .and_then(|d| d.get("top1"))
+                .and_then(|v| v.as_f64());
+            let danmaku_top5 = danmaku_dep
+                .and_then(|d| d.get("top5"))
+                .and_then(|v| v.as_f64());
+            let danmaku_top10 = danmaku_dep
+                .and_then(|d| d.get("top10"))
+                .and_then(|v| v.as_f64());
+            let danmaku_top1_percent = danmaku_dep
+                .and_then(|d| d.get("top1_percent"))
+                .and_then(|v| v.as_f64());
+            let danmaku_dependency_status = danmaku_dep
+                .and_then(|d| d.get("status"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let danmaku_user_count = item
+                .get("danmaku_user_count")
+                .and_then(|v| v.as_i64());
 
             anchors.push(Anchor {
                 anchor_name,
@@ -1325,6 +1382,13 @@ fn parse_anchor_data(raw_data: serde_json::Value) -> Vec<Anchor> {
                 danmaku_admiral,
                 danmaku_governor,
                 danmaku_normal,
+                danmaku_emoticon,
+                danmaku_top1,
+                danmaku_top5,
+                danmaku_top10,
+                danmaku_top1_percent,
+                danmaku_dependency_status,
+                danmaku_user_count,
             });
         }
     }
@@ -1400,6 +1464,19 @@ fn parse_live_session_data(
         let admiral_danmaku_count = item.get("admiral_danmaku_count").and_then(|v| v.as_i64());
         let governor_danmaku_count = item.get("governor_danmaku_count").and_then(|v| v.as_i64());
         let normal_danmaku_count = item.get("normal_danmaku_count").and_then(|v| v.as_i64());
+        let emoticon_danmaku_count = item.get("emoticon_danmaku_count").and_then(|v| v.as_i64());
+        let danmaku_dep = item.get("danmaku_dependency");
+        let danmaku_top1 = danmaku_dep.and_then(|d| d.get("top1")).and_then(|v| v.as_f64());
+        let danmaku_top5 = danmaku_dep.and_then(|d| d.get("top5")).and_then(|v| v.as_f64());
+        let danmaku_top10 = danmaku_dep.and_then(|d| d.get("top10")).and_then(|v| v.as_f64());
+        let danmaku_top1_percent = danmaku_dep
+            .and_then(|d| d.get("top1_percent"))
+            .and_then(|v| v.as_f64());
+        let danmaku_dependency_status = danmaku_dep
+            .and_then(|d| d.get("status"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let danmaku_user_count = item.get("danmaku_user_count").and_then(|v| v.as_i64());
         let gift = safe_parse_to_f64(item.get("gift"));
         let guard = safe_parse_to_f64(item.get("guard"));
         let super_chat = safe_parse_to_f64(item.get("super_chat"));
@@ -1435,6 +1512,13 @@ fn parse_live_session_data(
             admiral_danmaku_count,
             governor_danmaku_count,
             normal_danmaku_count,
+            emoticon_danmaku_count,
+            danmaku_top1,
+            danmaku_top5,
+            danmaku_top10,
+            danmaku_top1_percent,
+            danmaku_dependency_status,
+            danmaku_user_count,
             gift,
             guard,
             super_chat,
@@ -2342,8 +2426,11 @@ mod cache_api_tests {
                 "captain": null,
                 "admiral": null,
                 "governor": null,
-                "normal": null
+                "normal": null,
+                "emoticon": null
             },
+            "danmaku_dependency": null,
+            "danmaku_user_count": null,
             "whale_dependency": null
         }]);
         let anchors = parse_anchor_data(raw);
@@ -2361,6 +2448,13 @@ mod cache_api_tests {
             "danmaku_admiral",
             "danmaku_governor",
             "danmaku_normal",
+            "danmaku_emoticon",
+            "danmaku_top1",
+            "danmaku_top5",
+            "danmaku_top10",
+            "danmaku_top1_percent",
+            "danmaku_dependency_status",
+            "danmaku_user_count",
         ] {
             assert!(object.contains_key(field), "{field} must be present");
             assert!(object[field].is_null(), "{field} must be null");

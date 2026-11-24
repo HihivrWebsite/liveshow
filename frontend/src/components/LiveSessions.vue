@@ -191,6 +191,12 @@
               { label: '总督弹幕', value: formatNumber(session.governor_danmaku_count || 0), type: 'number' },
               { label: '普通弹幕', value: formatNumber(session.normal_danmaku_count || 0), type: 'number' }
             ] : []),
+            { label: '表情包弹幕', value: session.emoticon_danmaku_count != null ? formatNumber(session.emoticon_danmaku_count) : '—' },
+            { label: '弹幕发言人数', value: session.danmaku_user_count != null ? formatNumber(session.danmaku_user_count) : '—' },
+            { label: '弹幕Top1占比', value: formatDanmakuDependencyPercent(session.danmaku_top1, session.danmaku_dependency_status) },
+            { label: '弹幕Top5占比', value: formatDanmakuDependencyPercent(session.danmaku_top5, session.danmaku_dependency_status) },
+            { label: '弹幕Top10占比', value: formatDanmakuDependencyPercent(session.danmaku_top10, session.danmaku_dependency_status) },
+            { label: '弹幕Top1%占比', value: formatDanmakuDependencyPercent(session.danmaku_top1_percent, session.danmaku_dependency_status) },
             {
               label: '礼物收入',
               value: formatCurrency(session.gift) + '<br>(' + calculatePercentage(session.gift, calculateTotalRevenue(session)) + '%)',
@@ -258,6 +264,7 @@ import { getMonthRange } from '@/utils/monthUtils'
 import { provideGlobalCardState } from '@/composables/useGlobalCardState'
 import { getAvatar, getAvatarSync } from '@/utils/avatarCache'
 import { getAnchorDisplayName, isSupportedUnion } from '@/utils/guildConfig'
+import { formatDanmakuDependencyPercent } from '@/utils/dataProcessor'
 
 Chart.register(...registerables)
 
@@ -1042,6 +1049,7 @@ export default {
       calculateTotalRevenue,
       formatCurrency,
       formatNumber,
+      formatDanmakuDependencyPercent,
       formatDurationCell,
       getAnchorDisplayName,
       showSessionChart,

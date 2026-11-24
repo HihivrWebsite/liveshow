@@ -112,6 +112,24 @@ GET /gift
 | title | string | 直播标题 |
 | total_revenue | float | 总营收 |
 | union | string | 工会名称 |
+| danmaku_total | int/null | 月总弹幕数（上游 `danmaku.total`） |
+| danmaku_emoticon | int/null | 表情包弹幕数（上游 `danmaku.emoticon`，整条表情包发送 `dm_type=1`） |
+| danmaku_captain | int/null | 舰长弹幕数 |
+| danmaku_admiral | int/null | 提督弹幕数 |
+| danmaku_governor | int/null | 总督弹幕数 |
+| danmaku_normal | int/null | 普通弹幕数 |
+| danmaku_user_count | int/null | 当月去重发言人数（旧数据/部分覆盖为 null） |
+| danmaku_top1 | float/null | **弹幕**前 1 名占比 0–1（上游 `danmaku_dependency.top1`） |
+| danmaku_top5 | float/null | **弹幕**前 5 名占比 |
+| danmaku_top10 | float/null | **弹幕**前 10 名占比 |
+| danmaku_top1_percent | float/null | **弹幕**前 1% 发言人占比 |
+| danmaku_dependency_status | string/null | `live`/`archived`/`partial`/`unavailable`；UI 按此判空，`unavailable` 或缺失显示 `—` |
+| top1 | float/null | **金主**前 1 名付费占比（上游 `whale_dependency.top1`，与弹幕 `danmaku_top*` 独立） |
+| top5 | float/null | **金主**前 5 名占比 |
+| top10 | float/null | **金主**前 10 名占比 |
+| top1_percent | float/null | **金主**前 1% 用户占比 |
+
+> 历史月 `danmaku_dependency` 常为 `null` 或 `status=unavailable|partial`；前端必须按 `danmaku_dependency_status` 判空（显示 `—`），不能只看数值 `!= null`。金主 `top*` 与弹幕 `danmaku_top*` 字段名独立，禁止复用或覆盖。
 
 ---
 
@@ -150,8 +168,9 @@ GET /gift/by_month
 `year` 字段回显请求年份（按月请求时为 `null`）；按年请求时 `month` 置为同年份字符串（如 `"2026"`）。按年响应与按月的条目差异（上游实探确认）：
 
 - `payer_count` / `steel_coin_count` / `whale_dependency` 恒为 `null` → 顶层 `top1/top5/top10/top1_percent` 随之为 `null`（前端按 `!= null` 判空展示）；
+- `danmaku_user_count` / `danmaku_dependency` 按年也固定为 `null` → 后端解析出的 `danmaku_top*`、`danmaku_dependency_status`、`danmaku_user_count` 为 `null`，前端显示 `—`；
 - 上游不返回 `current_concurrency` → 后端统一规范化为 `current_concurrency: null`，前端据此显示「未开播」；
-- 条目 `month` 字段被 `year`（字符串，如 `"2026"`）替代；`danmaku` 对象存在，实探历史年各值为 `null`、当年部分非空；
+- 条目 `month` 字段被 `year`（字符串，如 `"2026"`）替代；`danmaku` 对象存在，实探历史年各值为 `null`、当年部分非空（含 `emoticon`）；
 - `total_revenue` 由后端按 gift+guard+super_chat 计算回填，合并排序语义与按月一致。
 
 ---
@@ -190,6 +209,13 @@ GET /gift/live_sessions
       "start_fans_count": 500,
       "end_fans_count": 510,
       "danmaku_count": 1234,
+      "emoticon_danmaku_count": 56,
+      "danmaku_user_count": 200,
+      "danmaku_top1": 0.1234,
+      "danmaku_top5": 0.3456,
+      "danmaku_top10": 0.4567,
+      "danmaku_top1_percent": 0.2345,
+      "danmaku_dependency_status": "live",
       "gift": 1234.56,
       "guard": 567.89,
       "super_chat": 234.56,
@@ -228,6 +254,13 @@ GET /gift/live_sessions
 | start_fans_count | int | 开播时粉丝团人数 |
 | end_fans_count | int/null | 下播时粉丝团人数 |
 | danmaku_count | int | 弹幕数 |
+| emoticon_danmaku_count | int/null | 表情包弹幕数（上游 `emoticon_danmaku_count`，口径同月度 `danmaku.emoticon`） |
+| danmaku_user_count | int/null | 整场去重发言人数 |
+| danmaku_top1 | float/null | **弹幕**前 1 名占比 0–1（上游 `danmaku_dependency.top1`） |
+| danmaku_top5 | float/null | **弹幕**前 5 名占比 |
+| danmaku_top10 | float/null | **弹幕**前 10 名占比 |
+| danmaku_top1_percent | float/null | **弹幕**前 1% 发言人占比 |
+| danmaku_dependency_status | string/null | `live`/`archived`/`partial`/`unavailable`；历史场次可能 `unavailable|partial` 或整项 `null`，UI 按此判空显示 `—` |
 | gift | float | 礼物收入 |
 | guard | float | 舰长收入 |
 | super_chat | float | SC收入 |

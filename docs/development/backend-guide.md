@@ -50,6 +50,12 @@ struct Anchor {
     title: String,            // 标题
     total_revenue: f64,       // 总营收
     union: String,            // 工会
+    top1/top5/top10/top1_percent: Option<f64>, // 金主占比（whale_dependency，勿与弹幕占比混用）
+    danmaku_total/captain/admiral/governor/normal: Option<i64>, // 弹幕分级
+    danmaku_emoticon: Option<i64>, // 表情包弹幕数（danmaku.emoticon）
+    danmaku_top1/top5/top10/top1_percent: Option<f64>, // 弹幕前排占比（danmaku_dependency）
+    danmaku_dependency_status: Option<String>, // live/archived/partial/unavailable
+    danmaku_user_count: Option<i64>, // 当月去重发言人数
 }
 ```
 
@@ -65,6 +71,10 @@ struct LiveSession {
     start_fans_count: i32,    // 开始时粉丝团数量
     end_fans_count: i32,      // 结束时粉丝团数量
     danmaku_count: i32,       // 弹幕数
+    emoticon_danmaku_count: Option<i64>, // 表情包弹幕数（上游 emoticon_danmaku_count）
+    danmaku_top1/top5/top10/top1_percent: Option<f64>, // 弹幕前排占比（danmaku_dependency，独立于金主 top*）
+    danmaku_dependency_status: Option<String>, // live/archived/partial/unavailable
+    danmaku_user_count: Option<i64>, // 整场去重发言人数
     gift: f64,                // 礼物收入
     guard: f64,               // 舰长收入
     super_chat: f64,          // SC收入

@@ -461,7 +461,13 @@
               { label: '舰长弹幕', value: formatNumber(anchor.danmaku_captain || 0), type: 'number' },
               { label: '提督弹幕', value: formatNumber(anchor.danmaku_admiral || 0), type: 'number' },
               { label: '总督弹幕', value: formatNumber(anchor.danmaku_governor || 0), type: 'number' }
-            ] : [])
+            ] : []),
+            { label: '表情包弹幕', value: anchor.danmaku_emoticon != null ? formatNumber(anchor.danmaku_emoticon) : '—' },
+            { label: '弹幕发言人数', value: anchor.danmaku_user_count != null ? formatNumber(anchor.danmaku_user_count) : '—' },
+            { label: '弹幕Top1占比', value: formatDanmakuDependencyPercent(anchor.danmaku_top1, anchor.danmaku_dependency_status) },
+            { label: '弹幕Top5占比', value: formatDanmakuDependencyPercent(anchor.danmaku_top5, anchor.danmaku_dependency_status) },
+            { label: '弹幕Top10占比', value: formatDanmakuDependencyPercent(anchor.danmaku_top10, anchor.danmaku_dependency_status) },
+            { label: '弹幕Top1%占比', value: formatDanmakuDependencyPercent(anchor.danmaku_top1_percent, anchor.danmaku_dependency_status) }
           ]"
           :whale-data="anchor.top1 != null ? { top1: anchor.top1, top5: anchor.top5, top10: anchor.top10, top1_percent: anchor.top1_percent } : null"
           :action-button="{ text: '查看详细数据', className: 'view-btn' }"
@@ -503,6 +509,7 @@ import {
   getAnchorDisplayName
 } from '@/utils/guildConfig'
 import { getApiErrorMessage } from '@/api'
+import { formatDanmakuDependencyPercent } from '@/utils/dataProcessor'
 
 Chart.register(...registerables)
 
@@ -634,6 +641,12 @@ export default {
           { label: '提督弹幕', value: formatNumber(anchor.danmaku_admiral || 0) },
           { label: '总督弹幕', value: formatNumber(anchor.danmaku_governor || 0) }
         ] : []),
+        { label: '表情包弹幕', value: anchor.danmaku_emoticon != null ? formatNumber(anchor.danmaku_emoticon) : '—' },
+        { label: '弹幕发言人数', value: anchor.danmaku_user_count != null ? formatNumber(anchor.danmaku_user_count) : '—' },
+        { label: '弹幕Top1占比', value: formatDanmakuDependencyPercent(anchor.danmaku_top1, anchor.danmaku_dependency_status) },
+        { label: '弹幕Top5占比', value: formatDanmakuDependencyPercent(anchor.danmaku_top5, anchor.danmaku_dependency_status) },
+        { label: '弹幕Top10占比', value: formatDanmakuDependencyPercent(anchor.danmaku_top10, anchor.danmaku_dependency_status) },
+        { label: '弹幕Top1%占比', value: formatDanmakuDependencyPercent(anchor.danmaku_top1_percent, anchor.danmaku_dependency_status) },
         ...(anchor.top1 != null ? [
           { label: 'Top1金主', value: (anchor.top1 * 100).toFixed(2) + '%' },
           { label: 'Top5金主', value: (anchor.top5 * 100).toFixed(2) + '%' },
@@ -708,6 +721,20 @@ export default {
                 combinedAnchors[key].top5 = anchor.top5
                 combinedAnchors[key].top10 = anchor.top10
                 combinedAnchors[key].top1_percent = anchor.top1_percent
+              }
+              // 弹幕前排占比/表情包/发言人数同样是比率或快照，保留最新有数据的月份
+              if (anchor.danmaku_dependency_status != null) {
+                combinedAnchors[key].danmaku_top1 = anchor.danmaku_top1
+                combinedAnchors[key].danmaku_top5 = anchor.danmaku_top5
+                combinedAnchors[key].danmaku_top10 = anchor.danmaku_top10
+                combinedAnchors[key].danmaku_top1_percent = anchor.danmaku_top1_percent
+                combinedAnchors[key].danmaku_dependency_status = anchor.danmaku_dependency_status
+              }
+              if (anchor.danmaku_emoticon != null) {
+                combinedAnchors[key].danmaku_emoticon = anchor.danmaku_emoticon
+              }
+              if (anchor.danmaku_user_count != null) {
+                combinedAnchors[key].danmaku_user_count = anchor.danmaku_user_count
               }
             }
           })
@@ -2889,6 +2916,7 @@ export default {
       calculateTotalRevenue,
       formatCurrency,
       formatNumber,
+      formatDanmakuDependencyPercent,
       getWhaleClass,
       formatLiveDuration,
       formatDurationWithBreak,

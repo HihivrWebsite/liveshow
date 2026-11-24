@@ -99,6 +99,33 @@ export const calculateTotalRevenue = (item) => {
 }
 
 /**
+ * 弹幕前排占比（danmaku_dependency）是否可用。
+ * 历史月 status=unavailable 时四项占比均为 null；status 缺失（旧缓存）也视为不可用。
+ * partial 表示仅覆盖已采集部分，值非空时仍展示（值为空则由 format 返回 —）。
+ * 不能只看数值 != null，必须结合 status 判空。
+ * @param {string|null|undefined} status - danmaku_dependency.status
+ * @param {number|null|undefined} value - 0–1 比例
+ * @returns {boolean}
+ */
+export const isDanmakuDependencyReady = (status, value) => {
+  if (status == null || status === 'unavailable') return false
+  return value != null && !isNaN(Number(value))
+}
+
+/**
+ * 格式化弹幕前排占比为百分比（1 位小数，与金主占比展示一致）。
+ * 不可用时返回 —。
+ * 注意：这是弹幕占比，不是金主 whale 占比。
+ * @param {number|null|undefined} value - 0–1 比例
+ * @param {string|null|undefined} status - danmaku_dependency.status
+ * @returns {string}
+ */
+export const formatDanmakuDependencyPercent = (value, status) => {
+  if (!isDanmakuDependencyReady(status, value)) return '—'
+  return (Number(value) * 100).toFixed(1) + '%'
+}
+
+/**
  * 防抖函数
  * @param {Function} func - 要防抖的函数
  * @param {number} delay - 延迟时间（毫秒）
